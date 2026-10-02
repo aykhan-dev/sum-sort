@@ -6,7 +6,10 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const read = f => fs.readFileSync(root + f, 'utf8');
 const src = read('src/page.src.html');
-const logic = read('src/logic.mjs').replace(/^export /gm, '');
+// pure modules, in dependency order: their imports of each other are dropped, their exports become plain declarations
+const MODULES = ['src/logic.mjs', 'src/meta.mjs'];
+const logic = MODULES.filter(f => fs.existsSync(root + f))
+  .map(f => read(f).replace(/^import [^\n]* from '\.\/[\w.-]+';\n/gm, '').replace(/^export /gm, '')).join('\n');
 const levels = read('src/levels.json').trim();
 if (!src.includes('/*__LOGIC__*/') || !src.includes('/*__LEVELS__*/')) throw new Error('placeholders missing in src/page.src.html');
 const page = src.replace('/*__LOGIC__*/', () => logic).replace('/*__LEVELS__*/', () => levels);

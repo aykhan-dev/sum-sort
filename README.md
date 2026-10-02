@@ -21,18 +21,25 @@ On GitHub Pages: repository Settings → Pages → Deploy from a branch → `mai
 | `index.html` | The built game. Generated, do not edit by hand. |
 | `src/page.src.html` | Page source: styles, markup, rendering and game code. |
 | `src/logic.mjs` | Pure game logic: solver, fail-rate model, level generator, chapters. |
+| `src/meta.mjs` | Pure meta-game logic around the levels (combos, daily puzzle, streaks, sharing). |
 | `src/levels.json` | Levels 1–100, generated once and checked by the solver. Later levels are generated on the device. |
-| `scripts/build.mjs` | Inlines logic and levels into the page and writes `index.html`. |
+| `scripts/build.mjs` | Inlines the pure modules and levels into the page and writes `index.html`. |
 | `scripts/generate-levels.mjs` | Regenerates `src/levels.json` and prints the difficulty curve. |
+| `tests/unit/` | Unit tests for the pure modules (node's built-in runner, about a second). |
 | `tests/playtest.mjs` | Plays the built page in headless Chromium with real touches. |
+| `docs/ROADMAP.md` | What gets built next, and why. |
 | `vendor/three/` | three.js r170 (MIT), so the page needs no CDN for code. |
 
 ## Build and test
 
 ```
 npm run build
+npm run test:unit    # pure logic, about a second
+npm run check        # build, fail if index.html was stale, unit tests
 npm i && npx playwright install chromium && npm test
 ```
+
+CI (`.github/workflows/ci.yml`) runs `npm run check` and the headless play-test on every push.
 
 ## Chapters
 

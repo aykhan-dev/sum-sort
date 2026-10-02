@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # index.html is generated: it must match what the sources build to
+      - name: Build is current, unit tests pass
+        run: npm run check
+      - run: npx playwright install --with-deps chromium
+      - name: Headless play-test
+        run: npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playtest-shots
+          path: shots/
+          if-no-files-found: ignore
