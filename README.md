@@ -60,6 +60,10 @@ Boosters arrive one at a time: Undo (level 11), Hint (13), +1 Jar (15), Split (2
 
 From level 19 the home screen offers one extra board a day, the same for everyone on that calendar date. It uses only the rules of the first three chapters. Monday is easy and the week climbs to Sunday (model fail rate 20% to 60%). Finishing dailies on consecutive days builds a streak. A daily never moves the level progress.
 
+## Stars and candy boxes
+
+Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop.
+
 ## Status
 
 Prototype. Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser, not yet on real phones.

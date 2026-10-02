@@ -142,3 +142,33 @@ test('stretch: a chapter, or a run of ten endless levels', () => {
   assert.deepEqual(stretchOf(47, mix), { from: 47, to: 56, done: 0, size: 10 });
   assert.deepEqual(stretchOf(102, mix), { from: 97, to: 106, done: 5, size: 10 });
 });
+
+import { THEMES, themeById, themesOwned, nextBox, boxesOpened, boxProgress } from '../../src/meta.mjs';
+
+test('candy boxes: one theme per box, further apart as stars pile up', () => {
+  assert.equal(THEMES[0].at, 0, 'the first counter is owned from the start');
+  const gaps = THEMES.slice(1).map((t, i) => t.at - THEMES[i].at);
+  gaps.forEach((g, i) => { if (i) assert.ok(g >= gaps[i - 1], 'gaps never shrink'); });
+  assert.equal(new Set(THEMES.map(t => t.id)).size, THEMES.length);
+  assert.ok(THEMES.at(-1).at <= 300, 'every box opens within the 100 stored levels (300 stars)');
+});
+
+test('candy boxes: owned, next, opened by a win, progress', () => {
+  assert.deepEqual(themesOwned(0).map(t => t.id), ['strawberry']);
+  assert.deepEqual(themesOwned(40).map(t => t.id), ['strawberry', 'mint', 'lemon']);
+  assert.deepEqual(nextBox(12), { at: 15, left: 3, theme: themeById('mint') });
+  assert.equal(nextBox(999), null);
+  assert.deepEqual(boxesOpened(13, 16).map(t => t.id), ['mint']);
+  assert.deepEqual(boxesOpened(15, 17), [], 'a box opens once');
+  assert.equal(boxProgress(15), 0); assert.equal(boxProgress(27.5), 0.5); assert.equal(boxProgress(999), 1);
+  assert.equal(themeById('nope').id, 'strawberry');
+});
+
+test('every counter is light enough for the ink to keep its contrast', () => {
+  const lum = hex => { const c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ink = lum('#3B2747'), soft = lum('#6A5676');
+  for (const t of THEMES) for (const hex of [t.stage, ...t.sky]) {
+    assert.ok((lum(hex) + 0.05) / (ink + 0.05) >= 7, `${t.id} ${hex} with ink`);
+    assert.ok((lum(hex) + 0.05) / (soft + 0.05) >= 4.5, `${t.id} ${hex} with soft ink`);
+  }
+});

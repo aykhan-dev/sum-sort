@@ -22,6 +22,7 @@
   --card:#FFFFFF;
   --line:#EED9E4;
   --line-deep:#E2C7D6;
+  --wash:rgba(250,225,216,.66);   /* the home screen's veil over the board; the counter theme sets it with --stage */
   --stage:#F7DAD0;
   --frost:rgba(255,255,255,.80);
   --frost-edge:rgba(255,255,255,.95);
@@ -140,7 +141,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 @keyframes callout-still{0%,100%{opacity:0}15%,70%{opacity:1}}
 
 /* win card */
-.win{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(255,236,228,.45);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.win{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(255,236,228,.45);background:color-mix(in srgb,color-mix(in srgb,var(--stage),#FFFFFF 45%) 45%,transparent);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .win-card{
   position:relative;width:min(100%,300px);margin-top:26px;
   background:var(--card);border:1px solid var(--frost-edge);border-radius:30px;padding:0 22px 22px;text-align:center;
@@ -249,16 +250,58 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .home{
   position:absolute;inset:0;z-index:5;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;justify-items:center;gap:12px;
   padding:max(10px,env(safe-area-inset-top)) 16px max(26px,env(safe-area-inset-bottom));
-  background:rgba(250,225,216,.66);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  background:var(--wash);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
   transition:opacity .26s ease,visibility 0s linear 0s;
 }
 .home.off{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .26s ease,visibility 0s linear .26s}
 .home-top{display:flex;align-items:center;justify-content:space-between;width:min(100%,760px);min-height:52px}
 .tally{
-  display:inline-flex;align-items:center;gap:5px;font:700 16px var(--display);color:var(--ink);font-variant-numeric:tabular-nums;
-  background:var(--frost);border:1px solid var(--frost-edge);border-radius:999px;padding:7px 12px;
+  position:relative;display:inline-flex;align-items:center;gap:6px;font:700 17px var(--display);color:var(--ink);font-variant-numeric:tabular-nums;
+  background:var(--frost);border:1px solid var(--frost-edge);border-radius:999px;padding:6px 6px 6px 13px;min-height:48px;
 }
-.tally svg{width:15px;height:15px;fill:var(--gold);stroke:var(--gold-deep);stroke-width:1.4;paint-order:stroke}
+.tally > svg{width:16px;height:16px;fill:var(--gold);stroke:var(--gold-deep);stroke-width:1.4;paint-order:stroke}
+/* the next candy box, with a ring that fills as the stars come in */
+.tally .box{position:relative;width:34px;height:34px;margin-left:2px;border-radius:50%;display:grid;place-items:center;
+  background:conic-gradient(var(--raspberry) calc(var(--p,0) * 1turn),var(--line) 0)}
+.tally .box::before{content:"";position:absolute;inset:4px;border-radius:50%;background:#FFFFFF}
+.tally .box svg{position:relative;width:17px;height:17px;fill:none;stroke:var(--raspberry-deep);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.tally.fresh::after{
+  content:"New";position:absolute;top:-8px;right:-6px;padding:1px 7px;border-radius:999px;
+  background:var(--gold);color:var(--ink);border:2px solid var(--card);font:800 11px/16px var(--body);
+}
+/* candy shop: every counter the boxes hold, and how far the next box is */
+.shop{position:absolute;inset:0;z-index:8;display:grid;place-items:center;padding:16px;background:rgba(59,39,71,.26);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+.shop-card{
+  width:min(100%,400px);max-height:100%;overflow:auto;background:var(--card);border-radius:28px;padding:16px 16px 18px;
+  box-shadow:0 6px 0 var(--line-deep),0 30px 50px -22px rgba(110,40,90,.6);animation:pop .35s cubic-bezier(.3,1.6,.5,1) both;
+}
+.shop-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.shop-head h2{margin:0 0 0 4px;font:700 30px var(--display);color:var(--raspberry)}
+.shop-sub{margin:2px 4px 10px;font-size:13.5px;font-weight:700;color:var(--ink-soft)}
+.shop-bar{height:12px;margin:0 4px;border-radius:6px;background:var(--ground);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
+.shop-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(180deg,#FFD466,var(--gold) 55%,var(--gold-deep))}
+.themes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.theme{display:grid;gap:3px;justify-items:center;padding:8px 8px 9px;border-radius:20px;font:800 12.5px var(--body);color:var(--ink-soft)}
+.theme .sw{position:relative;width:100%;height:62px;border-radius:14px;overflow:hidden;margin-bottom:3px;
+  background:linear-gradient(180deg,var(--s1),var(--s2) 55%,var(--s3))}
+.theme .sw::after{content:"";position:absolute;left:-12%;right:-12%;bottom:-34%;height:66%;border-radius:50%;background:var(--c);box-shadow:inset 0 3px 0 rgba(255,255,255,.55)}
+.theme .sw i{position:absolute;z-index:1;bottom:16px;width:20px;height:20px;border-radius:6px;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 2px 0 rgba(59,39,71,.22)}
+.theme .sw i:first-child{left:calc(50% - 23px);background:#9063F6}.theme .sw i:last-child{left:calc(50% + 3px);background:#F68741}
+.theme .tn{font:600 15px var(--display);color:var(--ink)}
+.theme[aria-pressed="true"]{border-color:var(--raspberry);box-shadow:0 4px 0 var(--raspberry-deep),var(--lift)}
+.theme[aria-pressed="true"] .ts{color:var(--raspberry-ink)}
+.theme:disabled{cursor:default}.theme:disabled:active{transform:none;box-shadow:0 4px 0 var(--line-deep),var(--lift)}
+.theme:disabled .sw{filter:grayscale(.75) opacity(.5)}
+/* a box opened on the win card */
+.reward{
+  display:flex;align-items:center;gap:8px;width:100%;margin-top:6px;padding:6px 6px 6px 7px;border-radius:18px;text-align:left;
+  background:linear-gradient(90deg,#FFF3D2,#FFFFFF);border:1px solid #F2D48A;animation:pop .45s cubic-bezier(.3,1.6,.5,1) .55s both;
+}
+.reward .sw{flex:none;width:36px;height:36px;border-radius:12px;background:linear-gradient(180deg,var(--s1),var(--s3));box-shadow:inset 0 -12px 0 var(--c),0 2px 0 rgba(59,39,71,.18)}
+.reward .rtxt{display:grid;min-width:0;flex:1}
+.reward small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9A6A0A}
+.reward b{font:600 15px var(--display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.reward .chip{padding:0 12px}
 .home-mid{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;min-height:0;width:100%}
 .wordmark{
   margin:0;display:grid;justify-items:center;rotate:-4deg;
@@ -346,6 +389,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   .home,.home.off,.top,.bottom{transition:none}
   .boost.rescue{animation:none}
   .jbar i.now,.jbar i.fill{animation:none}
+  .shop-card,.reward{animation:none}
   .callout{animation:callout-still 1.15s linear both}
   .raised,.cta{transition:none}
 }
@@ -420,6 +464,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
           <span class="stat"><small>Par</small><b id="winPar">3</b></span>
         </div>
         <p class="note" id="winText">No wasted moves.</p>
+        <div class="reward" id="winReward" hidden>
+          <span class="sw" id="rewardSw"></span>
+          <span class="rtxt"><small>New counter</small><b id="rewardName"></b></span>
+          <button class="chip" id="rewardUse" type="button">Use it</button>
+        </div>
         <div class="journey" id="winJourney" hidden><div class="jbar" id="winBar" aria-hidden="true"></div><p class="jnext" id="winNext"></p></div>
         <div class="win-actions">
           <button id="winHomeBtn" class="ghost raised" type="button" aria-label="Home">
@@ -435,7 +484,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 
   <section class="home" id="home" aria-labelledby="homeTitle">
     <div class="home-top">
-      <span class="tally" id="starTally" aria-label="Stars earned" hidden></span>
+      <button class="tally raised" id="starTally" type="button" hidden></button>
       <span></span>
       <button id="homeSound" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Sound">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/><path class="mute" d="m16 9 5 6M21 9l-5 6"/></svg>
@@ -464,6 +513,20 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
       <span class="dtxt"><span class="eyebrow" id="dailyEyebrow">Daily puzzle</span><span class="dname" id="dailyName">Thursday</span><span class="dsub" id="dailySub"></span></span>
       <span class="dside" id="dailySide"></span>
     </button>
+  </section>
+
+  <section class="shop" id="shop" role="dialog" aria-modal="true" aria-labelledby="shopTitle" hidden>
+    <div class="shop-card">
+      <div class="shop-head">
+        <h2 id="shopTitle">Candy shop</h2>
+        <button id="shopClose" class="icon-btn raised" type="button" aria-label="Close">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <p class="shop-sub" id="shopSub"></p>
+      <div class="shop-bar" aria-hidden="true"><i id="shopFill"></i></div>
+      <div class="themes" id="themes"></div>
+    </div>
   </section>
 </div>
 
@@ -540,6 +603,7 @@ const FLAME = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3
 const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11.3-6.8a1 1 0 0 0 0-1.72L9.5 4.34A1 1 0 0 0 8 5.2z"/></svg>';
 const TICK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
 const SHARE_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg>';
+const GIFT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="9" width="17" height="11.5" rx="2"/><path d="M2.5 9h19M12 9v11.5"/><path d="M12 9c-1.5-3.6-6-4.6-6-1.8C6 9 12 9 12 9zM12 9c1.5-3.6 6-4.6 6-1.8C18 9 12 9 12 9z"/></svg>';
 const NEXT_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
 /* ---------------- dom ---------------- */
@@ -559,12 +623,14 @@ const ui = {
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'),
   homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
-  winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext')
+  winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext'),
+  shop: $('shop'), shopClose: $('shopClose'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
+  reward: $('winReward'), rewardSw: $('rewardSw'), rewardName: $('rewardName'), rewardUse: $('rewardUse')
 };
 
 /* ---------------- saved progress (this browser only) ---------------- */
 const STORE = 'sumsort.proto.v1';
-let save = { stars: {}, last: 1, sound: true, daily: {}, streak: null };
+let save = { stars: {}, last: 1, sound: true, daily: {}, streak: null, theme: 'strawberry', boxSeen: 0 };
 try { const raw = localStorage.getItem(STORE); if (raw) save = Object.assign(save, JSON.parse(raw)); } catch (e) { /* play without saving */ }
 if (!save.daily || typeof save.daily !== 'object') save.daily = {};
 function persist() { try { localStorage.setItem(STORE, JSON.stringify(save)); } catch (e) { /* play without saving */ } }
@@ -638,6 +704,7 @@ const sfx = {
   // a sparkle after the seal chord, a step higher for every jar in the chain
   combo: n => { const r = Math.pow(2, Math.min(n - 2, 5) * 2 / 12); [1, 1.26, 1.5, 2].forEach((m, i) => tone(1046.5 * r * m, 0.2, { type: 'triangle', gain: 0.032, delay: 0.16 + i * 0.055 })); },
   perfect: () => [2, 4, 5, 4, 5].forEach((s, i) => tone(NOTES[s] * (i > 2 ? 4 : 2), 0.42, { gain: 0.045, delay: i * 0.085 })),
+  box: () => [0, 4, 2, 5, 4, 5].forEach((s, i) => tone(NOTES[s] * (i > 3 ? 4 : 2), 0.32, { type: i % 2 ? 'sine' : 'triangle', gain: 0.045, delay: 0.9 + i * 0.07 })),
   chapter: () => [0, 2, 4, 5, 4, 5, 5].forEach((s, i) => { tone(NOTES[s] * 2, 0.5, { type: 'triangle', gain: 0.05, delay: i * 0.12 }); tone(NOTES[s], 0.5, { gain: 0.03, delay: i * 0.12 }); })
 };
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* haptics are optional */ } };
@@ -659,13 +726,14 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = (() => {
+/* the room behind the board: a sky gradient, set by the counter theme */
+function skyTexture([top, mid, low]) {
   const c = document.createElement('canvas'); c.width = 4; c.height = 256;
   const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#E9DCFF'); gr.addColorStop(0.55, '#FFE0D2'); gr.addColorStop(1, '#FFD3C2');
+  gr.addColorStop(0, top); gr.addColorStop(0.55, mid); gr.addColorStop(1, low);
   g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
-})();
+}
 const pmrem = new THREE.PMREMGenerator(renderer);
 // a well-blurred room: reflections on the candy become soft gradients instead of hard window shapes
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.14).texture;
@@ -693,6 +761,14 @@ const counter = new THREE.Mesh(
   new RoundedBoxGeometry(120, 1, 120, 4, 0.45),
   new THREE.MeshPhysicalMaterial({ color: 0xF6D8CF, roughness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.45 }));
 counter.position.set(0, -0.5, -4); counter.receiveShadow = true; scene.add(counter);
+/* A counter theme recolours the sky, the counter top and the page around the canvas. */
+function paintTheme(t) {
+  if (scene.background) scene.background.dispose();
+  scene.background = skyTexture(t.sky); counter.material.color.set(t.counter);
+  const root = document.documentElement.style; root.setProperty('--stage', t.stage); root.setProperty('--wash', t.wash);
+  const meta = document.querySelector('meta[name="theme-color"]'); if (meta) meta.content = t.stage;
+}
+paintTheme(themeById(save.theme));
 
 const playGroup = new THREE.Group(); scene.add(playGroup);
 
@@ -1488,6 +1564,7 @@ function armIdle() {
    tile lands < jar seals < level cleared < cleared with three stars < chapter finished. Each rung adds to the one below. */
 async function winLevel() {
   won = true; dead = false; softDead = false; clearTimeout(idleTimer); refreshLocks(false); updateHud();
+  const starsBefore = totalStars();
   const id = buildId, ch = chapterOf(levelNo), tiles = def.par, L = lastLayout;
   const stars = winStars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
   const perfect = stars === 3 && !def.exact && !def.teach;      // tutorial levels cannot be played badly, so they stay on the plain rung
@@ -1501,7 +1578,9 @@ async function winLevel() {
     const before = save.streak ? save.streak.count : 0;
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; }
+  const opened = boxesOpened(starsBefore, totalStars());
   persist();
+  if (opened.length) sfx.box();
   // rung 3: level cleared
   sfx.win(); buzz([20, 40, 30]);
   jars.forEach((j, i) => setTimeout(() => { if (id === buildId) hop(j.view.group, 0.3, 420); }, i * 70 * SPEED));
@@ -1537,6 +1616,11 @@ async function winLevel() {
     : stars === 3 ? 'No wasted moves.'
     : rescued ? 'Solved with a booster. Go without one for 3 stars.'
     : `${plural(moveCount - def.par, 'move')} over par. Match par for 3 stars.`;
+  ui.reward.hidden = !opened.length;
+  if (opened.length) {   // the newest box: its counter, one tap to use it
+    const t = opened.at(-1); ui.reward.dataset.id = t.id; swatchStyle(ui.rewardSw, t); ui.rewardName.textContent = t.name;
+    ui.rewardUse.textContent = 'Use it'; ui.rewardUse.disabled = false;
+  }
   ui.winJourney.hidden = !!daily || levelNo === TEST_LEVEL;
   if (!ui.winJourney.hidden) { drawJourney(ui.winBar, levelNo, { cleared: true }); ui.winNext.innerHTML = chapterDone ? '' : nextText(levelNo); }
   ui.nextLabel.textContent = daily ? 'Share result' : chapterDone && next ? 'Next chapter' : 'Next level';
@@ -1593,19 +1677,53 @@ function nextText(after) {
   return `Up next: <b>${u.what}</b> at level ${u.at}`;
 }
 
+/* ---------------- candy boxes ----------------
+   Stars from levels and dailies pile up and open boxes; each box holds a counter theme for the whole room. */
+const totalStars = () => [...Object.values(save.stars), ...Object.values(save.daily).map(r => r && r.stars)].reduce((a, b) => a + (Number(b) || 0), 0);
+const swatchStyle = (el, t) => { el.style.cssText = `--s1:${t.sky[0]};--s2:${t.sky[1]};--s3:${t.sky[2]};--c:${t.counter}`; };
+function useTheme(id) {
+  const t = themeById(id); if (totalStars() < t.at) return;
+  save.theme = t.id; persist(); paintTheme(t); homeRenderUntil = performance.now() + 900;
+  sfx.select(6); buzz(8);
+}
+function renderTally() {
+  const total = totalStars(), nb = nextBox(total), newest = themesOwned(total).at(-1);
+  ui.tally.hidden = total === 0;
+  ui.tally.innerHTML = STAR + `<span>${total}</span><span class="box" style="--p:${boxProgress(total).toFixed(3)}">${GIFT}</span>`;
+  ui.tally.classList.toggle('fresh', newest.at > (Number(save.boxSeen) || 0));
+  ui.tally.setAttribute('aria-label', `${plural(total, 'star')}. Candy shop` + (nb ? `, next box at ${nb.at} stars` : ', every box open'));
+}
+function renderShop() {
+  const total = totalStars(), nb = nextBox(total), cur = themeById(save.theme).id;
+  ui.shopSub.textContent = nb ? `${plural(total, 'star')} · next box at ${nb.at}, ${nb.left} to go` : `${plural(total, 'star')} · every box is open`;
+  ui.shopFill.style.width = (boxProgress(total) * 100).toFixed(1) + '%';
+  ui.themes.innerHTML = THEMES.map(t => {
+    const own = total >= t.at, on = t.id === cur;
+    return `<button class="theme raised" type="button" data-id="${t.id}"${own ? '' : ' disabled'} aria-pressed="${on}" aria-label="${t.name}: ${on ? 'in use' : own ? 'use this counter' : `opens at ${t.at} stars`}" style="--s1:${t.sky[0]};--s2:${t.sky[1]};--s3:${t.sky[2]};--c:${t.counter}">`
+      + `<span class="sw"><i></i><i></i></span><span class="tn">${t.name}</span><span class="ts">${on ? 'In use' : own ? 'Tap to use' : `★ ${t.at}`}</span></button>`;
+  }).join('');
+}
+function openShop() {
+  if (!homeOpen) return;
+  renderShop(); ui.shop.hidden = false; ui.home.inert = true;
+  save.boxSeen = Math.max(Number(save.boxSeen) || 0, themesOwned(totalStars()).at(-1).at); persist(); renderTally();
+  sfx.select(4); ui.shopClose.focus({ preventScroll: true });
+}
+function closeShop() { if (ui.shop.hidden) return; ui.shop.hidden = true; ui.home.inert = false; ui.tally.focus({ preventScroll: true }); }
+
 /* ---------------- home ----------------
    One level at a time, forward only: home shows the level that is waiting and a Play button, nothing to browse. */
 const TEST_LEVEL = 999;
 let homeOpen = false, homeRenderUntil = 0;
 function showHome(focus = true) {
-  const ch = chapterOf(levelNo), total = Object.values(save.stars).reduce((a, b) => a + (Number(b) || 0), 0);
+  const ch = chapterOf(levelNo);
   ui.homeNum.textContent = String(levelNo);
   ui.homeChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.homeChapter.textContent = ch.name;
   const st = drawJourney(ui.homeBar, levelNo);
   ui.homeCount.textContent = `${st.done + 1} of ${st.size}`;
   ui.homeNext.innerHTML = nextText(levelNo - 1) || 'Endless levels: every one is new.';
   ui.homeJourney.setAttribute('aria-label', `${ch.name}, level ${st.done + 1} of ${st.size}. ${ui.homeNext.textContent}`);
-  ui.tally.hidden = total === 0; ui.tally.innerHTML = STAR + total;
+  renderTally();
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
   homeOpen = true; homeRenderUntil = performance.now() + 1600;
   ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
@@ -1795,6 +1913,15 @@ ui.winShare.addEventListener('click', () => shareFromWin(ui.winShare));
 ui.winHome.addEventListener('click', goHome);
 ui.homeBtn.addEventListener('click', goHome);
 ui.play.addEventListener('click', play);
+ui.tally.addEventListener('click', openShop);
+ui.shopClose.addEventListener('click', closeShop);
+ui.shop.addEventListener('click', e => { if (e.target === ui.shop) closeShop(); });
+ui.themes.addEventListener('click', e => { const b = e.target.closest('.theme'); if (b && !b.disabled) { useTheme(b.dataset.id); renderShop(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShop(); });
+ui.rewardUse.addEventListener('click', () => {
+  useTheme(ui.reward.dataset.id); ui.rewardUse.textContent = 'In use'; ui.rewardUse.disabled = true;
+  save.boxSeen = Math.max(Number(save.boxSeen) || 0, themeById(ui.reward.dataset.id).at); persist();
+});
 ui.daily.addEventListener('click', playDaily);
 function setSound(on) { soundOn = on; for (const b of [ui.sound, ui.homeSound]) b.setAttribute('aria-pressed', String(on)); save.sound = on; persist(); }
 for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { setSound(!soundOn); if (soundOn) sfx.select(5); }); b.setAttribute('aria-pressed', String(soundOn)); }
@@ -1842,7 +1969,7 @@ async function start(hot) {
     get dead() { return dead; }, get softDead() { return softDead; }, get plan() { return plan; }, get level() { return levelNo; }, get moves() { return moveCount; },
     get lowQuality() { return lowQuality; }, get allow() { return allow; }, get pending() { return !!pending; },
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
-    get daily() { return daily; }, playDaily, get save() { return save; }, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
+    get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
     setTileColor(v, hex) { tileMaterial(v).color.set(hex); },

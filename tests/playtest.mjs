@@ -171,7 +171,12 @@ await page.screenshot({ path: SHOTS + '/surface-21.png' });
 await go(3); await settled(); await playOut();
 await tapEl('#winHomeBtn'); await page.waitForTimeout(500); let h8 = await H(); await page.screenshot({ path: SHOTS + '/home-4.png' });
 pass('home from the win card shows the next level and the stars', h8.open && h8.num === '4' && h8.level === 4 && Number(h8.tally) > 0 && (await page.evaluate(() => document.getElementById('win').hidden)), JSON.stringify(h8));
-const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
+{ await tapEl('#starTally');
+  const shop = await page.evaluate(() => ({ open: !document.getElementById('shop').hidden, themes: document.querySelectorAll('#themes .theme').length,
+    inUse: [...document.querySelectorAll('#themes .theme[aria-pressed="true"]')].map(b => b.dataset.id), locked: document.querySelectorAll('#themes .theme:disabled').length }));
+  await page.keyboard.press('Escape');
+  pass('the star tally opens the candy shop: every counter, the first in use, the rest locked until their box', shop.open && shop.themes === 8 && shop.inUse.join() === 'strawberry' && shop.locked === 7 && await page.evaluate(() => document.getElementById('shop').hidden), JSON.stringify(shop)); }
+const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound', '#starTally'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
 pass('home controls are at least 48 px', Object.values(homeSizes).every(v => v.split('x').every(n => +n >= 48)), JSON.stringify(homeSizes));
 await tapEl('#homeSound'); pass('home sound button toggles both sound buttons', (await page.evaluate(() => ['soundBtn', 'homeSound'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join())) === 'false,false'); await tapEl('#homeSound');
 await tapEl('#playBtn'); h8 = await H(); pass('Play starts the next level', !h8.open && h8.level === 4 && h8.moves === 0);
@@ -198,6 +203,14 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-05'; __sumSort.show
   await page.screenshot({ path: SHOTS + '/home-daily-done.png' });
   await page.evaluate(() => { window.__sumSortToday = '2026-10-06'; __sumSort.showHome(); });
   pass('the next day brings a new daily and the streak is at stake', /^Play daily puzzle 6, Tuesday.*Keep your 1-day streak/.test(await page.evaluate(() => document.getElementById('dailyBtn').getAttribute('aria-label')))); }
+// 10. a win that crosses a box's star count opens it; its counter is one tap away
+await page.evaluate(() => { const s = __sumSort.save, daily = __sumSort.totalStars() - Object.values(s.stars).reduce((a, b) => a + b, 0); s.stars = { 1: 14 - daily }; });
+await page.evaluate(() => __sumSort.play()); await go(3); await settled(); await playOut();
+{ const r = await page.evaluate(() => ({ shown: !document.getElementById('winReward').hidden, name: document.getElementById('rewardName').textContent, total: __sumSort.totalStars() }));
+  await page.click('#rewardUse', { force: true }); await page.waitForTimeout(400);
+  const t = await page.evaluate(() => ({ theme: __sumSort.save.theme, stage: getComputedStyle(document.documentElement).getPropertyValue('--stage').trim() }));
+  pass('crossing 15 stars opens the first box, and Use it repaints the room', r.shown && r.name === 'Mint Parlour' && r.total === 17 && t.theme === 'mint' && t.stage === '#D0EDE2', JSON.stringify({ r, t }));
+  await page.screenshot({ path: SHOTS + '/win-box.png' }); }
 log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();

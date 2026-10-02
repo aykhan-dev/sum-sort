@@ -109,3 +109,33 @@ export function stretchOf(n, chapter) {
   const from = chapter.from + Math.floor((n - chapter.from) / 10) * 10;
   return { from, to: from + 9, done: n - from, size: 10 };
 }
+
+/* ---------------- candy boxes ----------------
+   Stars buy nothing in a shop; they open boxes. Each box holds a new counter for the candy shop: the room around the
+   board changes colour. Boxes come further apart as the stars pile up, about one every ten levels at first.
+   Every counter is a light pastel, so ink keeps its contrast on all of them. */
+export const THEMES = [
+  { id: 'strawberry', name: 'Strawberry', at: 0, sky: ['#E9DCFF', '#FFE0D2', '#FFD3C2'], counter: '#F6D8CF', stage: '#F7DAD0', wash: 'rgba(250,225,216,.66)' },
+  { id: 'mint', name: 'Mint Parlour', at: 15, sky: ['#D6F2EA', '#E6F6EE', '#C7ECDF'], counter: '#CBEADF', stage: '#D0EDE2', wash: 'rgba(212,238,228,.7)' },
+  { id: 'lemon', name: 'Lemon Drop', at: 40, sky: ['#FFF4C7', '#FFEFD5', '#FAE0A8'], counter: '#F6E4B2', stage: '#F8E8BA', wash: 'rgba(250,238,198,.7)' },
+  { id: 'blueberry', name: 'Blueberry Milk', at: 70, sky: ['#D9E3FF', '#E6EBFF', '#C9D6F6'], counter: '#CFDAF4', stage: '#D3DDF5', wash: 'rgba(218,226,248,.7)' },
+  { id: 'cotton', name: 'Cotton Candy', at: 105, sky: ['#FFD6EC', '#E8DFFF', '#D3E5FF'], counter: '#F0D3E8', stage: '#F0D7EA', wash: 'rgba(244,220,236,.7)' },
+  { id: 'caramel', name: 'Salted Caramel', at: 145, sky: ['#FBE4CF', '#F5DAC1', '#F2D5B9'], counter: '#EACFB2', stage: '#ECD3BA', wash: 'rgba(240,218,196,.7)' },
+  { id: 'grape', name: 'Grape Soda', at: 190, sky: ['#E4D7FF', '#EDE2FF', '#DED2F7'], counter: '#D9CAF2', stage: '#E2D6F6', wash: 'rgba(226,216,246,.7)' },
+  { id: 'peach', name: 'Peach Fizz', at: 240, sky: ['#FFE1D3', '#FFEADB', '#FFCDB4'], counter: '#F9D0BA', stage: '#FAD5C2', wash: 'rgba(250,224,210,.7)' }
+];
+export const themeById = id => THEMES.find(t => t.id === id) || THEMES[0];
+export const themesOwned = stars => THEMES.filter(t => stars >= t.at);
+/* the next box: { at, left, theme } or null once every box is open */
+export function nextBox(stars) {
+  const t = THEMES.find(x => x.at > stars);
+  return t ? { at: t.at, left: t.at - stars, theme: t } : null;
+}
+/* boxes a win just opened: the themes between the star totals before and after it */
+export const boxesOpened = (before, after) => THEMES.filter(t => t.at > before && t.at <= after);
+/* how far the stars are from the last box to the next, 0..1, for the progress ring */
+export function boxProgress(stars) {
+  const n = nextBox(stars); if (!n) return 1;
+  const prev = [...THEMES].reverse().find(t => t.at <= stars);
+  return (stars - prev.at) / (n.at - prev.at);
+}
