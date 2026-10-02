@@ -27,6 +27,9 @@ const tapEl = async sel => { const p = await page.evaluate(sel => { const el = d
   if (!p.ok) console.log('COVERED: ' + sel); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(450); };
 let h0 = await H(); console.log('home at start'.padEnd(30), JSON.stringify(h0));
 pass('game opens on home with level 1 and no star tally', h0.open && !h0.off && h0.num === '1' && h0.chapter === 'Match' && h0.tally === null);
+{ const d = await page.evaluate(() => ({ dis: document.getElementById('dailyBtn').getAttribute('aria-disabled'), label: document.getElementById('dailyBtn').getAttribute('aria-label') }));
+  await page.evaluate(() => document.getElementById('dailyBtn').click()); await page.waitForTimeout(300);
+  pass('a new player sees the daily locked, with how far to go', d.dis === 'true' && /opens at level 19, 18 levels to go/.test(d.label) && await page.evaluate(() => __sumSort.home && !__sumSort.daily), d.label); }
 { const p = await page.evaluate(() => __sumSort.screenOf('stack', 0, 0.5)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
   pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel))); }
 pass('no level list, no replay of old levels', (await page.evaluate(() => ['levelBtn', 'levels', 'replayBtn'].every(id => !document.getElementById(id)))));
@@ -166,6 +169,21 @@ await tapEl('#playBtn'); h8 = await H(); pass('Play starts the next level', !h8.
 await go(101); await settled(); const w101 = await playOut(); log('win L101 (generated)', { shown: w101.shown, title: w101.title });
 await page.reload(); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
 { const h = await H(); pass('after a win and a reload, home waits on the next level', h.open && h.num === '102' && h.level === 102, JSON.stringify(h)); await page.screenshot({ path: SHOTS + '/home-102.png' }); }
+// 9. daily puzzle: one board a day, its own result and streak, levels untouched
+await page.evaluate(() => { window.__sumSortToday = '2026-10-05'; __sumSort.showHome(); });
+{ const card = await page.evaluate(() => document.getElementById('dailyBtn').getAttribute('aria-label'));
+  await tapEl('#dailyBtn'); await settled();
+  const d = await page.evaluate(() => ({ daily: __sumSort.daily, level: __sumSort.level, tag: document.getElementById('levelTag').innerText.replace(/\n/g, ' '), jars: __sumSort.jars.length }));
+  pass('the daily card opens today\'s board', /^Play daily puzzle 5, Monday, Easy/.test(card) && d.daily === '2026-10-05' && /Daily #5 Monday/i.test(d.tag), JSON.stringify(d));
+  const w = await playOut(); log('win daily', w); await page.screenshot({ path: SHOTS + '/win-daily.png' });
+  const after = await page.evaluate(() => ({ result: __sumSort.save.daily['2026-10-05'], streak: __sumSort.save.streak, last: __sumSort.save.last }));
+  pass('a daily win records the day and starts a streak, and leaves the levels alone', w.shown && /^Daily #5/.test(await page.evaluate(() => document.getElementById('winEyebrow').textContent)) && after.result && after.result.stars >= 1 && after.streak.count === 1 && after.last === 102 && w.next === 'Back to levels', JSON.stringify(after));
+  await tapEl('#nextBtn'); const h9 = await H();
+  const done = await page.evaluate(() => ({ dis: document.getElementById('dailyBtn').getAttribute('aria-disabled'), label: document.getElementById('dailyBtn').getAttribute('aria-label') }));
+  pass('back home: the level waits where it was, the daily shows done until tomorrow', h9.open && h9.level === 102 && done.dis === 'true' && /done with/.test(done.label), JSON.stringify({ h9, done }));
+  await page.screenshot({ path: SHOTS + '/home-daily-done.png' });
+  await page.evaluate(() => { window.__sumSortToday = '2026-10-06'; __sumSort.showHome(); });
+  pass('the next day brings a new daily and the streak is at stake', /^Play daily puzzle 6, Tuesday.*Keep your 1-day streak/.test(await page.evaluate(() => document.getElementById('dailyBtn').getAttribute('aria-label')))); }
 log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();

@@ -36,7 +36,7 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | --- | --- | --- | --- | --- | --- |
 | E1 | Fast unit tests, `meta.mjs` for pure meta logic, CI on push | Every feature below lands with tests in seconds, not minutes | enabler | 2 | done |
 | F1 | **Combo callouts**: quick seals chain into "Sweet! → Yummy! → Sugar rush!" words, rising pitch, camera punch | Rewards flow; the single biggest "feel" upgrade per line of code | 5 | 2 | done |
-| F2 | **Daily Puzzle + streak**: one seeded board per day, same for everyone, Monday easy to Sunday hard; flame streak on home | The return loop. Gives a reason to open the game every day | 5 | 3 | todo |
+| F2 | **Daily Puzzle + streak**: one seeded board per day, same for everyone, Monday easy to Sunday hard; flame streak on home | The return loop. Gives a reason to open the game every day | 5 | 3 | done |
 | F3 | **Share result**: Wordle-style text card (stars, moves vs par, streak, jar emoji row) via the share sheet or clipboard | Free spread; players recruit players | 5 | 1 | todo |
 | F4 | **Journey on home**: chapter progress bar, "next: Split in 3 levels", daily card | Goal-gradient effect: near goals pull players forward | 4 | 2 | todo |
 | F5 | **Star rewards**: star milestones open a candy box that unlocks counter themes and jar lids | Turns stars into a collection; long-term pull | 4 | 3 | todo |
@@ -58,6 +58,7 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 
 | When (UTC) | Item | Result |
 | --- | --- | --- |
-| 21:20 | E1 | Unit tests (7) run in about 1 s; `npm run check`; CI workflow; build inlines several pure modules. |
-| 22:05 | F1 | Combo chain = seals in a row with only stack-to-jar moves (exactly what a par game is). From the 2nd seal a wordmark-style word pops over the jar (Sweet → Tasty → Yummy → Delicious → Sugar rush), with a sparkle that climbs in pitch and a 1–4% camera lean. Gold words and extra sparks from the 5th. Words are page text: sharp, sized to fit a 390 px phone, never take a tap. Reduced motion: fade only, no lean. First try was a 3D sprite: too small and pale on a phone, replaced. |
+| 21:01 | E1 | Unit tests (7) run in about 1 s; `npm run check`; CI workflow; build inlines several pure modules. |
+| 21:16 | F1 | Combo chain = seals in a row with only stack-to-jar moves (exactly what a par game is). From the 2nd seal a wordmark-style word pops over the jar (Sweet → Tasty → Yummy → Delicious → Sugar rush), with a sparkle that climbs in pitch and a 1–4% camera lean. Gold words and extra sparks from the 5th. Words are page text: sharp, sized to fit a 390 px phone, never take a tap. Reduced motion: fade only, no lean. First try was a 3D sprite: too small and pale on a phone, replaced. |
+| 21:40 | F2 | Daily puzzle from level 19 (first Sums level, so it asks for nothing untaught; locked card says how far to go). Board seeded from the date text, Monday easy → Sunday hard. On-device generation proved too slow (up to 3 s desktop) and biased about 8 points harder than measured (closest-of-many noisy estimates), so a year of dailies is made offline with an independent 6,000-play re-check: every weekday within 5 points of target, max 0.64 under the 0.65 cap, 25 KB. Streak = dailies on consecutive days. Levels and level stars untouched. |
 

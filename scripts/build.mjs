@@ -11,8 +11,10 @@ const MODULES = ['src/logic.mjs', 'src/meta.mjs'];
 const logic = MODULES.filter(f => fs.existsSync(root + f))
   .map(f => read(f).replace(/^import [^\n]* from '\.\/[\w.-]+';\n/gm, '').replace(/^export /gm, '')).join('\n');
 const levels = read('src/levels.json').trim();
-if (!src.includes('/*__LOGIC__*/') || !src.includes('/*__LEVELS__*/')) throw new Error('placeholders missing in src/page.src.html');
-const page = src.replace('/*__LOGIC__*/', () => logic).replace('/*__LEVELS__*/', () => levels);
+// the daily pool, one board per line in the source, packed tight in the page
+const dailies = JSON.stringify(JSON.parse(read('src/dailies.json')));
+for (const ph of ['/*__LOGIC__*/', '/*__LEVELS__*/', '/*__DAILIES__*/']) if (!src.includes(ph)) throw new Error(ph + ' placeholder missing in src/page.src.html');
+const page = src.replace('/*__LOGIC__*/', () => logic).replace('/*__LEVELS__*/', () => levels).replace('/*__DAILIES__*/', () => dailies);
 
 const CDN = 'https://cdn.jsdelivr.net/npm/three@0.170.0/';
 if (!page.includes(CDN + 'build/three.module.js')) throw new Error('three.js import map not found');

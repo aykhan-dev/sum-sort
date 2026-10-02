@@ -1,4 +1,5 @@
 /* ================= meta game (pure, no rendering): combos, daily puzzle, streaks, sharing ================= */
+import { generateWith, mulberry32 } from './logic.mjs';
 
 /* Combo: jars sealed in a row with no wasted move between them. A tile from a stack into a numbered jar keeps the
    chain going, because that is the only kind of move a par game is made of. Anything else (a jar-to-jar move, the
@@ -8,3 +9,63 @@ export const COMBO_WORDS = ['', '', 'Sweet!', 'Tasty!', 'Yummy!', 'Delicious!', 
 export const comboWord = n => n < 2 ? '' : COMBO_WORDS[Math.min(n, COMBO_WORDS.length - 1)];
 /* the chain after one move; `clean` = stack to numbered jar, `seals` = the move sealed that jar */
 export const comboStep = (chain, { clean, seals }) => !clean ? 0 : seals ? chain + 1 : chain;
+
+/* ---------------- daily puzzle ----------------
+   One board per calendar day, the same for everyone who opens it on that date, wherever they are: the board is
+   seeded from the date's text ("2026-10-03"), not from a clock. Monday is gentle and the week climbs to Sunday,
+   the way newspaper puzzles do. Only rules every player has learned by the time the daily opens: sums, no frosted
+   tiles, no ribbons. The model fail rate stays under the game's 65% cap. */
+export const DAILY_OPENS = 19;            // the first Sums level: everything a daily asks for has been taught
+const DAILY_EPOCH = Date.UTC(2026, 9, 1);  // daily #1
+export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DAILY_RECIPES = [   // Monday first; `want` is the model fail rate, measured offline (scripts/generate-dailies.mjs)
+  { level: 'Easy', jars: 4, stacks: 3, parts: [2, 2], minT: 5, maxT: 11, want: 0.20 },
+  { level: 'Easy', jars: 4, stacks: 3, parts: [2, 3], minT: 6, maxT: 12, want: 0.28 },
+  { level: 'Medium', jars: 5, stacks: 4, parts: [2, 3], minT: 6, maxT: 14, want: 0.36 },
+  { level: 'Medium', jars: 5, stacks: 4, parts: [2, 3], minT: 7, maxT: 15, want: 0.42 },
+  { level: 'Tricky', jars: 5, stacks: 4, parts: [2, 3], minT: 7, maxT: 16, want: 0.48 },
+  { level: 'Hard', jars: 6, stacks: 5, parts: [2, 3], minT: 7, maxT: 16, want: 0.54 },
+  { level: 'Hard', jars: 6, stacks: 5, parts: [2, 3], minT: 7, maxT: 17, want: 0.60 }
+];
+export const DAILY_CAP = 0.65;
+const pad2 = n => String(n).padStart(2, '0');
+/* the player's own calendar date, as text */
+export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const keyUTC = key => { const [y, m, d] = key.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+export const addDays = (key, n) => { const d = new Date(keyUTC(key) + n * 86400000); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`; };
+export const dailyNumber = key => Math.round((keyUTC(key) - DAILY_EPOCH) / 86400000) + 1;
+export const weekdayOf = key => (new Date(keyUTC(key)).getUTCDay() + 6) % 7;   // 0 = Monday
+export const dailyLabel = key => { const d = new Date(keyUTC(key)); return `${WEEKDAYS[weekdayOf(key)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
+export const dailyRecipe = key => ({ ch: 'daily', ...DAILY_RECIPES[weekdayOf(key)] });
+/* FNV-1a over the date text: a different, stable seed for every day */
+export function dailySeed(key) {
+  let h = 0x811C9DC5;
+  for (let i = 0; i < key.length; i++) { h ^= key.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return h >>> 0;
+}
+/* Dailies come from a pool made offline and checked by the solver (src/dailies.json, one per day from daily #1).
+   Past the end of the pool the device makes its own: the same seed on every device, cheaper settings. */
+export function dailyFromPool(pool, key) {
+  const raw = pool[dailyNumber(key) - 1];
+  return raw ? { jars: raw.j, stacks: raw.s, par: raw.p, daily: key } : null;
+}
+export function generateDaily(key, opts = { tries: 60, runs: 400, tol: 0.06 }) {
+  const r = dailyRecipe(key), seed = dailySeed(key);
+  let def = null;
+  for (let salt = 0; salt < 8 && !(def && def.fail <= DAILY_CAP - 0.05); salt++) {
+    const d = generateWith(r, mulberry32(seed + salt * 0x9E3779B1), opts);
+    if (d && (!def || Math.abs(d.fail - r.want) < Math.abs(def.fail - r.want))) def = d;
+  }
+  return def && { ...def, daily: key };
+}
+/* Streak: dailies finished on consecutive days. Finishing today's again changes nothing; a missed day starts over. */
+export function streakAfter(streak, key) {
+  const s = { count: 0, best: 0, last: null, ...(streak || {}) };
+  if (s.last === key) return s;
+  const count = s.last === addDays(key, -1) ? s.count + 1 : 1;
+  return { count, best: Math.max(s.best, count), last: key };
+}
+/* the streak as it stands today: still alive if the last daily was today or yesterday */
+export const streakNow = (streak, today) => streak && (streak.last === today || streak.last === addDays(today, -1)) ? streak.count : 0;
+export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;

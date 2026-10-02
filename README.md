@@ -23,8 +23,10 @@ On GitHub Pages: repository Settings → Pages → Deploy from a branch → `mai
 | `src/logic.mjs` | Pure game logic: solver, fail-rate model, level generator, chapters. |
 | `src/meta.mjs` | Pure meta-game logic around the levels (combos, daily puzzle, streaks, sharing). |
 | `src/levels.json` | Levels 1–100, generated once and checked by the solver. Later levels are generated on the device. |
+| `src/dailies.json` | Daily puzzles for a year from 1 Oct 2026, one per day, checked by the solver. Later days are generated on the device. |
 | `scripts/build.mjs` | Inlines the pure modules and levels into the page and writes `index.html`. |
 | `scripts/generate-levels.mjs` | Regenerates `src/levels.json` and prints the difficulty curve. |
+| `scripts/generate-dailies.mjs` | Regenerates `src/dailies.json` and prints the fail rate per weekday. |
 | `tests/unit/` | Unit tests for the pure modules (node's built-in runner, about a second). |
 | `tests/playtest.mjs` | Plays the built page in headless Chromium with real touches. |
 | `docs/ROADMAP.md` | What gets built next, and why. |
@@ -53,6 +55,10 @@ CI (`.github/workflows/ci.yml`) runs `npm run check` and the headless play-test 
 | 47+ | Mixed | Everything at once. |
 
 Boosters arrive one at a time: Undo (level 11), Hint (13), +1 Jar (15), Split (21).
+
+## Daily puzzle
+
+From level 19 the home screen offers one extra board a day, the same for everyone on that calendar date. It uses only the rules of the first three chapters. Monday is easy and the week climbs to Sunday (model fail rate 20% to 60%). Finishing dailies on consecutive days builds a streak. A daily never moves the level progress.
 
 ## Status
 

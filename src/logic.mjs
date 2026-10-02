@@ -210,9 +210,12 @@ export const toState = def => ({
 /* Build level n. A candidate must be clearable straight from the stacks (so par is one move per tile), and is
    accepted only when 2,000 simulated plays land within `tol` of the chapter's target fail rate. `near` is the
    previous level's measured rate: the curve may not move more than 10 points between neighbours. */
-export function generate(n, { tries = 400, tol = 0.05, near = null, runs = 2000, maxJump = 0.10 } = {}) {
+export function generate(n, opts = {}) {
   if (TAUGHT[n]) return TAUGHT[n];
-  const r = recipe(n), rng = mulberry32(0x5EED + n * 7919);
+  return generateWith(recipe(n), mulberry32(0x5EED + n * 7919), opts);
+}
+/* The same search for any recipe and seeded random source (the daily puzzle brings its own). */
+export function generateWith(r, rng, { tries = 400, tol = 0.05, near = null, runs = 2000, maxJump = 0.10 } = {}) {
   let best = null, bestGap = Infinity;
   for (let i = 0; i < tries; i++) {
     const def = candidate(r, rng); if (!def) continue;
