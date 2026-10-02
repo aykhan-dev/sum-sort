@@ -114,3 +114,31 @@ test('share squares and link', () => {
   assert.equal(shareUrl({ protocol: 'https:', origin: 'https://a.github.io', pathname: '/sum-sort/index.html' }), 'https://a.github.io/sum-sort/');
   assert.equal(shareUrl({ protocol: 'file:', origin: 'null', pathname: '/x/index.html' }), '');
 });
+
+import { upNext, stretchOf, MILESTONES } from '../../src/meta.mjs';
+import { CHAPTERS } from '../../src/logic.mjs';
+import { readFileSync } from 'node:fs';
+
+test('up next: the nearest thing that opens, everything opening at that level named together', () => {
+  assert.deepEqual(upNext(3), { at: 11, left: 8, what: 'two-tile jars and the Undo booster' });
+  assert.deepEqual(upNext(18), { at: 19, left: 1, what: 'bigger sums and the daily puzzle' });
+  assert.equal(upNext(19).what, 'the Split booster');
+  assert.equal(upNext(46).what, 'endless mixed levels');
+  assert.equal(upNext(47), null);
+});
+
+test('milestones agree with the chapters, the booster unlocks and the daily', () => {
+  for (const c of CHAPTERS.slice(1)) assert.ok(MILESTONES.some(m => m.at === c.from), `chapter ${c.name} at ${c.from}`);
+  const page = readFileSync(new URL('../../src/page.src.html', import.meta.url), 'utf8');
+  const unlock = JSON.parse(page.match(/const UNLOCK = (\{[^}]*\})/)[1].replace(/(\w+):/g, '"$1":'));
+  for (const [b, at] of Object.entries(unlock)) assert.ok(MILESTONES.some(m => m.at === at && /booster/.test(m.what)), `booster ${b} at ${at}`);
+  assert.ok(MILESTONES.some(m => m.at === DAILY_OPENS && /daily/.test(m.what)));
+});
+
+test('stretch: a chapter, or a run of ten endless levels', () => {
+  const sums = CHAPTERS.find(c => c.id === 'sums'), mix = CHAPTERS.find(c => c.id === 'mix');
+  assert.deepEqual(stretchOf(19, sums), { from: 19, to: 30, done: 0, size: 12 });
+  assert.deepEqual(stretchOf(30, sums), { from: 19, to: 30, done: 11, size: 12 });
+  assert.deepEqual(stretchOf(47, mix), { from: 47, to: 56, done: 0, size: 10 });
+  assert.deepEqual(stretchOf(102, mix), { from: 97, to: 106, done: 5, size: 10 });
+});

@@ -295,7 +295,22 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   font:700 60px/1 var(--display);font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(120,20,50,.35);
   box-shadow:inset 0 3px 0 rgba(255,255,255,.5),inset 0 -5px 0 rgba(0,0,0,.10),0 6px 0 var(--chip-lo),0 22px 26px -16px rgba(199,48,79,.7);
 }
-.home-level .chapter-tag{margin:6px 0 0;background:var(--frost);border-color:var(--frost-edge)}
+.home-level .chapter-tag{margin:0;background:var(--frost);border-color:var(--frost-edge)}
+/* the journey: where this level sits in its chapter, and what opens next */
+.journey{display:grid;justify-items:center;gap:7px;margin-top:4px;width:min(100%,260px)}
+.jrow{display:flex;align-items:center;gap:8px}
+.jcount{font:700 15px var(--display);color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.jbar{display:flex;gap:3px;width:100%;height:10px}
+.jbar i{flex:1;border-radius:5px;background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--line-deep)}
+.jbar i.on{background:linear-gradient(180deg,var(--chip-hi),var(--chip) 60%,var(--chip-lo));box-shadow:none}
+.jbar i.now{box-shadow:inset 0 0 0 2px var(--chip);animation:seg 1.4s ease-in-out infinite}
+.jbar i.fill{animation:segfill .7s cubic-bezier(.3,1.6,.5,1) .35s both}
+@keyframes seg{50%{background:color-mix(in srgb,var(--chip) 25%,#FFFFFF)}}
+@keyframes segfill{from{scale:1 .2;opacity:.2}to{scale:1 1;opacity:1}}
+.jnext{margin:0;font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center;text-wrap:balance}
+.jnext b{color:var(--ink);font-weight:800}
+.win-card .journey{margin:6px 0 0;width:100%}
+.win-card .jbar{height:9px}
 .play{flex:none;width:min(100%,300px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
 .play svg{width:24px;height:24px;fill:currentColor;flex:none}
 @keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
@@ -330,6 +345,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 @media (max-height:600px){
   .motif{display:none}
   .home-level .num{min-width:84px;height:84px;font-size:46px;border-radius:26px}
+  .home .jnext{display:none}
 }
 
 @media (max-width:520px){
@@ -339,6 +355,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   .win-card,.stars svg.on,.win-card.perfect .stars::before,.play{animation:none}
   .home,.home.off,.top,.bottom{transition:none}
   .boost.rescue{animation:none}
+  .jbar i.now,.jbar i.fill{animation:none}
   .callout{animation:callout-still 1.15s linear both}
   .raised,.cta{transition:none}
 }
@@ -413,6 +430,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
           <span class="stat"><small>Par</small><b id="winPar">3</b></span>
         </div>
         <p class="note" id="winText">No wasted moves.</p>
+        <div class="journey" id="winJourney" hidden><div class="jbar" id="winBar" aria-hidden="true"></div><p class="jnext" id="winNext"></p></div>
         <div class="win-actions">
           <button id="winHomeBtn" class="ghost raised" type="button" aria-label="Home">
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1v-9"/></svg>
@@ -441,7 +459,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
       <div class="home-level">
         <span class="eyebrow">Level</span>
         <span class="num gummy c-rasp" id="homeNum">1</span>
-        <span class="chapter-tag" id="homeChapter">Match</span>
+        <div class="journey" id="homeJourney">
+          <div class="jrow"><span class="chapter-tag" id="homeChapter">Match</span><span class="jcount" id="homeCount"></span></div>
+          <div class="jbar" id="homeBar" aria-hidden="true"></div>
+          <p class="jnext" id="homeNext"></p>
+        </div>
       </div>
     </div>
     <button id="playBtn" class="cta gummy c-rasp play" type="button">
@@ -788,6 +810,29 @@ function shareText({ title, stars, moves, par, seals = [], boosters = 0, streak 
 /* the page's own address, fit for sharing: no query, no hash, nothing for a local file */
 const shareUrl = loc => loc && /^https?:$/.test(loc.protocol) ? loc.origin + loc.pathname.replace(/index\.html$/, '') : '';
 
+/* ---------------- the journey ----------------
+   Near goals pull harder than far ones, so home always names the next thing a player is working towards:
+   where they stand in the chapter, and what opens next (a booster, a new rule, the daily) and how far it is. */
+const MILESTONES = [
+  { at: 11, what: 'two-tile jars' }, { at: 11, what: 'the Undo booster' }, { at: 13, what: 'the Hint booster' },
+  { at: 15, what: 'the +1 Jar booster' }, { at: 19, what: 'bigger sums' }, { at: 19, what: 'the daily puzzle' },
+  { at: 21, what: 'the Split booster' }, { at: 31, what: 'frosted tiles' }, { at: 39, what: 'ribbon-tied jars' },
+  { at: 47, what: 'endless mixed levels' }
+];
+/* what opens next for a player about to play level n: { at, left, what } with everything opening at that level, or null */
+function upNext(n, list = MILESTONES) {
+  const ahead = list.filter(m => m.at > n);
+  if (!ahead.length) return null;
+  const at = Math.min(...ahead.map(m => m.at)), what = ahead.filter(m => m.at === at).map(m => m.what);
+  return { at, left: at - n, what: what.length > 1 ? what.slice(0, -1).join(', ') + ' and ' + what.at(-1) : what[0] };
+}
+/* where level n sits in its stretch of the journey: a chapter, or a run of ten in the endless levels */
+function stretchOf(n, chapter) {
+  if (chapter.to !== Infinity) return { from: chapter.from, to: chapter.to, done: n - chapter.from, size: chapter.to - chapter.from + 1 };
+  const from = chapter.from + Math.floor((n - chapter.from) / 10) * 10;
+  return { from, to: from + 9, done: n - from, size: 10 };
+}
+
 
 /* Levels 1-100 are fixed content, made by generate() and checked by the solver; later ones are generated on the device.
    j = jar targets, s = tile stacks (last value is the top), p = par, l = seals needed to untie a jar, h = frosted tiles,
@@ -967,7 +1012,9 @@ const ui = {
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
   homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
-  dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag')
+  dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'),
+  homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
+  winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext')
 };
 
 /* ---------------- saved progress (this browser only) ---------------- */
@@ -1945,6 +1992,8 @@ async function winLevel() {
     : stars === 3 ? 'No wasted moves.'
     : rescued ? 'Solved with a booster. Go without one for 3 stars.'
     : `${plural(moveCount - def.par, 'move')} over par. Match par for 3 stars.`;
+  ui.winJourney.hidden = !!daily || levelNo === TEST_LEVEL;
+  if (!ui.winJourney.hidden) { drawJourney(ui.winBar, levelNo, { cleared: true }); ui.winNext.innerHTML = chapterDone ? '' : nextText(levelNo); }
   ui.nextLabel.textContent = daily ? 'Share result' : chapterDone && next ? 'Next chapter' : 'Next level';
   ui.next.querySelector('svg').outerHTML = daily ? SHARE_ICON : NEXT_ICON;
   ui.next.className = 'cta gummy ' + (daily ? 'c-grape' : 'c-rasp');
@@ -1984,6 +2033,21 @@ function shareFromWin(btn) {
   });
 }
 
+/* ---------------- the journey ----------------
+   A bar with one segment per level of the stretch (a chapter, or a run of ten endless levels), and the next thing
+   that opens. On home the waiting level pulses; on the win card the level just cleared fills in. */
+function drawJourney(bar, n, { cleared = false } = {}) {
+  const ch = chapterOf(n), st = stretchOf(n, ch);
+  bar.className = 'jbar ' + CHAPTER_TINT[ch.id];
+  bar.innerHTML = Array.from({ length: st.size }, (_, i) => `<i class="${i < st.done ? 'on' : i === st.done ? (cleared ? 'on fill' : 'now') : ''}"></i>`).join('');
+  return st;
+}
+/* `after` = the last level cleared */
+function nextText(after) {
+  const u = upNext(after); if (!u) return '';
+  return `Up next: <b>${u.what}</b> at level ${u.at}`;
+}
+
 /* ---------------- home ----------------
    One level at a time, forward only: home shows the level that is waiting and a Play button, nothing to browse. */
 const TEST_LEVEL = 999;
@@ -1992,6 +2056,10 @@ function showHome(focus = true) {
   const ch = chapterOf(levelNo), total = Object.values(save.stars).reduce((a, b) => a + (Number(b) || 0), 0);
   ui.homeNum.textContent = String(levelNo);
   ui.homeChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.homeChapter.textContent = ch.name;
+  const st = drawJourney(ui.homeBar, levelNo);
+  ui.homeCount.textContent = `${st.done + 1} of ${st.size}`;
+  ui.homeNext.innerHTML = nextText(levelNo - 1) || 'Endless levels: every one is new.';
+  ui.homeJourney.setAttribute('aria-label', `${ch.name}, level ${st.done + 1} of ${st.size}. ${ui.homeNext.textContent}`);
   ui.tally.hidden = total === 0; ui.tally.innerHTML = STAR + total;
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
   homeOpen = true; homeRenderUntil = performance.now() + 1600;

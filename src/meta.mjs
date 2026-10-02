@@ -86,3 +86,26 @@ export function shareText({ title, stars, moves, par, seals = [], boosters = 0, 
 }
 /* the page's own address, fit for sharing: no query, no hash, nothing for a local file */
 export const shareUrl = loc => loc && /^https?:$/.test(loc.protocol) ? loc.origin + loc.pathname.replace(/index\.html$/, '') : '';
+
+/* ---------------- the journey ----------------
+   Near goals pull harder than far ones, so home always names the next thing a player is working towards:
+   where they stand in the chapter, and what opens next (a booster, a new rule, the daily) and how far it is. */
+export const MILESTONES = [
+  { at: 11, what: 'two-tile jars' }, { at: 11, what: 'the Undo booster' }, { at: 13, what: 'the Hint booster' },
+  { at: 15, what: 'the +1 Jar booster' }, { at: 19, what: 'bigger sums' }, { at: 19, what: 'the daily puzzle' },
+  { at: 21, what: 'the Split booster' }, { at: 31, what: 'frosted tiles' }, { at: 39, what: 'ribbon-tied jars' },
+  { at: 47, what: 'endless mixed levels' }
+];
+/* what opens next for a player about to play level n: { at, left, what } with everything opening at that level, or null */
+export function upNext(n, list = MILESTONES) {
+  const ahead = list.filter(m => m.at > n);
+  if (!ahead.length) return null;
+  const at = Math.min(...ahead.map(m => m.at)), what = ahead.filter(m => m.at === at).map(m => m.what);
+  return { at, left: at - n, what: what.length > 1 ? what.slice(0, -1).join(', ') + ' and ' + what.at(-1) : what[0] };
+}
+/* where level n sits in its stretch of the journey: a chapter, or a run of ten in the endless levels */
+export function stretchOf(n, chapter) {
+  if (chapter.to !== Infinity) return { from: chapter.from, to: chapter.to, done: n - chapter.from, size: chapter.to - chapter.from + 1 };
+  const from = chapter.from + Math.floor((n - chapter.from) / 10) * 10;
+  return { from, to: from + 9, done: n - from, size: 10 };
+}

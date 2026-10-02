@@ -35,6 +35,8 @@ pass('game opens on home with level 1 and no star tally', h0.open && !h0.off && 
   pass('a new player sees the daily locked, with how far to go', d.dis === 'true' && /opens at level 19, 18 levels to go/.test(d.label) && await page.evaluate(() => __sumSort.home && !__sumSort.daily), d.label); }
 { const p = await page.evaluate(() => __sumSort.screenOf('stack', 0, 0.5)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
   pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel))); }
+{ const j = await page.evaluate(() => ({ count: homeCount.textContent, next: homeNext.textContent, segs: homeBar.children.length, now: homeBar.querySelectorAll('.now').length }));
+  pass('home shows the chapter journey and what opens next', j.count === '1 of 10' && j.segs === 10 && j.now === 1 && j.next === 'Up next: two-tile jars and the Undo booster at level 11', JSON.stringify(j)); }
 pass('no level list, no replay of old levels', (await page.evaluate(() => ['levelBtn', 'levels', 'replayBtn'].every(id => !document.getElementById(id)))));
 await page.screenshot({ path: SHOTS + '/home-1.png' });
 await tapEl('#playBtn'); h0 = await H();
@@ -123,6 +125,8 @@ await go(3); await settled(); const w3 = await playOut(); log('win L3 (tutorial)
 await go(16); await settled(); const w16 = await playOut(); log('win L16 (3 stars)', w16); await page.screenshot({ path: SHOTS + '/win-perfect.png' });
 { const c = await page.evaluate(() => ({ best: __sumSort.bestChain, words: __sumSort.callouts, jars: __sumSort.jars.length }));
   pass('a clean run chains every jar into a combo, with a word from the second seal on', c.best === c.jars && c.words === c.jars - 1, JSON.stringify(c));
+  const wj = await page.evaluate(() => ({ hidden: winJourney.hidden, on: winBar.querySelectorAll('.on').length, segs: winBar.children.length, next: winNext.textContent }));
+  pass('the win card fills in the cleared level on the chapter bar', !wj.hidden && wj.segs === 8 && wj.on === 6 && wj.next === 'Up next: bigger sums and the daily puzzle at level 19', JSON.stringify(wj));
   await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
   const t = await page.evaluate(() => window.__copied.at(-1) || '');
   pass('the win card shares a spoiler-free result', /^Sum Sort Level 16 ⭐⭐⭐\n8 moves, par 8 · no boosters\n🟩🟨🟨🟨/.test(t), JSON.stringify(t)); }
