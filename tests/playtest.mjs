@@ -12,6 +12,9 @@ const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--ena
 const ctx = await browser.newContext({ viewport: { width: 390, height: 760 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
 const page = await ctx.newPage(); page.setDefaultTimeout(180000);
 await page.addInitScript(() => { window.__sumSortKeepQuality = true; });   // the test decides the render quality itself
+// sharing goes to a clipboard the test can read, never to a real share sheet
+await page.addInitScript(() => { window.__copied = []; Object.defineProperty(navigator, 'share', { value: undefined });
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } } }); });
 await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());   // system fonts are enough here, and the run stays offline
 const errors = [];
 page.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_FAILED/.test(m.text())) errors.push(m.text()); });
@@ -119,7 +122,10 @@ const playOut = async () => { for (let k = 0; k < 40; k++) { const st = await pa
 await go(3); await settled(); const w3 = await playOut(); log('win L3 (tutorial)', w3);
 await go(16); await settled(); const w16 = await playOut(); log('win L16 (3 stars)', w16); await page.screenshot({ path: SHOTS + '/win-perfect.png' });
 { const c = await page.evaluate(() => ({ best: __sumSort.bestChain, words: __sumSort.callouts, jars: __sumSort.jars.length }));
-  pass('a clean run chains every jar into a combo, with a word from the second seal on', c.best === c.jars && c.words === c.jars - 1, JSON.stringify(c)); }
+  pass('a clean run chains every jar into a combo, with a word from the second seal on', c.best === c.jars && c.words === c.jars - 1, JSON.stringify(c));
+  await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const t = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('the win card shares a spoiler-free result', /^Sum Sort Level 16 ⭐⭐⭐\n8 moves, par 8 · no boosters\n🟩🟨🟨🟨/.test(t), JSON.stringify(t)); }
 await go(10); await settled(); const w10 = await playOut(); log('win L10 (chapter end)', w10); await page.screenshot({ path: SHOTS + '/win-chapter.png' });
 pass('ladder: tutorial clear < perfect < chapter', !/perfect/.test(w3.cls) && /perfect/.test(w16.cls) && /chapter-done/.test(w10.cls) && w10.next === 'Next chapter');
 await page.click('#nextBtn', { force: true }); await page.waitForTimeout(1200);
@@ -177,10 +183,14 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-05'; __sumSort.show
   pass('the daily card opens today\'s board', /^Play daily puzzle 5, Monday, Easy/.test(card) && d.daily === '2026-10-05' && /Daily #5 Monday/i.test(d.tag), JSON.stringify(d));
   const w = await playOut(); log('win daily', w); await page.screenshot({ path: SHOTS + '/win-daily.png' });
   const after = await page.evaluate(() => ({ result: __sumSort.save.daily['2026-10-05'], streak: __sumSort.save.streak, last: __sumSort.save.last }));
-  pass('a daily win records the day and starts a streak, and leaves the levels alone', w.shown && /^Daily #5/.test(await page.evaluate(() => document.getElementById('winEyebrow').textContent)) && after.result && after.result.stars >= 1 && after.streak.count === 1 && after.last === 102 && w.next === 'Back to levels', JSON.stringify(after));
-  await tapEl('#nextBtn'); const h9 = await H();
+  pass('a daily win records the day and starts a streak, and leaves the levels alone', w.shown && /^Daily #5/.test(await page.evaluate(() => document.getElementById('winEyebrow').textContent)) && after.result && after.result.stars >= 1 && after.streak.count === 1 && after.last === 102, JSON.stringify(after));
+  await tapEl('#nextBtn');
+  const shared = await page.evaluate(() => ({ t: window.__copied.at(-1) || '', label: document.getElementById('nextLabel').textContent }));
+  pass('sharing is the daily\'s main button', w.next === 'Share result' && /^Sum Sort Daily #5 ⭐/.test(shared.t) && shared.label === 'Copied!', JSON.stringify(shared));
+  await tapEl('#winHomeBtn'); const h9 = await H();
   const done = await page.evaluate(() => ({ dis: document.getElementById('dailyBtn').getAttribute('aria-disabled'), label: document.getElementById('dailyBtn').getAttribute('aria-label') }));
-  pass('back home: the level waits where it was, the daily shows done until tomorrow', h9.open && h9.level === 102 && done.dis === 'true' && /done with/.test(done.label), JSON.stringify({ h9, done }));
+  pass('back home: the level waits where it was, the daily shows done until tomorrow', h9.open && h9.level === 102 && /done with.*Share result$/.test(done.label), JSON.stringify({ h9, done }));
+  await tapEl('#dailyBtn'); pass('the done card shares the same result', await page.evaluate(() => window.__copied.at(-1) === window.__copied.at(-2)));
   await page.screenshot({ path: SHOTS + '/home-daily-done.png' });
   await page.evaluate(() => { window.__sumSortToday = '2026-10-06'; __sumSort.showHome(); });
   pass('the next day brings a new daily and the streak is at stake', /^Play daily puzzle 6, Tuesday.*Keep your 1-day streak/.test(await page.evaluate(() => document.getElementById('dailyBtn').getAttribute('aria-label')))); }

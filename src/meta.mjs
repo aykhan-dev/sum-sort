@@ -69,3 +69,20 @@ export function streakAfter(streak, key) {
 /* the streak as it stands today: still alive if the last daily was today or yesterday */
 export const streakNow = (streak, today) => streak && (streak.last === today || streak.last === addDays(today, -1)) ? streak.count : 0;
 export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
+
+/* ---------------- sharing ----------------
+   A result anyone can paste anywhere, with nothing given away about the board: stars, moves against par, one square
+   per jar in the order it sealed (green: a clean seal, yellow: part of a combo, purple: sealed after a reshuffle),
+   the streak, and the link. */
+export const SEAL_SQUARES = { clean: '🟩', combo: '🟨', messy: '🟪' };
+export const sealSquare = chainAtSeal => chainAtSeal >= 2 ? SEAL_SQUARES.combo : chainAtSeal === 1 ? SEAL_SQUARES.clean : SEAL_SQUARES.messy;
+export function shareText({ title, stars, moves, par, seals = [], boosters = 0, streak = 0, url = '' }) {
+  const lines = [`${title} ${'⭐'.repeat(stars)}${'☆'.repeat(3 - stars)}`];
+  lines.push(`${moves} moves, par ${par}${boosters ? ` · ${boosters} booster${boosters === 1 ? '' : 's'}` : ' · no boosters'}`);
+  if (seals.length) lines.push(seals.map(sealSquare).join(''));
+  if (streak > 1) lines.push(`🔥 ${streak}-day streak`);
+  if (url) lines.push(url);
+  return lines.join('\n');
+}
+/* the page's own address, fit for sharing: no query, no hash, nothing for a local file */
+export const shareUrl = loc => loc && /^https?:$/.test(loc.protocol) ? loc.origin + loc.pathname.replace(/index\.html$/, '') : '';

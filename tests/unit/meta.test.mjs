@@ -98,3 +98,19 @@ test('daily pool: a year of boards, each solvable from the stacks in par, near i
   });
   assert.equal(dailyFromPool(pool, addDays('2026-10-01', pool.length)), null);
 });
+
+import { shareText, sealSquare, shareUrl } from '../../src/meta.mjs';
+
+test('share text: stars, moves against par, one square per seal, streak, link', () => {
+  const t = shareText({ title: 'Sum Sort Daily #5', stars: 3, moves: 12, par: 12, seals: [1, 2, 3, 0], streak: 4, url: 'https://x.github.io/sum-sort/' });
+  assert.equal(t, 'Sum Sort Daily #5 ⭐⭐⭐\n12 moves, par 12 · no boosters\n🟩🟨🟨🟪\n🔥 4-day streak\nhttps://x.github.io/sum-sort/');
+  const u = shareText({ title: 'Sum Sort Level 42', stars: 1, moves: 20, par: 14, boosters: 1 });
+  assert.equal(u, 'Sum Sort Level 42 ⭐☆☆\n20 moves, par 14 · 1 booster');
+  assert.ok(!/streak/.test(shareText({ title: 'x', stars: 2, moves: 1, par: 1, streak: 1 })), 'a one-day streak is not worth a line');
+});
+
+test('share squares and link', () => {
+  assert.equal(sealSquare(0), '🟪'); assert.equal(sealSquare(1), '🟩'); assert.equal(sealSquare(5), '🟨');
+  assert.equal(shareUrl({ protocol: 'https:', origin: 'https://a.github.io', pathname: '/sum-sort/index.html' }), 'https://a.github.io/sum-sort/');
+  assert.equal(shareUrl({ protocol: 'file:', origin: 'null', pathname: '/x/index.html' }), '');
+});

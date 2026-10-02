@@ -193,6 +193,12 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 }
 .cta:active{transform:translateY(4px);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 1px 0 var(--chip-lo)}
 .ghost{width:54px;min-height:52px;border-radius:18px;display:grid;place-items:center;color:var(--ink)}
+/* share: a quiet corner button on a level's win card; on the daily it is the main button */
+.win-share{position:absolute;top:12px;right:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
+.win-share .done{display:none}
+.win-share.copied .arrow{display:none}.win-share.copied .done{display:block}
+.share-tip{position:absolute;top:64px;right:6px;font:800 12px var(--body);color:var(--ink-soft);opacity:0;transition:opacity .2s ease;pointer-events:none}
+.win-share.copied + .share-tip{opacity:1}
 @keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes star{from{scale:0;opacity:0}to{scale:1;opacity:1}}
 
@@ -303,6 +309,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .flame svg{width:22px;height:22px;fill:#FF8C42;stroke:#D8572A;stroke-width:1.6;stroke-linejoin:round}
 .daily .go{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#FFFFFF}
 .daily .go svg{width:16px;height:16px;fill:currentColor}
+.daily .go svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4}
 .daily .tick{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:var(--ink);box-shadow:0 2px 0 var(--gold-deep)}
 .daily .tick svg.i{width:18px;height:18px;stroke-width:3}
 .daily[aria-disabled="true"]{cursor:default}
@@ -382,6 +389,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
     </div>
     <div class="win" id="win" hidden>
       <div class="win-card" id="winCard" role="dialog" aria-labelledby="winTitle">
+        <button id="winShareBtn" class="win-share raised" type="button" aria-label="Share result">
+          <svg class="i arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg>
+          <svg class="i done" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>
+        </button>
+        <span class="share-tip" id="shareTip" aria-live="polite"></span>
         <div class="stars" id="winStars" role="img" aria-label="3 of 3 stars"></div>
         <p class="eyebrow" id="winEyebrow">Level 1 cleared</p>
         <h2 id="winTitle">Sweet!</h2>
@@ -505,6 +517,8 @@ const DEFAULT_TIP = 'The badge shows what a jar still needs. Hit it exactly to s
 const FLAME = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c.6 3.2-1.3 4.9-2.9 6.6C7.4 10.9 6 12.7 6 15.2 6 18.6 8.7 21.5 12 21.5s6-2.7 6-6.3c0-2.4-1.2-4.3-2.6-5.7-.2 1.6-1 2.7-2.1 3.2.4-3.6-.4-7-1.3-9.2z"/></svg>';
 const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11.3-6.8a1 1 0 0 0 0-1.72L9.5 4.34A1 1 0 0 0 8 5.2z"/></svg>';
 const TICK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+const SHARE_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg>';
+const NEXT_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
 /* ---------------- dom ---------------- */
 const $ = id => document.getElementById(id);
@@ -515,7 +529,7 @@ const ui = {
   win: $('win'), winText: $('winText'), winEyebrow: $('winEyebrow'), winTitle: $('winTitle'), winStars: $('winStars'),
   winMoves: $('winMoves'), winPar: $('winPar'), tally: $('starTally'), winCard: $('winCard'), winChapter: $('winChapter'),
   winStats: $('winStats'), nextLabel: $('nextLabel'), tray: $('tray'), hud: $('hud'),
-  next: $('nextBtn'), winHome: $('winHomeBtn'),
+  next: $('nextBtn'), winHome: $('winHomeBtn'), winShare: $('winShareBtn'), shareTip: $('shareTip'),
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
@@ -960,7 +974,8 @@ let moveCount = 0, spareUsed = false, rescued = false, allow = { ...ALLOW };
 let dead = false, softDead = false, plan = null, spareRescues = false, splitArmed = false, tipText = DEFAULT_TIP, buildId = 0;
 let flights = 0;      // tiles in the air: they never block input
 let daily = null;     // the date key of the daily puzzle on the board, or null for the level
-let chain = 0, bestChain = 0, callouts = 0;   // jars sealed in a row with no wasted move (see comboStep), words shown
+let chain = 0, bestChain = 0, callouts = 0;
+let sealLog = [], boostersUsed = 0, winStars = 0;   // for the shared result: the chain at each seal, in order, and boosters spent   // jars sealed in a row with no wasted move (see comboStep), words shown
 let pending = null;   // one remembered tap, replayed as soon as the board can take it
 let deferred = null;  // one booster press waiting for flying tiles to land
 let hitMeshes = [];
@@ -988,7 +1003,7 @@ function buildLevel(n) {
   sel = null; history = []; busy = 0; flights = 0; pending = null; deferred = null;
   won = false; moveCount = 0; spareUsed = false; rescued = false; allow = { ...ALLOW };
   dead = false; softDead = false; plan = null; spareRescues = false; setSplitArmed(false);
-  chain = 0; bestChain = 0; callouts = 0;
+  chain = 0; bestChain = 0; callouts = 0; sealLog = []; boostersUsed = 0;
   jars = def.jars.map((t, i) => {
     const lock = def.locks ? def.locks[i] : 0, view = makeJarView({ target: t, locked: lock > 0 });
     const tiles = (def.fill ? def.fill[i] : []).map((v, k) => {
@@ -1270,6 +1285,7 @@ function moveTo(di) {
   moveCount++;
   chain = comboStep(chain, { clean: src.kind === 'stack' && dst.t != null, seals }); bestChain = Math.max(bestChain, chain);
   const combo = seals ? chain : 0;
+  if (seals) sealLog.push(chain);
   const finishing = jars.every(j => j.t == null || j.sealed);
   if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
   updateHud();
@@ -1336,8 +1352,9 @@ function callout(j, n) {
 async function undo() {
   if (busy || won || !history.length || allow.undo <= 0 || !unlocked('undo')) return;
   const id = buildId;
-  deselect(); setSplitArmed(false); busy++; allow.undo--; chain = 0;
+  deselect(); setSplitArmed(false); busy++; allow.undo--; chain = 0; boostersUsed++;
   const h = history.pop();
+  if (h.seals) sealLog.pop();
   if (h.type === 'split') {
     const list = srcList(h.loc), view = srcView(h.loc);
     list.splice(list.length - 2, 2).forEach(p => view.group.remove(p.mesh));
@@ -1359,7 +1376,7 @@ async function undo() {
 async function addSpare() {
   if (busy || won || spareUsed || allow.spare <= 0 || !unlocked('spare')) return;
   const id = buildId;
-  deselect(); setSplitArmed(false); busy++; spareUsed = true; rescued = true; allow.spare--; chain = 0; updateHud();
+  deselect(); setSplitArmed(false); busy++; spareUsed = true; rescued = true; allow.spare--; chain = 0; boostersUsed++; updateHud();
   const j = { t: null, lock: 0, exact: false, tiles: [], sealed: false, spare: true, view: makeJarView({ spare: true }) };
   jars.push(j); j.view.group.scale.setScalar(0.001); playGroup.add(j.view.group);
   refreshHits();
@@ -1389,7 +1406,7 @@ async function doSplit(loc) {
   if (tile.v < 2) return fail('A 1 is as small as it gets.');
   if (loc.kind === 'jar' && list.length >= JAR_CAP) return fail('No room in that jar for two tiles.');
   if (sel) { ringTo(srcView(sel).selRing, 0); sel = null; }
-  busy++; allow.split--; rescued = true; chain = 0; updateHud();
+  busy++; allow.split--; rescued = true; chain = 0; boostersUsed++; updateHud();
   const small = Math.floor(tile.v / 2), big = tile.v - small;
   list.pop(); const k = list.length;
   await tween(140, t => tile.mesh.scale.setScalar(1 - 0.6 * t), ease.inQuad);
@@ -1414,7 +1431,7 @@ function hint() {
   if (dead) { toast('No way out from here. Undo a move first.'); return; }
   if (!plan) { toast('This one is too tangled to read. Try an undo.'); return; }
   const m = plan[0];
-  allow.hint--; updateHud();
+  allow.hint--; boostersUsed++; updateHud();
   if (!sel || sel.kind !== m.src.kind || sel.i !== m.src.i) { deselect(); select(m.src); }
   pulseBadge(jars[m.dst].view);
 }
@@ -1448,7 +1465,7 @@ function armIdle() {
 async function winLevel() {
   won = true; dead = false; softDead = false; clearTimeout(idleTimer); refreshLocks(false); updateHud();
   const id = buildId, ch = chapterOf(levelNo), tiles = def.par, L = lastLayout;
-  const stars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
+  const stars = winStars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
   const perfect = stars === 3 && !def.exact && !def.teach;      // tutorial levels cannot be played badly, so they stay on the plain rung
   const chapterDone = !daily && levelNo === ch.to;
   // the level is done the moment it is won: leaving now and coming back later starts the next one.
@@ -1456,7 +1473,7 @@ async function winLevel() {
   let streakGrew = false;
   if (daily) {
     const prev = save.daily[daily];
-    save.daily[daily] = { stars: Math.max(prev ? prev.stars : 0, stars), moves: prev ? Math.min(prev.moves, moveCount) : moveCount, par: def.par };
+    save.daily[daily] = prev && prev.stars >= stars ? prev : { stars, moves: moveCount, par: def.par, seals: sealLog.slice(), boosters: boostersUsed };
     const before = save.streak ? save.streak.count : 0;
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; }
@@ -1496,10 +1513,43 @@ async function winLevel() {
     : stars === 3 ? 'No wasted moves.'
     : rescued ? 'Solved with a booster. Go without one for 3 stars.'
     : `${plural(moveCount - def.par, 'move')} over par. Match par for 3 stars.`;
-  ui.nextLabel.textContent = daily ? 'Back to levels' : chapterDone && next ? 'Next chapter' : 'Next level';
+  ui.nextLabel.textContent = daily ? 'Share result' : chapterDone && next ? 'Next chapter' : 'Next level';
+  ui.next.querySelector('svg').outerHTML = daily ? SHARE_ICON : NEXT_ICON;
+  ui.next.className = 'cta gummy ' + (daily ? 'c-grape' : 'c-rasp');
+  ui.winShare.hidden = !!daily; ui.winShare.classList.remove('copied'); ui.shareTip.textContent = '';
   ui.win.hidden = false; ui.next.focus({ preventScroll: true });
   // past the stored levels, build the next one now, while nobody is mid-move
   if (!daily && levelNo >= LEVELS.length) setTimeout(() => getLevel(levelNo + 1), 400);
+}
+
+/* ---------------- sharing ----------------
+   The phone's share sheet where there is one, the clipboard everywhere else. */
+function resultText() {
+  if (daily) return dailyShareText(daily);
+  return shareText({ title: `Sum Sort Level ${levelNo}`, stars: winStars, moves: moveCount, par: def.par, seals: sealLog, boosters: boostersUsed, url: shareUrl(location) });
+}
+function dailyShareText(key) {
+  const r = save.daily[key]; if (!r) return '';
+  return shareText({ title: `Sum Sort Daily #${dailyNumber(key)}`, stars: r.stars, moves: r.moves, par: r.par, seals: r.seals || [], boosters: r.boosters || 0,
+    streak: streakNow(save.streak, todayKey()), url: shareUrl(location) });
+}
+let lastShared = '';
+async function shareOut(text, done) {
+  lastShared = text; save.shares = (save.shares || 0) + 1; persist();
+  try {
+    if (navigator.share && matchMedia('(pointer: coarse)').matches) { await navigator.share({ text }); return done('Shared'); }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); return done('Copied'); } catch (e) { /* older browsers: below */ }
+  const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+  document.body.appendChild(ta); ta.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) { /* nothing left to try */ }
+  ta.remove(); done(ok ? 'Copied' : 'Could not copy');
+}
+function shareFromWin(btn) {
+  shareOut(resultText(), how => {
+    sfx.select(8); buzz(8);
+    if (btn === ui.next) { ui.nextLabel.textContent = how === 'Copied' ? 'Copied!' : how; setTimeout(() => { if (daily && !ui.win.hidden) ui.nextLabel.textContent = 'Share result'; }, 2200); }
+    else { ui.winShare.classList.add('copied'); ui.shareTip.textContent = how === 'Copied' ? 'Copied!' : how; setTimeout(() => { ui.winShare.classList.remove('copied'); ui.shareTip.textContent = ''; }, 2200); }
+  });
 }
 
 /* ---------------- home ----------------
@@ -1539,7 +1589,7 @@ function renderDaily() {
   const { key, result, locked, streak } = dailyState(), r = dailyRecipe(key);
   ui.dailyMon.textContent = dailyLabel(key).split(' ')[2]; ui.dailyDay.textContent = String(Number(key.slice(8)));
   ui.daily.classList.toggle('locked', locked);
-  ui.daily.setAttribute('aria-disabled', String(locked || !!result));
+  ui.daily.setAttribute('aria-disabled', String(locked));
   const flame = n => `<span class="flame">${FLAME}${n}</span>`;
   if (locked) {
     const left = DAILY_OPENS - levelNo;
@@ -1550,8 +1600,8 @@ function renderDaily() {
     const h = Math.floor(msToNextDay() / 3600000), m = Math.floor(msToNextDay() / 60000) % 60;
     ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)} · done`; ui.dailyName.textContent = `${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} ${plural(result.moves, 'move')}`;
     ui.dailySub.textContent = `Next in ${h ? h + 'h ' : ''}${m}m`;
-    ui.dailySide.innerHTML = streak ? flame(streak) : `<span class="tick">${TICK}</span>`;
-    ui.daily.setAttribute('aria-label', `Daily puzzle done with ${plural(result.stars, 'star')}. Streak ${plural(streak, 'day')}. Next one in ${h} hours ${m} minutes`);
+    ui.dailySide.innerHTML = (streak ? flame(streak) : '') + `<span class="go gummy c-grape">${SHARE_ICON}</span>`;
+    ui.daily.setAttribute('aria-label', `Daily puzzle done with ${plural(result.stars, 'star')}. Streak ${plural(streak, 'day')}. Next one in ${h} hours ${m} minutes. Share result`);
   } else {
     ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)}`; ui.dailyName.textContent = `${WEEKDAYS[weekdayOf(key)]} · ${r.level}`;
     ui.dailySub.textContent = streak ? 'Keep your streak' : save.streak && save.streak.best ? 'Start a new streak' : 'Same board for all';
@@ -1561,7 +1611,11 @@ function renderDaily() {
 }
 function playDaily() {
   const { key, result, locked } = dailyState();
-  if (!homeOpen || locked || result) return;
+  if (!homeOpen || locked) return;
+  if (result) {   // done for today: the card shares the result instead
+    shareOut(dailyShareText(key), how => { ui.dailySub.textContent = how === 'Copied' ? 'Copied!' : how; sfx.select(8); setTimeout(renderDaily, 2600); });
+    return;
+  }
   leaveHome(); stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false;
   sfx.select(7); buzz(8);
   daily = key; buildLevel(levelNo); fitCamera(false);
@@ -1691,7 +1745,8 @@ ui.hint.addEventListener('click', () => whenSettled(hint));
 ui.restart.addEventListener('click', restart);
 ui.stripRestart.addEventListener('click', restart);
 ui.refill.addEventListener('click', refill);
-ui.next.addEventListener('click', () => { if (daily) goHome(); else goLevel(levelNo + 1); });
+ui.next.addEventListener('click', () => { if (daily) shareFromWin(ui.next); else goLevel(levelNo + 1); });
+ui.winShare.addEventListener('click', () => shareFromWin(ui.winShare));
 ui.winHome.addEventListener('click', goHome);
 ui.homeBtn.addEventListener('click', goHome);
 ui.play.addEventListener('click', play);
@@ -1742,7 +1797,7 @@ async function start(hot) {
     get dead() { return dead; }, get softDead() { return softDead; }, get plan() { return plan; }, get level() { return levelNo; }, get moves() { return moveCount; },
     get lowQuality() { return lowQuality; }, get allow() { return allow; }, get pending() { return !!pending; },
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
-    get daily() { return daily; }, playDaily, get save() { return save; },
+    get daily() { return daily; }, playDaily, get save() { return save; }, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
     setTileColor(v, hex) { tileMaterial(v).color.set(hex); },
