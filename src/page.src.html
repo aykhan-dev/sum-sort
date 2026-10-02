@@ -382,8 +382,10 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .play svg{width:24px;height:24px;fill:currentColor;flex:none}
 @keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
 /* the daily puzzle: a card under Play. Locked until the rules it uses are taught, then one board a day. */
+.modes{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:min(100%,300px)}
+.modes.two{grid-template-columns:minmax(0,1fr) 88px}
 .daily{
-  width:min(100%,300px);min-height:64px;border-radius:20px;padding:8px 12px 8px 8px;
+  width:100%;min-height:64px;border-radius:20px;padding:8px 12px 8px 8px;
   display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;
 }
 .daily .cal{
@@ -409,6 +411,22 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .daily.locked .cal{filter:grayscale(.8) opacity(.6)}
 .daily.locked .dname{color:var(--ink-soft)}
 .level-tag.is-daily .eyebrow{color:#7848E0}
+.modes.two .daily .go{display:none}
+.modes.two .daily .dname{font-size:16px}
+/* Sugar Rush: a minute of quick boards, next to the daily */
+.rush{display:grid;justify-items:center;align-content:center;gap:1px;padding:6px 4px;border-radius:20px;min-height:64px;line-height:1.1}
+.rush .bolt{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;margin-bottom:2px;text-shadow:none}
+.rush .bolt svg{width:18px;height:18px;fill:#FFFFFF;stroke:none}
+.rush .rname{font:600 15px var(--display);color:var(--ink)}
+.rush .rsub{font-size:11.5px;font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
+.level-tag.is-rush .eyebrow{color:#C2561A}
+/* the rush clock: under ten seconds it turns red and beats */
+.hud.hurry #movesPill b{color:var(--raspberry-ink)}
+.hud.hurry .pill{animation:hurry .5s ease-in-out infinite alternate}
+@keyframes hurry{to{border-color:#F8B9C7;box-shadow:0 6px 14px -8px rgba(199,48,79,.7)}}
+.pill b.gain{animation:gain .6s cubic-bezier(.3,1.7,.5,1)}
+@keyframes gain{0%{scale:1}40%{scale:1.45;color:#1C9C90}100%{scale:1}}
+.stars .bolt-big{width:84px;height:84px;margin-bottom:-4px;filter:drop-shadow(0 4px 0 #DE6C23) drop-shadow(0 10px 12px rgba(222,108,35,.35));animation:star .45s cubic-bezier(.3,1.7,.5,1) both}
 /* shorter phones: the level number gives up some size, so the motif (the game in one line) keeps its room */
 @media (max-height:700px){
   .home-level .num{min-width:88px;height:88px;font-size:50px;border-radius:28px}
@@ -429,6 +447,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   .boost.rescue{animation:none}
   .jbar i.now,.jbar i.fill{animation:none}
   .shop-card,.reward{animation:none}
+  .hud.hurry .pill,.pill b.gain,.stars .bolt-big{animation:none}
   .callout{animation:callout-still 1.15s linear both}
   .flash.go,.level-tag .num.pop{animation:none}
   .vignette::after{transition:none}
@@ -502,8 +521,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
         <h2 id="winTitle">Sweet!</h2>
         <p class="chapter-tag" id="winChapter" hidden></p>
         <div class="stats" id="winStats">
-          <span class="stat"><small>Moves</small><b id="winMoves">3</b></span>
-          <span class="stat"><small>Par</small><b id="winPar">3</b></span>
+          <span class="stat"><small id="winMovesLabel">Moves</small><b id="winMoves">3</b></span>
+          <span class="stat"><small id="winParLabel">Par</small><b id="winPar">3</b></span>
         </div>
         <p class="note" id="winText">No wasted moves.</p>
         <div class="reward" id="winReward" hidden>
@@ -552,11 +571,17 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
     <button id="playBtn" class="cta gummy c-rasp play" type="button">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11.3-6.8a1 1 0 0 0 0-1.72L9.5 4.34A1 1 0 0 0 8 5.2z"/></svg>Play
     </button>
+    <div class="modes" id="modes">
     <button id="dailyBtn" class="daily raised" type="button">
       <span class="cal gummy c-grape" aria-hidden="true"><small id="dailyMon">Oct</small><b id="dailyDay">1</b></span>
       <span class="dtxt"><span class="eyebrow" id="dailyEyebrow">Daily puzzle</span><span class="dname" id="dailyName">Thursday</span><span class="dsub" id="dailySub"></span></span>
       <span class="dside" id="dailySide"></span>
     </button>
+    <button id="rushBtn" class="rush raised" type="button" hidden>
+      <span class="bolt gummy c-orange" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 2 4.5 13.5h6L9.5 22l9-12h-6z"/></svg></span>
+      <span class="rname">Rush</span><span class="rsub" id="rushSub">1 minute</span>
+    </button>
+    </div>
   </section>
 
   <section class="shop" id="shop" role="dialog" aria-modal="true" aria-labelledby="shopTitle" hidden>
@@ -648,6 +673,8 @@ const PLAY_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v1
 const TICK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
 const SHARE_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5"/><path d="m7.5 8 4.5-4.5L16.5 8"/><path d="M5 12.5V19a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-6.5"/></svg>';
 const GIFT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="9" width="17" height="11.5" rx="2"/><path d="M2.5 9h19M12 9v11.5"/><path d="M12 9c-1.5-3.6-6-4.6-6-1.8C6 9 12 9 12 9zM12 9c1.5-3.6 6-4.6 6-1.8C18 9 12 9 12 9z"/></svg>';
+const BOLT_BIG = '<svg class="bolt-big" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2 4.5 13.5h6L9.5 22l9-12h-6z" fill="#FF8C42" stroke="#DE6C23" stroke-width="1.2" stroke-linejoin="round"/></svg>';
+const REPLAY_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>';
 const NEXT_ICON = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
 
 /* ---------------- dom ---------------- */
@@ -666,6 +693,7 @@ const ui = {
   homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
+  modes: $('modes'), rush: $('rushBtn'), rushSub: $('rushSub'), winMovesLabel: $('winMovesLabel'), winParLabel: $('winParLabel'),
   homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
   winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext'),
   shop: $('shop'), shopClose: $('shopClose'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
@@ -745,6 +773,7 @@ const sfx = {
   split: () => { tone(700, 0.09, { type: 'triangle', gain: 0.05 }); tone(940, 0.11, { type: 'triangle', gain: 0.05, delay: 0.08 }); },
   stuck: () => { tone(330, 0.2, { gain: 0.05, to: 290 }); tone(247, 0.3, { gain: 0.05, to: 220, delay: 0.16 }); },
   nudge: () => tone(392, 0.22, { gain: 0.045, to: 440 }),
+  tick: () => tone(1320, 0.05, { type: 'square', gain: 0.02 }),
   // a sparkle after the seal chord, a step higher for every jar in the chain
   combo: n => { const r = Math.pow(2, Math.min(n - 2, 5) * 2 / 12); [1, 1.26, 1.5, 2].forEach((m, i) => tone(1046.5 * r * m, 0.2, { type: 'triangle', gain: 0.032, delay: 0.16 + i * 0.055 })); },
   perfect: () => [2, 4, 5, 4, 5].forEach((s, i) => tone(NOTES[s] * (i > 2 ? 4 : 2), 0.42, { gain: 0.045, delay: i * 0.085 })),
@@ -1119,6 +1148,7 @@ let dead = false, softDead = false, plan = null, spareRescues = false, splitArme
 let flights = 0;      // tiles in the air: they never block input
 let daily = null;     // the date key of the daily puzzle on the board, or null for the level
 let finaleJar = null; // the last numbered jar left open, once the others are sealed
+let rush = null;      // a Sugar Rush run: { seed, round, score, boards, endsAt, pausedLeft, over, def, next }
 let chain = 0, bestChain = 0, callouts = 0;
 let sealLog = [], boostersUsed = 0, winStars = 0;   // for the shared result: the chain at each seal, in order, and boosters spent   // jars sealed in a row with no wasted move (see comboStep), words shown
 let pending = null;   // one remembered tap, replayed as soon as the board can take it
@@ -1143,7 +1173,7 @@ function buildLevel(n) {
   [...playGroup.children].forEach(ch => playGroup.remove(ch));
   if (confetti) { confetti.mesh.dispose(); confetti = null; }
   levelTrash.forEach(x => x.dispose()); levelTrash = [];
-  levelNo = n; def = daily ? getDaily(daily) : getLevel(n);
+  levelNo = n; def = rush ? rush.def : daily ? getDaily(daily) : getLevel(n);
   toastMsg = ''; clearTimeout(toastTimer);
   sel = null; history = []; busy = 0; flights = 0; pending = null; deferred = null;
   won = false; moveCount = 0; spareUsed = false; rescued = false; allow = { ...ALLOW };
@@ -1171,22 +1201,23 @@ function buildLevel(n) {
   stacks.forEach(s => playGroup.add(s.view.group));
   layoutPlay(false); refreshHits();
   const ch = chapterOf(n);
-  tipText = daily ? `Daily puzzle: the same board for everyone today. ${dailyRecipe(daily).level} on a ${WEEKDAYS[weekdayOf(daily)]}.`
+  tipText = rush ? (rush.round ? `Board ${rush.round + 1}. Every board you clear adds ${RUSH.perBoard} seconds.` : `Seal jars fast: every board you clear adds ${RUSH.perBoard} seconds. Combos score more.`)
+    : daily ? `Daily puzzle: the same board for everyone today. ${dailyRecipe(daily).level} on a ${WEEKDAYS[weekdayOf(daily)]}.`
     : def.rule || (n === ch.from ? ch.rule : INTRO[n] || (def.exact ? MATCH_TIP : DEFAULT_TIP));
   // the level tag: a level number, or the day of the month for the daily
-  ui.levelTag.classList.toggle('is-daily', !!daily);
-  ui.levelNum.className = 'num gummy ' + (daily ? 'c-grape' : 'c-rasp');
-  ui.levelNum.textContent = daily ? String(Number(daily.slice(8))) : String(n);
+  ui.levelTag.classList.toggle('is-daily', !!daily); ui.levelTag.classList.toggle('is-rush', !!rush);
+  ui.levelNum.className = 'num gummy ' + (rush ? 'c-orange' : daily ? 'c-grape' : 'c-rasp');
+  ui.levelNum.textContent = rush ? String(rush.round + 1) : daily ? String(Number(daily.slice(8))) : String(n);
   ui.levelNum.classList.remove('pop'); void ui.levelNum.offsetWidth; ui.levelNum.classList.add('pop');
-  ui.levelTag.querySelector('.eyebrow').textContent = daily ? `Daily #${dailyNumber(daily)}` : 'Level';
-  ui.chapterName.textContent = daily ? WEEKDAYS[weekdayOf(daily)] : ch.name;
+  ui.levelTag.querySelector('.eyebrow').textContent = rush ? 'Sugar Rush' : daily ? `Daily #${dailyNumber(daily)}` : 'Level';
+  ui.chapterName.textContent = rush ? `Board ${rush.round + 1}` : daily ? WEEKDAYS[weekdayOf(daily)] : ch.name;
   ui.win.hidden = true;
   // chapter 1 shows nothing but the board; each booster arrives on the level where it first helps
   ui.hud.hidden = !!def.exact;
   let shown = 0;
   for (const b of BOOSTERS) { const on = unlocked(b); ui[b].hidden = !on; ui[b].classList.toggle('fresh', !daily && levelNo === UNLOCK[b]); if (on) shown++; }
-  ui.tray.hidden = shown === 0; ui.tray.style.setProperty('--cols', Math.max(1, shown));
-  if (n !== TEST_LEVEL && !daily) { save.last = n; persist(); }
+  ui.tray.hidden = shown === 0 || !!rush; ui.tray.style.setProperty('--cols', Math.max(1, shown));   // a rush is played without boosters
+  if (n !== TEST_LEVEL && !daily && !rush) { save.last = n; persist(); }
   // entrance: jars and dishes pop in, back row first
   if (!REDUCED) {
     const groups = [...jars, ...stacks].map(o => o.view.group);
@@ -1274,8 +1305,8 @@ function refreshLocks(animated = true) {
   });
 }
 function updateHud() {
-  ui.moves.innerHTML = `Moves <b>${moveCount}</b>`;
-  ui.par.innerHTML = `Par <b>${def.par}</b>`;
+  if (rush) { rushShown = ''; renderRushHud(); }   // in a rush the two pills are the clock and the score
+  else { ui.moves.innerHTML = `Moves <b>${moveCount}</b>`; ui.par.innerHTML = `Par <b>${def.par}</b>`; ui.hud.classList.remove('hurry'); }
   ui.undoCount.textContent = allow.undo; ui.spareCount.textContent = allow.spare;
   ui.splitCount.textContent = allow.split; ui.hintCount.textContent = allow.hint;
   ui.undo.disabled = won || !history.length || allow.undo <= 0;
@@ -1305,7 +1336,9 @@ function renderStrip() {
   ui.undo.classList.toggle('rescue', stuck && canUndo);
   ui.spare.classList.toggle('rescue', stuck && canSpare);
   ui.stripRestart.hidden = !stuck;
-  ui.refill.hidden = !(stuck && !canUndo && !canSpare && history.length > 0 && unlocked('undo'));
+  ui.stripRestart.textContent = rush ? `Skip board (−${RUSH.skip} s)` : 'Restart';
+  ui.refill.hidden = !!rush || !(stuck && !canUndo && !canSpare && history.length > 0 && unlocked('undo'));
+  if (stuck && rush && !toastMsg) ui.tip.textContent = 'Dead end. Skip to a new board.';
 }
 /* After every change: is the board still winnable? Stack-only search first (fast), then the full search. */
 function analyse(move) {
@@ -1445,16 +1478,19 @@ function moveTo(di) {
   chain = comboStep(chain, { clean: src.kind === 'stack' && dst.t != null, seals }); bestChain = Math.max(bestChain, chain);
   const combo = seals ? chain : 0;
   if (seals) sealLog.push(chain);
+  if (seals && rush) { rush.score += rushSealPoints(chain); renderRushHud(true); }
   const finishing = jars.every(j => j.t == null || j.sealed);
   if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
   updateHud();
   // the winning tile flies in slow motion while the camera leans toward its jar
-  if (finishing && !REDUCED) kickCamera(dst.view.group.position, 7, 1500);
-  flyTo(tile.mesh, dst.view.group, jarSlotY(slot), 3.35, finishing && !REDUCED ? 1.9 : 1).then(async () => {
+  // the winning tile flies in slow motion while the camera leans toward its jar (not in a rush: the clock is running)
+  const slowMo = finishing && !REDUCED && !rush;
+  if (slowMo) kickCamera(dst.view.group.position, 7, 1500);
+  flyTo(tile.mesh, dst.view.group, jarSlotY(slot), 3.35, slowMo ? 1.9 : 1).then(async () => {
     if (id !== buildId) return;
     tile.flying = false; flights--;
     sfx.drop(slot); buzz(8); syncBadge(dst);
-    if (seals) { const lid = sealAnim(dst, combo, finishing); if (finishing) { await lid; if (id === buildId) winLevel(); return; } }
+    if (seals) { const lid = sealAnim(dst, combo, finishing); if (finishing) { await lid; if (id === buildId) (rush ? rushCleared() : winLevel()); return; } }
     if (!won) afterChange({ src, dst: di });
     settle();
   });
@@ -1611,6 +1647,7 @@ let idleTimer = 0;
 function armIdle() {
   clearTimeout(idleTimer);
   if (won) return;
+  if (rush) return;   // no free hints against the clock
   const id = buildId, delay = def.exact || def.teach || softDead ? 2200 : 8000;
   idleTimer = setTimeout(() => {
     if (id !== buildId || won || dead || !plan || homeOpen) return;
@@ -1672,6 +1709,7 @@ async function winLevel() {
   ui.winChapter.hidden = !chapterDone;
   if (chapterDone) { ui.winChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.winChapter.textContent = `Chapter complete: ${ch.name}`; }
   ui.winStats.hidden = !!def.exact || !!def.teach;
+  ui.winMovesLabel.textContent = 'Moves'; ui.winParLabel.textContent = 'Par';
   ui.winMoves.textContent = moveCount; ui.winPar.textContent = def.par;
   const streakNote = daily && save.streak ? (save.streak.count > 1 ? `${save.streak.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.' : '';
   ui.winText.textContent = daily ? streakNote
@@ -1696,9 +1734,81 @@ async function winLevel() {
   if (!daily && levelNo >= LEVELS.length) setTimeout(() => getLevel(levelNo + 1), 400);
 }
 
+/* ---------------- Sugar Rush ----------------
+   One minute on the clock, small boards one after another. A cleared board adds time; a dead end can be skipped
+   for a few seconds. The next board is made while this one is played, so there is no wait between them. */
+const rushLeft = () => !rush ? 0 : rush.pausedLeft != null ? rush.pausedLeft : Math.max(0, (rush.endsAt - performance.now()) / 1000);
+let rushShown = '', rushTick = -1;
+function renderRushHud(gain = false) {
+  if (!rush) return;
+  const left = Math.ceil(rushLeft()), key = left + '|' + rush.score;
+  if (key === rushShown && !gain) return; rushShown = key;
+  ui.moves.innerHTML = `Time <b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b>`;
+  ui.par.innerHTML = `Score <b${gain ? ' class="gain"' : ''}>${rush.score}</b>`;
+  ui.hud.classList.toggle('hurry', left <= 10 && !rush.over);
+  if (left <= 5 && left > 0 && left !== rushTick && !rush.over) { rushTick = left; sfx.tick(); }
+}
+function prefetchRush() { setTimeout(() => { if (rush && !rush.next && !rush.over) rush.next = rushBoard(rush.seed, rush.round + 1); }, 450); }
+function startRush() {
+  if (levelNo < RUSH_OPENS) return;
+  const seed = window.__sumSortRushSeed || ((Date.now() ^ Math.floor(Math.random() * 0x7FFFFFFF)) >>> 0);
+  daily = null;
+  rush = { seed, round: 0, score: 0, boards: 0, endsAt: 0, pausedLeft: null, over: false, def: rushBoard(seed, 0), next: null };
+  if (homeOpen) { leaveHome(); stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false; }
+  rush.endsAt = performance.now() + RUSH.start * 1000; rushTick = -1;
+  buildLevel(levelNo); fitCamera(false);
+  sfx.select(9); buzz(10); prefetchRush();
+}
+function nextRushBoard() {
+  rush.round++; rush.def = rush.next || rushBoard(rush.seed, rush.round); rush.next = null;
+  buildLevel(levelNo); fitCamera(false); prefetchRush();
+}
+async function rushCleared() {
+  if (!rush || rush.over) return;
+  won = true; rush.boards++; rush.score += RUSH.clear;
+  rush.endsAt = performance.now() + rushTimeAfterClear(rushLeft()) * 1000;
+  sfx.win(); buzz([20, 40, 30]); renderRushHud(true);
+  jars.forEach((j, i) => setTimeout(() => { if (rush && !rush.over) hop(j.view.group, 0.3, 380); }, i * 60 * SPEED));
+  await wait(620);
+  if (!rush || rush.over) return;
+  nextRushBoard(); toast(`Board cleared: +${RUSH.perBoard} seconds, +${RUSH.clear} points.`);
+}
+function rushSkip() {
+  if (!rush || rush.over) return;
+  rush.endsAt -= RUSH.skip * 1000; sfx.split(); nextRushBoard();
+}
+function endRush() {
+  if (!rush || rush.over) return;
+  rush.over = true; won = true; clearTimeout(idleTimer); deselect(); setSplitArmed(false);
+  const prev = save.rush || { best: 0, plays: 0 }, isBest = rush.score > (prev.best || 0);
+  save.rush = { best: Math.max(prev.best || 0, rush.score), plays: (prev.plays || 0) + 1, last: rush.score };
+  persist(); renderRushHud(true);
+  if (isBest && rush.score > 0) { sfx.perfect(); buzz([20, 40, 30, 40, 60]); } else { sfx.win(); buzz([20, 40, 30]); }
+  const L = lastLayout;
+  if (!REDUCED && isBest && L) confetti = makeConfetti(40, { x0: L.minX, x1: L.maxX, z0: L.minZ, z1: L.maxZ });
+  ui.winCard.classList.toggle('perfect', isBest && rush.score > 0); ui.winCard.classList.remove('chapter-done');
+  ui.winEyebrow.textContent = `Sugar Rush · ${plural(rush.boards, 'board')}`;
+  ui.winTitle.textContent = isBest && rush.score > 0 ? 'New best!' : "Time's up!";
+  ui.winStars.innerHTML = BOLT_BIG; ui.winStars.setAttribute('aria-label', 'Sugar Rush');
+  ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true;
+  ui.winMovesLabel.textContent = 'Score'; ui.winParLabel.textContent = 'Best';
+  ui.winMoves.textContent = rush.score; ui.winPar.textContent = save.rush.best;
+  ui.winText.textContent = isBest && prev.best ? `${rush.score - prev.best} more than your last best.` : rush.boards ? 'Clean seals in a row score double, triple and up.' : 'Clear a board to win time back.';
+  ui.nextLabel.textContent = 'Play again'; ui.next.querySelector('svg').outerHTML = REPLAY_ICON; ui.next.className = 'cta gummy c-orange';
+  ui.winShare.hidden = false; ui.winShare.classList.remove('copied'); ui.shareTip.textContent = '';
+  ui.win.hidden = false; ui.next.focus({ preventScroll: true });
+}
+/* a hidden tab stops the clock */
+document.addEventListener('visibilitychange', () => {
+  if (!rush || rush.over) return;
+  if (document.hidden) rush.pausedLeft = rushLeft();
+  else if (rush.pausedLeft != null) { rush.endsAt = performance.now() + rush.pausedLeft * 1000; rush.pausedLeft = null; }
+});
+
 /* ---------------- sharing ----------------
    The phone's share sheet where there is one, the clipboard everywhere else. */
 function resultText() {
+  if (rush) return rushShareText({ score: rush.score, boards: rush.boards, best: (save.rush && save.rush.best) || 0, url: shareUrl(location) });
   if (daily) return dailyShareText(daily);
   return shareText({ title: `Sum Sort Level ${levelNo}`, stars: winStars, moves: moveCount, par: def.par, seals: sealLog, boosters: boostersUsed, url: shareUrl(location) });
 }
@@ -1787,7 +1897,7 @@ function showHome(focus = true) {
   ui.homeCount.textContent = `${st.done + 1} of ${st.size}`;
   ui.homeNext.innerHTML = nextText(levelNo - 1) || 'Endless levels: every one is new.';
   ui.homeJourney.setAttribute('aria-label', `${ch.name}, level ${st.done + 1} of ${st.size}. ${ui.homeNext.textContent}`);
-  renderTally(); renderInstall();
+  renderTally(); renderInstall(); renderRush();
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
   homeOpen = true; homeRenderUntil = performance.now() + 1600;
   ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
@@ -1802,9 +1912,17 @@ function play() {
 }
 /* Home from a finished level leaves that level behind: the next one is set up to wait. */
 function goHome() {
-  if (daily) { daily = null; buildLevel(levelNo); fitCamera(false); }   // a daily left half-done starts over next time
+  if (rush) { rush = null; ui.hud.classList.remove('hurry'); buildLevel(levelNo); fitCamera(false); }   // a rush left early is not scored
+  else if (daily) { daily = null; buildLevel(levelNo); fitCamera(false); }   // a daily left half-done starts over next time
   else if (won) { buildLevel(levelNo === TEST_LEVEL ? Math.max(1, Number(save.last) || 1) : levelNo + 1); fitCamera(false); }
   showHome();
+}
+/* The rush card sits beside the daily once it opens, with the best score to beat. */
+function renderRush() {
+  const open = levelNo >= RUSH_OPENS, best = save.rush && save.rush.best;
+  ui.rush.hidden = !open; ui.modes.classList.toggle('two', open);
+  ui.rushSub.textContent = best ? `Best ${best}` : 'New!';
+  ui.rush.setAttribute('aria-label', `Sugar Rush: one minute of quick boards.${best ? ` Best score ${best}.` : ''}`);
 }
 /* The daily card: locked (with how far to go), open (with the streak at stake), or done (with when the next one comes). */
 let dailyTimer = 0;
@@ -1830,8 +1948,10 @@ function renderDaily() {
     ui.dailySide.innerHTML = (streak ? flame(streak) : '') + `<span class="go gummy c-grape">${SHARE_ICON}</span>`;
     ui.daily.setAttribute('aria-label', `Daily puzzle done with ${plural(result.stars, 'star')}. Streak ${plural(streak, 'day')}. Next one in ${h} hours ${m} minutes. Share result`);
   } else {
-    ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)}`; ui.dailyName.textContent = `${WEEKDAYS[weekdayOf(key)]} · ${r.level}`;
-    ui.dailySub.textContent = streak ? 'Keep your streak' : save.streak && save.streak.best ? 'Start a new streak' : 'Same board for all';
+    const day = WEEKDAYS[weekdayOf(key)];
+    ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)}`; ui.dailyName.textContent = `${levelNo >= RUSH_OPENS ? day.slice(0, 3) : day} · ${r.level}`;
+    const narrow = levelNo >= RUSH_OPENS;   // the card shares its row with Sugar Rush
+    ui.dailySub.textContent = streak ? 'Keep your streak' : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
     ui.dailySide.innerHTML = (streak ? flame(streak) : '') + `<span class="go gummy c-grape">${PLAY_ICON}</span>`;
     ui.daily.setAttribute('aria-label', `Play daily puzzle ${dailyNumber(key)}, ${WEEKDAYS[weekdayOf(key)]}, ${r.level}.` + (streak ? ` Keep your ${streak}-day streak` : ''));
   }
@@ -1970,9 +2090,10 @@ ui.spare.addEventListener('click', () => whenSettled(addSpare));
 ui.split.addEventListener('click', () => whenSettled(onSplitButton));
 ui.hint.addEventListener('click', () => whenSettled(hint));
 ui.restart.addEventListener('click', restart);
-ui.stripRestart.addEventListener('click', restart);
+ui.stripRestart.addEventListener('click', () => { if (rush) rushSkip(); else restart(); });
 ui.refill.addEventListener('click', refill);
-ui.next.addEventListener('click', () => { if (daily) shareFromWin(ui.next); else goLevel(levelNo + 1); });
+ui.next.addEventListener('click', () => { if (rush) startRush(); else if (daily) shareFromWin(ui.next); else goLevel(levelNo + 1); });
+ui.rush.addEventListener('click', () => { if (homeOpen) startRush(); });
 ui.winShare.addEventListener('click', () => shareFromWin(ui.winShare));
 ui.winHome.addEventListener('click', goHome);
 ui.homeBtn.addEventListener('click', goHome);
@@ -2008,6 +2129,7 @@ for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { 
 const clock = new THREE.Clock(); let frames = 0, slowMs = 0;
 function loop() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime, now = performance.now();
+  if (rush && !rush.over && !homeOpen) { if (rushLeft() <= 0) endRush(); else renderRushHud(); }
   for (const tw of [...tweens]) {
     const k = clamp01((now - tw.t0) / tw.dur); tw.fn(tw.e(k), k);
     if (k >= 1) { tweens.delete(tw); tw.res(); }
@@ -2050,6 +2172,8 @@ async function start(hot) {
     get dead() { return dead; }, get softDead() { return softDead; }, get plan() { return plan; }, get level() { return levelNo; }, get moves() { return moveCount; },
     get lowQuality() { return lowQuality; }, get allow() { return allow; }, get pending() { return !!pending; },
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
+    get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
+    endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },

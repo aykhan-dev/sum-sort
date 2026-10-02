@@ -93,7 +93,7 @@ export const shareUrl = loc => loc && /^https?:$/.test(loc.protocol) ? loc.origi
 export const MILESTONES = [
   { at: 11, what: 'two-tile jars' }, { at: 11, what: 'the Undo booster' }, { at: 13, what: 'the Hint booster' },
   { at: 15, what: 'the +1 Jar booster' }, { at: 19, what: 'bigger sums' }, { at: 19, what: 'the daily puzzle' },
-  { at: 21, what: 'the Split booster' }, { at: 31, what: 'frosted tiles' }, { at: 39, what: 'ribbon-tied jars' },
+  { at: 21, what: 'the Split booster' }, { at: 25, what: 'Sugar Rush' }, { at: 31, what: 'frosted tiles' }, { at: 39, what: 'ribbon-tied jars' },
   { at: 47, what: 'endless mixed levels' }
 ];
 /* what opens next for a player about to play level n: { at, left, what } with everything opening at that level, or null */
@@ -138,4 +138,37 @@ export function boxProgress(stars) {
   const n = nextBox(stars); if (!n) return 1;
   const prev = [...THEMES].reverse().find(t => t.at <= stars);
   return (stars - prev.at) / (n.at - prev.at);
+}
+
+/* ---------------- Sugar Rush ----------------
+   A timed run of small boards, for when one level at a time is not enough. A minute on the clock; every board
+   cleared adds time back. A seal scores more inside a combo, so clean play beats fast mistakes. Boards grow as the run
+   goes on, and every run is new. It opens once the daily and every booster are known, and uses no boosters. */
+export const RUSH_OPENS = 25;
+export const RUSH = { start: 60, perBoard: 8, cap: 90, seal: 10, clear: 25, skip: 5 };
+const RUSH_STEPS = [   // [from round, recipe]: small and kind first, a little bigger as the run goes on
+  [0, { jars: 3, stacks: 3, parts: [2, 2], minT: 5, maxT: 11, want: 0.20 }],
+  [2, { jars: 3, stacks: 3, parts: [2, 3], minT: 5, maxT: 12, want: 0.25 }],
+  [5, { jars: 4, stacks: 3, parts: [2, 2], minT: 5, maxT: 12, want: 0.30 }],
+  [9, { jars: 4, stacks: 4, parts: [2, 3], minT: 6, maxT: 13, want: 0.35 }]
+];
+export const rushRecipe = round => ({ ch: 'rush', ...RUSH_STEPS.filter(([from]) => round >= from).at(-1)[1] });
+/* a board for this run and round: quick to make (a few ms, rarely a quarter second), within 10 points of its target */
+export function rushBoard(seed, round) {
+  const r = rushRecipe(round);
+  let any = null;
+  for (let salt = 0; salt < 8; salt++) {
+    const d = generateWith(r, mulberry32((seed + round * 7919 + salt * 104729) >>> 0), { tries: 80, runs: 120, tol: 0.08 });
+    if (d && Math.abs(d.fail - r.want) <= 0.1) return d;
+    any = any || d;
+  }
+  return any;
+}
+export const rushSealPoints = chain => RUSH.seal * Math.max(1, chain);
+/* seconds on the clock after a board is cleared, never past the cap */
+export const rushTimeAfterClear = left => Math.min(RUSH.cap, left + RUSH.perBoard);
+export function rushShareText({ score, boards, best, url = '' }) {
+  const lines = [`Sum Sort Sugar Rush ⚡ ${score}`, `${boards} board${boards === 1 ? '' : 's'} in the rush${score >= best && score > 0 ? ' · new best' : ''}`];
+  if (url) lines.push(url);
+  return lines.join('\n');
 }

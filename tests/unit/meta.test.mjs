@@ -172,3 +172,32 @@ test('every counter is light enough for the ink to keep its contrast', () => {
     assert.ok((lum(hex) + 0.05) / (soft + 0.05) >= 4.5, `${t.id} ${hex} with soft ink`);
   }
 });
+
+import { RUSH, RUSH_OPENS, rushRecipe, rushBoard, rushSealPoints, rushTimeAfterClear, rushShareText } from '../../src/meta.mjs';
+
+test('sugar rush: opens after the daily and every booster, as a milestone', () => {
+  assert.ok(RUSH_OPENS > DAILY_OPENS && RUSH_OPENS > 21);
+  assert.equal(upNext(24).what, 'Sugar Rush');
+});
+
+test('sugar rush: boards grow with the run, are solvable from the stacks, and come quickly', () => {
+  assert.equal(rushRecipe(0).jars, 3); assert.equal(rushRecipe(40).jars, 4);
+  for (let round = 0; round < 12; round++) assert.ok(rushRecipe(round).want <= rushRecipe(round + 1).want);
+  const t0 = performance.now();
+  for (let round = 0; round < 12; round++) {
+    const d = rushBoard(12345, round);
+    assert.ok(d, `round ${round}`);
+    assert.equal(d.jars.length, rushRecipe(round).jars);
+    assert.equal(solve(toState(d), 20000, true).status, 'solved', `round ${round} from the stacks`);
+  }
+  assert.ok(performance.now() - t0 < 3000, 'a whole run of boards in well under a second each');
+  assert.deepEqual(rushBoard(777, 3), rushBoard(777, 3), 'the same seed and round, the same board');
+});
+
+test('sugar rush: score and clock', () => {
+  assert.equal(rushSealPoints(0), RUSH.seal); assert.equal(rushSealPoints(1), RUSH.seal); assert.equal(rushSealPoints(4), 4 * RUSH.seal);
+  assert.equal(rushTimeAfterClear(10), 10 + RUSH.perBoard);
+  assert.equal(rushTimeAfterClear(RUSH.cap - 1), RUSH.cap);
+  assert.equal(rushShareText({ score: 340, boards: 7, best: 300, url: 'https://x/' }), 'Sum Sort Sugar Rush ⚡ 340\n7 boards in the rush · new best\nhttps://x/');
+  assert.equal(rushShareText({ score: 120, boards: 1, best: 300 }), 'Sum Sort Sugar Rush ⚡ 120\n1 board in the rush');
+});

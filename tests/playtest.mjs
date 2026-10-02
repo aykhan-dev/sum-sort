@@ -236,6 +236,25 @@ log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scroll
   const ok = await p2.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0, null, { timeout: 120000 }).then(() => true, () => false);
   pass('the built page can be installed, previews well, and plays offline after one visit', head.manifest && /\/og\.png$/.test(head.og || '') && ok, JSON.stringify({ ...head, offline: ok }));
   await off.close(); }
+// 12. Sugar Rush: from level 25 a minute of quick boards; clearing one wins time back, the clock ends it, the best is kept
+await page.evaluate(() => { window.__sumSortRushSeed = 4242; __sumSort.goLevel(30); __sumSort.showHome(); });
+{ const card = await page.evaluate(() => ({ two: document.getElementById('modes').classList.contains('two'), shown: !document.getElementById('rushBtn').hidden }));
+  await tapEl('#rushBtn'); await settled();
+  const r0 = await page.evaluate(() => ({ r: __sumSort.rush, hud: document.getElementById('hud').innerText.replace(/\n/g, ' '), tray: document.getElementById('tray').hidden, last: __sumSort.save.last }));
+  for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.rush.round === 0 && __sumSort.plan && __sumSort.plan[0]); if (!m) break;
+    await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.waitForFunction(() => __sumSort.rush.round === 1, null, { timeout: 30000 });
+  const r1 = await page.evaluate(() => __sumSort.rush);
+  await page.evaluate(() => __sumSort.setRushLeft(0.2));
+  await page.waitForFunction(() => !document.getElementById('win').hidden, null, { timeout: 30000 }); await page.waitForTimeout(600);
+  const end = await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, score: Number(document.getElementById('winMoves').textContent), best: __sumSort.save.rush, next: document.getElementById('nextLabel').textContent }));
+  await page.screenshot({ path: SHOTS + '/rush-end.png' });
+  await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const shared = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('Sugar Rush opens beside the daily, runs on a clock without boosters, and leaves the levels alone', card.two && card.shown && r0.r.left > 55 && /^Time (1:00|0:5\d) Score 0$/.test(r0.hud) && r0.tray && r0.last === 30, JSON.stringify({ card, r0 }));
+  pass('a cleared rush board scores and wins time; the clock ends the run, keeps the best and shares it', r1.boards === 1 && r1.score >= 3 * 10 + 25 && end.title === 'New best!' && end.score === r1.score && end.best.best === r1.score && end.next === 'Play again' && /^Sum Sort Sugar Rush ⚡ \d+/.test(shared), JSON.stringify({ r1, end, shared }));
+  await tapEl('#winHomeBtn'); const hr = await H();
+  pass('home after a rush: the level waits, the best score shows', hr.open && hr.level === 30 && /^Best \d+$/.test(await page.evaluate(() => document.getElementById('rushSub').textContent)), JSON.stringify(hr)); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
