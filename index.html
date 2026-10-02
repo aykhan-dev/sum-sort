@@ -1,0 +1,1932 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F7DAD0">
+<meta name="description" content="Sum Sort: fill each jar with number tiles that add up to its badge.">
+<style>html,body{margin:0;padding:0}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>Sum Sort</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800&display=swap">
+</head>
+<body>
+<style>
+/* Layout: one surface. The candy counter fills the whole screen; the level bar floats at its top edge and the
+   coach line and booster tray at its bottom edge, with no frame around the play area.
+   The game opens on a home screen: the same counter behind a soft wash, the current level and one Play button.
+   There is no level list. Progress only moves forward, one level at a time.
+   Single deliberate look (pastel sweet shop) on either host theme.
+   Every raised control is a "gummy": the same glossy rounded slab as the number tiles on the counter. */
+:root{
+  --ground:#FFF0E8;
+  --ground-2:#F1E6FF;
+  --ink:#3B2747;
+  --ink-soft:#6A5676;
+  --raspberry:#E8456B;
+  --raspberry-deep:#C7304F;
+  --raspberry-ink:#B32643;
+  --gold:#F5B83D;
+  --gold-deep:#D9962B;
+  --card:#FFFFFF;
+  --line:#EED9E4;
+  --line-deep:#E2C7D6;
+  --stage:#F7DAD0;
+  --frost:rgba(255,255,255,.80);
+  --frost-edge:rgba(255,255,255,.95);
+  --lift:0 12px 22px -14px rgba(110,40,90,.45);
+  --display:'Fredoka','Arial Rounded MT Bold','Trebuchet MS',ui-rounded,system-ui,sans-serif;
+  --body:'Nunito',ui-rounded,system-ui,-apple-system,'Segoe UI',sans-serif;
+  color-scheme:light;
+}
+/* flavour sets: base, highlight, shade */
+/* raspberry carries white text, so it is the deeper cut: 4.5:1 or better from top to bottom */
+.c-rasp{--chip:#CF3358;--chip-hi:#D63A5F;--chip-lo:#A82743}
+.c-blue{--chip:#3E7BFA;--chip-hi:#73A0FF;--chip-lo:#2B5ED0}
+.c-mint{--chip:#2EC4B6;--chip-hi:#62DDD1;--chip-lo:#1C9C90}
+.c-orange{--chip:#FF8C42;--chip-hi:#FFAE78;--chip-lo:#DE6C23}
+.c-gold{--chip:#F7B32B;--chip-hi:#FFD466;--chip-lo:#D99214}
+.c-pink{--chip:#FF7EB6;--chip-hi:#FFA6CD;--chip-lo:#E45A97}
+.c-grape{--chip:#9B6BFF;--chip-hi:#BB99FF;--chip-lo:#7848E0}
+
+html,body{height:100%}
+body{
+  background-color:var(--stage);
+  color:var(--ink);
+  font-family:var(--body);
+  -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
+}
+*{box-sizing:border-box}
+button{font-family:inherit;color:inherit}
+button:focus-visible{outline:3px solid var(--raspberry);outline-offset:2px}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+.app{position:relative;height:100%;min-height:500px;overflow:hidden}
+/* the two bands of controls that float over the counter; taps between the buttons fall through to the board */
+.top,.bottom{
+  position:absolute;left:50%;translate:-50% 0;width:min(calc(100% - 32px),760px);
+  display:grid;pointer-events:none;
+}
+.top{top:max(10px,env(safe-area-inset-top));gap:8px}
+.bottom{bottom:max(12px,env(safe-area-inset-bottom));gap:10px}
+.top button,.bottom button{pointer-events:auto}
+/* behind the home wash only the board shows, not the game's buttons */
+.top,.bottom{transition:opacity .2s ease}
+.at-home .top,.at-home .bottom{opacity:0}
+
+/* shared raised surface */
+.raised{
+  background:var(--card);border:1px solid var(--line);cursor:pointer;
+  box-shadow:0 4px 0 var(--line-deep),var(--lift);
+  transition:transform .08s ease,box-shadow .08s ease;
+}
+.raised:active{transform:translateY(3px);box-shadow:0 1px 0 var(--line-deep)}
+/* after .raised on purpose: a gummy that is also raised keeps its candy fill */
+.gummy{
+  color:#FFFFFF;
+  background:linear-gradient(180deg,var(--chip-hi) 0%,var(--chip) 52%,var(--chip-lo) 100%);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 2px 0 var(--chip-lo);
+}
+
+/* level bar */
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.bar-left{display:flex;align-items:center;gap:8px;min-width:0}
+/* the level is a label, not a control: it sits flat on the counter */
+.level-tag{
+  display:inline-flex;align-items:center;gap:10px;min-width:0;border-radius:18px;padding:4px 14px 4px 4px;
+  background:var(--frost);border:1px solid var(--frost-edge);
+}
+.level-tag .num{
+  min-width:40px;height:40px;border-radius:13px;padding:0 8px;
+  display:grid;place-items:center;font:700 21px var(--display);font-variant-numeric:tabular-nums;
+  text-shadow:0 1px 0 rgba(120,20,50,.35);
+}
+.level-tag .txt{display:grid;text-align:left;min-width:0}
+.level-tag .eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);line-height:1.2}
+.level-tag .name{font:600 18px var(--display);line-height:1.1;white-space:nowrap}
+.bar-actions{display:flex;gap:8px}
+.icon-btn{width:48px;height:48px;border-radius:50%;color:var(--ink);display:grid;place-items:center}
+.icon-btn[aria-pressed="false"] .wave{display:none}
+.icon-btn[aria-pressed="true"] .mute{display:none}
+.icon-btn[aria-pressed="false"]{color:var(--ink-soft)}
+
+/* the counter: the whole app */
+.stage{position:absolute;inset:0;overflow:hidden;background:var(--stage)}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:default}
+.vignette{
+  position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(140% 100% at 50% 45%,rgba(255,255,255,0) 55%,rgba(190,120,160,.16) 100%);
+}
+.hud{justify-self:start}
+.pill{
+  display:inline-flex;align-items:center;gap:10px;
+  font:800 13px var(--body);color:var(--ink-soft);background:var(--frost);border:1px solid var(--frost-edge);
+  border-radius:999px;padding:6px 13px;box-shadow:0 6px 14px -8px rgba(110,40,90,.4);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);font-variant-numeric:tabular-nums;
+}
+.pill b{font:700 15px var(--display);color:var(--ink);margin-left:2px}
+.pill .sep{width:1px;height:14px;background:var(--line-deep)}
+.fallback{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;font-weight:700;color:var(--ink)}
+
+/* win card */
+.win{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(255,236,228,.45);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+.win-card{
+  position:relative;width:min(100%,300px);margin-top:26px;
+  background:var(--card);border:1px solid var(--frost-edge);border-radius:30px;padding:0 22px 22px;text-align:center;
+  box-shadow:0 6px 0 var(--line-deep),0 30px 50px -22px rgba(110,40,90,.6);
+  animation:pop .45s cubic-bezier(.3,1.6,.5,1) both;
+  display:grid;gap:6px;justify-items:center;
+}
+.stars{position:relative;display:flex;gap:2px;justify-content:center;align-items:flex-end;margin-top:-34px;height:74px}
+/* the three-star rung: slow gold rays turn behind the stars */
+.win-card.perfect .stars::before{
+  content:"";position:absolute;left:50%;top:50%;width:250px;height:250px;translate:-50% -52%;border-radius:50%;z-index:-1;
+  background:repeating-conic-gradient(from 0deg,rgba(245,184,61,.34) 0 12deg,rgba(245,184,61,0) 12deg 24deg);
+  -webkit-mask-image:radial-gradient(circle,#000 18%,transparent 68%);mask-image:radial-gradient(circle,#000 18%,transparent 68%);
+  animation:rays 16s linear infinite;
+}
+.win-card.perfect{box-shadow:0 6px 0 var(--gold-deep),0 30px 50px -22px rgba(110,40,90,.6);border-color:var(--gold)}
+@keyframes rays{to{rotate:1turn}}
+.chapter-tag{
+  display:inline-flex;align-items:center;gap:8px;margin:6px 0 0;padding:6px 14px 6px 8px;border-radius:999px;
+  font:600 15px var(--display);color:var(--ink);background:var(--ground);border:1px solid var(--line);
+}
+.chapter-tag::before{
+  content:"";width:18px;height:18px;border-radius:6px;
+  background:linear-gradient(180deg,var(--chip-hi),var(--chip) 52%,var(--chip-lo));box-shadow:inset 0 2px 0 rgba(255,255,255,.5);
+}
+.stars svg{width:54px;height:54px;fill:#EFE3EC;stroke:#DCCBD8;stroke-width:1.4;stroke-linejoin:round;paint-order:stroke}
+.stars svg:nth-child(1){transform:rotate(-12deg) translateY(2px)}
+.stars svg:nth-child(2){width:70px;height:70px;transform:translateY(-8px)}
+.stars svg:nth-child(3){transform:rotate(12deg) translateY(2px)}
+.stars svg.on{fill:var(--gold);stroke:var(--gold-deep);filter:drop-shadow(0 3px 0 var(--gold-deep)) drop-shadow(0 8px 10px rgba(217,150,43,.35));animation:star .45s cubic-bezier(.3,1.7,.5,1) both}
+.stars svg.on:nth-child(2){animation-delay:.14s}
+.stars svg.on:nth-child(3){animation-delay:.28s}
+.win-card .eyebrow{margin:6px 0 0;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.win-card h2{margin:0;font:700 42px var(--display);color:var(--raspberry);line-height:1;letter-spacing:.2px}
+.stats{display:flex;gap:8px;margin-top:8px}
+.stat{
+  display:grid;gap:1px;min-width:86px;padding:8px 14px;border-radius:16px;background:var(--ground);border:1px solid var(--line);
+  font-variant-numeric:tabular-nums;
+}
+.stat small{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
+.stat b{font:700 24px var(--display);line-height:1.05;color:var(--ink)}
+.win-card .note{margin:4px 0 0;font-size:13px;font-weight:700;color:var(--ink-soft);text-wrap:balance}
+.win-actions{display:flex;gap:10px;align-items:stretch;margin-top:12px;width:100%}
+.cta{
+  flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+  font:700 18px var(--display);border:0;border-radius:18px;padding:13px 18px;min-height:52px;
+  text-shadow:0 1px 0 rgba(120,20,50,.35);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 5px 0 var(--chip-lo),0 14px 20px -12px rgba(199,48,79,.7);
+  transition:transform .08s ease,box-shadow .08s ease;
+}
+.cta:active{transform:translateY(4px);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 1px 0 var(--chip-lo)}
+.ghost{width:54px;min-height:52px;border-radius:18px;display:grid;place-items:center;color:var(--ink)}
+@keyframes pop{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes star{from{scale:0;opacity:0}to{scale:1;opacity:1}}
+
+/* coach strip: tip in normal play, the fail state when the board is dead */
+.strip{
+  display:flex;align-items:center;justify-content:center;gap:10px;min-height:42px;justify-self:center;
+  max-width:100%;padding:6px 14px;border-radius:18px;border:1px solid transparent;
+  font-size:13.5px;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.3;
+}
+.strip p{margin:0;min-width:0;max-width:72ch;text-wrap:balance}
+.strip.note{background:var(--frost);border-color:var(--frost-edge)}
+.strip.note p{color:var(--ink);font-weight:800}
+.strip.stuck{background:rgba(255,228,234,.94);border-color:#F8B9C7}
+.strip.stuck p{color:var(--raspberry-ink);font-weight:800}
+.strip.soft{background:rgba(255,243,214,.94);border-color:#F2D48A}
+.strip.soft p{color:var(--ink);font-weight:800}
+.chip{
+  font:800 13px var(--body);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:999px;
+  min-height:48px;padding:0 18px;cursor:pointer;box-shadow:0 2px 0 var(--line-deep);
+}
+.chip{flex:none}
+.chip:active{transform:translateY(1px);box-shadow:0 1px 0 var(--line-deep)}
+
+/* booster tray */
+.tray{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:10px;max-width:calc(var(--cols,4) * 115px);width:100%;justify-self:center}
+.boost{
+  position:relative;display:grid;justify-items:center;gap:5px;padding:9px 4px 8px;border-radius:20px;
+  font:800 13px var(--body);color:var(--ink);
+}
+.boost .ico{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:var(--ink)}   /* ink icons: 3.4:1 or better on every chip */
+.boost .ico svg.i{width:22px;height:22px;stroke-width:2.4}
+.boost:disabled{cursor:default;transform:none;color:var(--ink-soft);box-shadow:0 4px 0 var(--line)}
+.boost:disabled .ico{filter:grayscale(.85) opacity(.55)}
+.boost[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#FFFFFF;box-shadow:0 4px 0 #1F1228,var(--lift)}
+.boost .count{
+  position:absolute;top:-7px;right:-3px;min-width:24px;height:24px;border-radius:999px;background:#CF3358;color:#FFFFFF;
+  border:2px solid var(--card);font:800 12px/20px var(--body);text-align:center;padding:0 5px;font-variant-numeric:tabular-nums;
+}
+.boost:disabled .count{background:#B9A9C2}
+.boost.fresh::after{
+  content:"New";position:absolute;top:-9px;left:-4px;padding:1px 8px;border-radius:999px;
+  background:var(--gold);color:var(--ink);border:2px solid var(--card);font:800 12px/18px var(--body);
+}
+.boost.rescue{border-color:var(--raspberry);box-shadow:0 4px 0 var(--raspberry-deep),var(--lift);animation:nudge 1.1s ease-in-out infinite}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* home: the counter and the waiting board behind a soft wash, the current level, one way in */
+.home{
+  position:absolute;inset:0;z-index:5;display:grid;grid-template-rows:auto minmax(0,1fr) auto;justify-items:center;gap:8px;
+  padding:max(10px,env(safe-area-inset-top)) 16px max(26px,env(safe-area-inset-bottom));
+  background:rgba(250,225,216,.66);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+  transition:opacity .26s ease,visibility 0s linear 0s;
+}
+.home.off{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .26s ease,visibility 0s linear .26s}
+.home-top{display:flex;align-items:center;justify-content:space-between;width:min(100%,760px);min-height:52px}
+.tally{
+  display:inline-flex;align-items:center;gap:5px;font:700 16px var(--display);color:var(--ink);font-variant-numeric:tabular-nums;
+  background:var(--frost);border:1px solid var(--frost-edge);border-radius:999px;padding:7px 12px;
+}
+.tally svg{width:15px;height:15px;fill:var(--gold);stroke:var(--gold-deep);stroke-width:1.4;paint-order:stroke}
+.home-mid{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;min-height:0;width:100%}
+.wordmark{
+  margin:0;display:grid;justify-items:center;rotate:-4deg;
+  font:700 clamp(50px,min(19vw,12vh),92px)/.9 var(--display);letter-spacing:.5px;
+}
+.wordmark span:first-child{color:var(--raspberry);text-shadow:0 .055em 0 var(--raspberry-deep),0 .16em .2em rgba(199,48,79,.28)}
+.wordmark span:last-child{color:var(--ink);text-shadow:0 .055em 0 #1F1228,0 .16em .2em rgba(59,39,71,.25);margin-left:.5em}
+/* the whole game in one line: two tiles add up to what the jar asks for */
+.motif{display:flex;align-items:center;gap:9px;font:700 22px var(--display);color:var(--ink-soft)}
+.motif .t{
+  width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font:700 25px var(--display);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.12),0 3px 0 rgba(59,39,71,.22);
+}
+.motif .t2{background:#9063F6;color:#332354}
+.motif .t3{background:#F68741;color:#613112}
+.motif .badge{
+  width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font:700 25px var(--display);color:var(--ink);
+  background:#FFFFFF;border:3px solid #EADDF0;box-shadow:0 3px 8px -3px rgba(110,40,90,.45);
+}
+.home-level{display:grid;justify-items:center;gap:8px}
+.home-level .eyebrow{font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
+.home-level .num{
+  min-width:108px;height:108px;padding:0 22px;border-radius:32px;display:grid;place-items:center;
+  font:700 60px/1 var(--display);font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(120,20,50,.35);
+  box-shadow:inset 0 3px 0 rgba(255,255,255,.5),inset 0 -5px 0 rgba(0,0,0,.10),0 6px 0 var(--chip-lo),0 22px 26px -16px rgba(199,48,79,.7);
+}
+.home-level .chapter-tag{margin:6px 0 0;background:var(--frost);border-color:var(--frost-edge)}
+.play{flex:none;width:min(100%,300px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
+.play svg{width:24px;height:24px;fill:currentColor;flex:none}
+@keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
+@media (max-height:600px){
+  .motif{display:none}
+  .home-level .num{min-width:84px;height:84px;font-size:46px;border-radius:26px}
+}
+
+@media (max-width:520px){
+  .tray{gap:8px}
+}
+@media (prefers-reduced-motion:reduce){
+  .win-card,.stars svg.on,.win-card.perfect .stars::before,.play{animation:none}
+  .home,.home.off,.top,.bottom{transition:none}
+  .boost.rescue{animation:none}
+  .raised,.cta{transition:none}
+}
+</style>
+
+<div class="app" id="app">
+  <main class="stage" id="stage">
+    <canvas id="scene" aria-label="Sum Sort level: glass jars with number badges and stacks of numbered gummy tiles on a candy counter"></canvas>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="top" id="topUi">
+      <header class="bar">
+        <div class="bar-left">
+          <button id="homeBtn" class="icon-btn raised" type="button" aria-label="Home">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1v-9"/></svg>
+          </button>
+          <div class="level-tag" id="levelTag">
+            <span class="num gummy c-rasp" id="levelNum">1</span>
+            <span class="txt"><span class="eyebrow">Level</span><span class="name" id="chapterName">Match</span></span>
+          </div>
+        </div>
+        <div class="bar-actions">
+          <button id="soundBtn" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Sound">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/><path class="mute" d="m16 9 5 6M21 9l-5 6"/></svg>
+          </button>
+          <button id="restartBtn" class="icon-btn raised" type="button" aria-label="Restart level">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          </button>
+        </div>
+      </header>
+      <div class="hud" id="hud"><div class="pill"><span id="movesPill">Moves <b>0</b></span><span class="sep"></span><span id="parPill">Par <b>3</b></span></div></div>
+    </div>
+    <div class="bottom" id="bottomUi">
+      <div class="strip" id="strip">
+        <p id="tip" role="status" aria-live="polite">Tap a tile, then the jar with the same number.</p>
+        <button class="chip" id="refillBtn" type="button" hidden title="Stands in for a rewarded ad">Refill boosters</button>
+        <button class="chip" id="stripRestart" type="button" hidden>Restart</button>
+      </div>
+
+      <nav class="tray" id="tray" aria-label="Boosters">
+        <button class="boost raised" id="undoBtn" type="button" disabled>
+          <span class="ico gummy c-blue"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></span>
+          Undo<span class="count" id="undoCount">5</span>
+        </button>
+        <button class="boost raised" id="spareBtn" type="button">
+          <span class="ico gummy c-mint"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10"/><path d="M8 3v3a3 3 0 0 1-2 3v9a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V9a3 3 0 0 1-2-3V3"/><path d="M12 11v6M9 14h6"/></svg></span>
+          +1 Jar<span class="count" id="spareCount">1</span>
+        </button>
+        <button class="boost raised" id="splitBtn" type="button" aria-pressed="false">
+          <span class="ico gummy c-orange"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="7" height="8" rx="2.5"/><rect x="14" y="8" width="7" height="8" rx="2.5"/><path d="M12 4v16" stroke-dasharray="2 3"/></svg></span>
+          Split<span class="count" id="splitCount">1</span>
+        </button>
+        <button class="boost raised" id="hintBtn" type="button">
+          <span class="ico gummy c-gold"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></span>
+          Hint<span class="count" id="hintCount">3</span>
+        </button>
+      </nav>
+    </div>
+    <div class="win" id="win" hidden>
+      <div class="win-card" id="winCard" role="dialog" aria-labelledby="winTitle">
+        <div class="stars" id="winStars" role="img" aria-label="3 of 3 stars"></div>
+        <p class="eyebrow" id="winEyebrow">Level 1 cleared</p>
+        <h2 id="winTitle">Sweet!</h2>
+        <p class="chapter-tag" id="winChapter" hidden></p>
+        <div class="stats" id="winStats">
+          <span class="stat"><small>Moves</small><b id="winMoves">3</b></span>
+          <span class="stat"><small>Par</small><b id="winPar">3</b></span>
+        </div>
+        <p class="note" id="winText">No wasted moves.</p>
+        <div class="win-actions">
+          <button id="winHomeBtn" class="ghost raised" type="button" aria-label="Home">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1v-9"/></svg>
+          </button>
+          <button id="nextBtn" class="cta gummy c-rasp" type="button"><span id="nextLabel">Next level</span>
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <section class="home" id="home" aria-labelledby="homeTitle">
+    <div class="home-top">
+      <span class="tally" id="starTally" aria-label="Stars earned" hidden></span>
+      <span></span>
+      <button id="homeSound" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Sound">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/><path class="mute" d="m16 9 5 6M21 9l-5 6"/></svg>
+      </button>
+    </div>
+    <div class="home-mid">
+      <h1 class="wordmark" id="homeTitle"><span>Sum</span><span>Sort</span></h1>
+      <div class="motif" role="img" aria-label="A 2 tile and a 3 tile fill a jar that needs 5">
+        <span class="t t2">2</span>+<span class="t t3">3</span>=<span class="badge">5</span>
+      </div>
+      <div class="home-level">
+        <span class="eyebrow">Level</span>
+        <span class="num gummy c-rasp" id="homeNum">1</span>
+        <span class="chapter-tag" id="homeChapter">Match</span>
+      </div>
+    </div>
+    <button id="playBtn" class="cta gummy c-rasp play" type="button">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.2v13.6a1 1 0 0 0 1.5.86l11.3-6.8a1 1 0 0 0 0-1.72L9.5 4.34A1 1 0 0 0 8 5.2z"/></svg>Play
+    </button>
+  </section>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.min.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ================= game logic (pure, no rendering) ================= */
+const JAR_CAP = 4, STACK_CAP = 4;
+const sumOf = a => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i]; return s; };
+
+/* seeded random, so level N is the same level for everyone */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* Can the loose tiles still be split across the open targets (exact sums, at most JAR_CAP per jar)?
+   Order and stacking are ignored, so `false` proves a dead end and `true` proves nothing. */
+const partCache = new Map();
+function canPartition(tiles, targets) {
+  if (sumOf(tiles) !== sumOf(targets)) return false;
+  if (!targets.length) return tiles.length === 0;
+  const counts = new Array(10).fill(0);
+  for (const v of tiles) counts[v]++;
+  const ts = targets.slice().sort((a, b) => b - a);
+  const key = counts.join('.') + '|' + ts.join(',');
+  const hit = partCache.get(key);
+  if (hit !== undefined) return hit;
+  const rec = ti => ti === ts.length ? counts.every(c => c === 0) : pick(ts[ti], 9, JAR_CAP, ti);
+  function pick(rem, maxV, left, ti) {
+    if (rem === 0) return rec(ti + 1);
+    if (left === 0) return false;
+    for (let v = Math.min(maxV, rem); v >= 1; v--) {
+      if (!counts[v]) continue;
+      counts[v]--; const ok = pick(rem - v, v, left - 1, ti); counts[v]++;
+      if (ok) return true;
+    }
+    return false;
+  }
+  const res = rec(0);
+  if (partCache.size > 20000) partCache.clear();
+  partCache.set(key, res);
+  return res;
+}
+
+/* state: { J: [{ t, tiles, sealed, lock, exact }], S: [[...]] }
+   (t null = spare jar, lock = seals needed to untie, exact = the jar only takes the one tile equal to its number)
+   returns { status: 'solved' | 'dead' | 'unknown', path } ; a path step is { src: {kind,i}, dst, v, seals } */
+function solve(state, maxNodes = 40000, stackOnly = false) {
+  const J = state.J.map(j => ({ t: j.t, lock: j.lock || 0, exact: !!j.exact, sealed: !!j.sealed, tiles: j.tiles.slice(), sum: sumOf(j.tiles) }));
+  const S = state.S.map(s => s.slice());
+  let sealedCount = J.filter(j => j.sealed).length, nodes = 0, capped = false;
+  const seen = new Set(), path = [];
+  const done = () => { for (const j of J) if (j.t != null && !j.sealed) return false; return true; };
+  const feasible = () => {
+    const loose = [], open = [];
+    for (const s of S) for (const v of s) loose.push(v);
+    for (const j of J) if (!j.sealed) { for (const v of j.tiles) loose.push(v); if (j.t != null) open.push(j.t); }
+    return canPartition(loose, open);
+  };
+  const key = () => S.map(s => s.join(',')).sort().join('/') + '|' +
+    J.map(j => (j.t == null ? 'x' : j.t) + (j.sealed ? '#' : ':') + j.lock + ':' + j.tiles.join(',')).sort().join('/');
+  if (done()) return { status: 'solved', path: [] };
+  if (!feasible()) return { status: 'dead', path: null };
+  function dfs() {
+    if (done()) return true;
+    if (++nodes > maxNodes) { capped = true; return false; }
+    const k = key(); if (seen.has(k)) return false; seen.add(k);
+    const moves = [];
+    const consider = (kind, i, v) => {
+      for (let di = 0; di < J.length; di++) {
+        const j = J[di];
+        if (kind === 'jar' && i === di) continue;
+        if (j.sealed || sealedCount < j.lock || j.tiles.length >= JAR_CAP) continue;
+        if (j.t != null && (j.sum + v > j.t || (j.exact && v !== j.t))) continue;
+        const seals = j.t != null && j.sum + v === j.t;
+        // shuffling a lone tile between two empty jars of the same kind changes nothing
+        if (kind === 'jar' && J[i].tiles.length === 1 && j.tiles.length === 0 && J[i].t === j.t && J[i].lock === j.lock) continue;
+        moves.push({ src: { kind, i }, dst: di, v, seals, score: (seals ? 0 : 2) + (kind === 'jar' ? 3 : 0) + (j.t == null ? 4 : 0) });
+      }
+    };
+    for (let i = 0; i < S.length; i++) if (S[i].length) consider('stack', i, S[i][S[i].length - 1]);
+    if (!stackOnly) for (let i = 0; i < J.length; i++) if (!J[i].sealed && J[i].tiles.length) consider('jar', i, J[i].tiles[J[i].tiles.length - 1]);
+    moves.sort((a, b) => a.score - b.score);
+    for (const m of moves) {
+      const from = m.src.kind === 'stack' ? S[m.src.i] : J[m.src.i].tiles;
+      from.pop(); if (m.src.kind === 'jar') J[m.src.i].sum -= m.v;
+      const d = J[m.dst]; d.tiles.push(m.v); d.sum += m.v;
+      if (m.seals) { d.sealed = true; sealedCount++; }
+      path.push(m);
+      if ((!m.seals || feasible()) && dfs()) return true;
+      path.pop();
+      if (m.seals) { d.sealed = false; sealedCount--; }
+      d.tiles.pop(); d.sum -= m.v;
+      from.push(m.v); if (m.src.kind === 'jar') J[m.src.i].sum += m.v;
+      if (capped) return false;
+    }
+    return false;
+  }
+  if (dfs()) return { status: 'solved', path: path.slice() };
+  return { status: capped ? 'unknown' : 'dead', path: null };
+}
+
+/* How often a casual player gets stuck: takes a sealing move when one is on offer (most of the time),
+   otherwise any legal tile from a stack, and never reshuffles jars. 0 = cannot fail, 1 = always fails. */
+function failRate(def, rng, runs = 80) {
+  let fails = 0;
+  for (let r = 0; r < runs; r++) {
+    const J = def.jars.map((t, i) => ({ t, lock: def.locks ? def.locks[i] : 0, sum: def.fill ? sumOf(def.fill[i]) : 0, n: def.fill ? def.fill[i].length : 0, sealed: false }));
+    const S = def.stacks.map(s => s.slice());
+    let sealedCount = 0;
+    for (;;) {
+      if (J.every(j => j.sealed)) break;
+      const moves = [];
+      S.forEach((s, si) => {
+        if (!s.length) return; const v = s[s.length - 1];
+        J.forEach((j, di) => {
+          if (j.sealed || sealedCount < j.lock || j.n >= JAR_CAP || j.sum + v > j.t || (def.exact && v !== j.t)) return;
+          moves.push({ si, di, v, seals: j.sum + v === j.t });
+        });
+      });
+      if (!moves.length) { fails++; break; }
+      const sealing = moves.filter(m => m.seals);
+      const pool = sealing.length && rng() < 0.8 ? sealing : moves;
+      const m = pool[Math.floor(rng() * pool.length)];
+      S[m.si].pop(); const j = J[m.di]; j.sum += m.v; j.n++;
+      if (m.seals) { j.sealed = true; sealedCount++; }
+    }
+  }
+  return fails / runs;
+}
+
+/* ---------------- level recipe per chapter ---------------- */
+/* Ramp and targets are decisions recorded in the Sum Sort Taste File:
+   ten fail-proof Match levels, then one new rule per chapter, model fail rate capped at 65%. */
+const CHAPTERS = [
+  { id: 'match', name: 'Match', from: 1, to: 10, rule: 'Tap a tile, then the jar with the same number.' },
+  { id: 'pairs', name: 'Pairs', from: 11, to: 18, rule: 'These jars need two tiles. The badge counts down what is still missing.' },
+  { id: 'sums', name: 'Sums', from: 19, to: 30, rule: 'Bigger sums now, and some tiles fit several jars. Think before you drop.' },
+  { id: 'frosted', name: 'Frosted', from: 31, to: 38, rule: 'Frosted tiles hide their number until they reach the top.' },
+  { id: 'ribbons', name: 'Ribbons', from: 39, to: 46, rule: 'A ribbon ties a jar shut until you seal other jars first.' },
+  { id: 'mix', name: 'Mixed', from: 47, to: Infinity, rule: 'Everything at once, and it never runs out.' }
+];
+const chapterOf = n => CHAPTERS.find(c => n >= c.from && n <= c.to);
+/* Hand-made levels that teach one rule each and cannot be failed. */
+const TAUGHT = {
+  12: { jars: [6, 2], stacks: [[6]], fill: [[2], []], par: 2, fail: 0, teach: 'jar',
+    rule: 'Tiles in a jar can move too. Tap the jar holding the 2, then the jar that needs 2.' }
+};
+const lerp = (a, b, k) => a + (b - a) * Math.max(0, Math.min(1, k));
+function recipe(n) {
+  const c = chapterOf(n), ch = c.id, k = c.to === Infinity ? (n - c.from) / 4 : (n - c.from) / (c.to - c.from);
+  if (ch === 'match') return { ch, exact: true, distinct: true, parts: [1, 1], minT: 1, maxT: 9, want: 0,
+    jars: [3, 3, 4, 4, 5, 5, 5, 6, 6, 6][n - 1], stacks: [2, 2, 2, 3, 3, 3, 3, 4, 4, 4][n - 1] };
+  if (ch === 'pairs') return { ch, jars: n < 15 ? 3 : 4, stacks: 3, parts: [2, 2], singles: n < 15 ? 1 : 0, minT: 5, maxT: 11, want: lerp(0.10, 0.25, k) };
+  if (ch === 'sums') return { ch, jars: n < 25 ? 4 : 5, stacks: n < 25 ? 3 : 4, parts: [2, 3], minT: 6, maxT: 13, want: lerp(0.25, 0.40, k) };
+  if (ch === 'frosted') return { ch, jars: n < 35 ? 4 : 5, stacks: n < 35 ? 3 : 4, parts: [2, 3], minT: 6, maxT: 14, want: lerp(0.35, 0.50, k), hidden: true };
+  if (ch === 'ribbons') return { ch, jars: 5, stacks: 4, parts: [2, 3], minT: 6, maxT: 15, want: lerp(0.40, 0.55, k), locks: n < 43 ? 1 : 2, hidden: n >= 44 };
+  return { ch, jars: n % 3 === 0 ? 6 : 5, stacks: n % 3 === 0 ? 5 : 4, parts: [2, n % 2 ? 3 : 4], minT: 7, maxT: 17,
+    want: lerp(0.50, 0.65, k), locks: n % 4 === 1 ? 2 : n % 2 === 0 ? 1 : 0, hidden: n % 3 !== 1 };
+}
+
+function splitTarget(t, k, rng) {
+  // prefer parts of 2 or more: a board full of 1s is fiddly, not hard
+  const lo = t >= 2 * k && rng() < 0.75 ? 2 : 1;
+  for (let tries = 0; tries < 40; tries++) {
+    const parts = []; let left = t;
+    for (let i = 0; i < k - 1; i++) {
+      const hi = Math.min(9, left - lo * (k - 1 - i)); if (hi < lo) break;
+      const p = lo + Math.floor(rng() * (hi - lo + 1)); parts.push(p); left -= p;
+    }
+    parts.push(left);
+    if (parts.length === k && parts.every(p => p >= lo && p <= 9)) return parts;
+  }
+  return null;
+}
+function candidate(r, rng) {
+  const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
+  const targets = [], tiles = [];
+  for (let i = 0; i < r.jars; i++) {
+    let t, tries = 0;
+    do { t = ri(r.minT, r.maxT); } while (r.distinct && targets.includes(t) && ++tries < 50);
+    const k = i < (r.singles || 0) ? 1 : Math.min(ri(r.parts[0], r.parts[1]), t);
+    if (k === 1 && t > 9) t = ri(3, 9);
+    const parts = splitTarget(t, t < 4 ? 1 : k, rng); if (!parts) return null;
+    targets.push(t); tiles.push(...parts);
+  }
+  if (!r.distinct && new Set(targets).size < Math.min(3, r.jars)) return null;
+  if (tiles.length > r.stacks * STACK_CAP) return null;
+  if (!r.exact && tiles.filter(v => v === 1).length > 2) return null;   // at most two 1-tiles per level
+  for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
+  const stacks = Array.from({ length: r.stacks }, () => []);
+  tiles.forEach((v, i) => {
+    if (i < r.stacks) { stacks[i].push(v); return; }
+    const open = stacks.filter(s => s.length < STACK_CAP); open[Math.floor(rng() * open.length)].push(v);
+  });
+  const def = { jars: targets, stacks };
+  if (r.locks) {
+    def.locks = targets.map(() => 0);
+    const order = targets.map((_, i) => i);   // seeded shuffle, the same on every JavaScript engine
+    for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    for (let i = 0; i < r.locks; i++) def.locks[order[i]] = i === 0 ? 1 : 2;
+  }
+  if (r.hidden) def.hidden = true;
+  if (r.exact) def.exact = true;
+  return def;
+}
+const toState = def => ({
+  J: def.jars.map((t, i) => ({ t, tiles: def.fill ? def.fill[i].slice() : [], sealed: false, lock: def.locks ? def.locks[i] : 0, exact: !!def.exact })),
+  S: def.stacks.map(s => s.slice())
+});
+/* Build level n. A candidate must be clearable straight from the stacks (so par is one move per tile), and is
+   accepted only when 2,000 simulated plays land within `tol` of the chapter's target fail rate. `near` is the
+   previous level's measured rate: the curve may not move more than 10 points between neighbours. */
+function generate(n, { tries = 400, tol = 0.05, near = null, runs = 2000, maxJump = 0.10 } = {}) {
+  if (TAUGHT[n]) return TAUGHT[n];
+  const r = recipe(n), rng = mulberry32(0x5EED + n * 7919);
+  let best = null, bestGap = Infinity;
+  for (let i = 0; i < tries; i++) {
+    const def = candidate(r, rng); if (!def) continue;
+    if (solve(toState(def), 6000, true).status !== 'solved') continue;
+    def.par = sumOf(def.stacks.map(s => s.length));
+    if (r.exact) { def.fail = 0; return def; }
+    const rough = failRate(def, rng, 150);
+    if (Math.abs(rough - r.want) > tol + 0.07) continue;
+    def.fail = failRate(def, rng, runs);
+    const gap = Math.abs(def.fail - r.want), jump = near == null ? 0 : Math.abs(def.fail - near);
+    if (gap <= tol && jump <= maxJump) return def;
+    if (gap + Math.max(0, jump - maxJump) < bestGap) { best = def; bestGap = gap + Math.max(0, jump - maxJump); }
+  }
+  return best;
+}
+
+
+/* Levels 1-100 are fixed content, made by generate() and checked by the solver; later ones are generated on the device.
+   j = jar targets, s = tile stacks (last value is the top), p = par, l = seals needed to untie a jar, h = frosted tiles,
+   x = exact-fit jars (chapter 1), f = tiles already in the jars, t/r = the rule a hand-made level teaches */
+const LEVELS = [
+  {"j":[5,7,3],"s":[[7],[5,3]],"p":3,"x":1},
+  {"j":[4,5,9],"s":[[4,9],[5]],"p":3,"x":1},
+  {"j":[3,9,1,6],"s":[[6,1,3],[9]],"p":4,"x":1},
+  {"j":[4,2,3,1],"s":[[4],[1,3],[2]],"p":4,"x":1},
+  {"j":[1,3,7,6,5],"s":[[5,1],[7,3],[6]],"p":5,"x":1},
+  {"j":[2,7,1,6,9],"s":[[6,7,1],[9],[2]],"p":5,"x":1},
+  {"j":[7,3,5,1,4],"s":[[7,3,4],[1],[5]],"p":5,"x":1},
+  {"j":[5,9,8,1,2,7],"s":[[1],[9,5],[7],[2,8]],"p":6,"x":1},
+  {"j":[8,4,5,2,9,1],"s":[[2,4],[1],[8],[9,5]],"p":6,"x":1},
+  {"j":[3,8,4,2,1,6],"s":[[1,8],[6],[4,2],[3]],"p":6,"x":1},
+  {"j":[8,9,7],"s":[[2,2],[7,8],[5]],"p":5},
+  {"j":[6,2],"s":[[6]],"p":2,"f":[[2],[]],"t":"jar","r":"Tiles in a jar can move too. Tap the jar holding the 2, then the jar that needs 2."},
+  {"j":[7,5,8],"s":[[2],[3,5],[3,7]],"p":5},
+  {"j":[8,9,6],"s":[[5,1],[1],[8,8]],"p":5},
+  {"j":[7,8,5,10],"s":[[3,3,2,5],[2,2,5],[8]],"p":8},
+  {"j":[6,5,9,11],"s":[[3,2,2],[3,3],[3,6,9]],"p":8},
+  {"j":[7,6,5,9],"s":[[2,1],[1,4,4],[4,5,6]],"p":8},
+  {"j":[7,9,7,5],"s":[[3,4,4],[2,5,2],[3,5]],"p":8},
+  {"j":[9,12,9,7],"s":[[3,7],[3,1,3,6],[3,6,5]],"p":9},
+  {"j":[8,9,11,6],"s":[[2,2,4,8],[4,3,6],[3,2]],"p":9},
+  {"j":[6,9,6,7],"s":[[2,2,2,5],[1,2,4],[1,3,4,2]],"p":11},
+  {"j":[9,8,7,6],"s":[[2,3,2,3],[1,2,2,2],[4,5,4]],"p":11},
+  {"j":[6,11,13,13],"s":[[2,5,4,6],[4,2],[2,7,7,4]],"p":10},
+  {"j":[9,7,6,9],"s":[[2,2,2,2],[2,2,5,2],[5,5,2]],"p":11},
+  {"j":[9,8,7,7,7],"s":[[3,4,2,2],[2,4],[1,5,4,3],[2,3,3]],"p":13},
+  {"j":[6,6,9,7,11],"s":[[2,3],[1,4,4,2],[1,2,4,3],[3,2,4,4]],"p":14},
+  {"j":[9,9,9,11,7],"s":[[7,2,4],[2,2],[3,7,7],[2,2,7]],"p":11},
+  {"j":[7,9,7,11,9],"s":[[2,4,5],[2,4,4,2],[3,2,3],[7,5]],"p":12},
+  {"j":[7,10,9,7,7],"s":[[5,3,5,3],[5],[2,2,2,2],[2,2,2,5]],"p":13},
+  {"j":[7,7,7,8,9],"s":[[2,4,2,2],[1,2,7],[5,2,1,5],[5]],"p":12},
+  {"j":[8,6,11,11],"s":[[2,4,5],[2,4,5,4],[1,2,5,2]],"p":11,"h":1},
+  {"j":[8,8,12,13],"s":[[5,4,8],[5,4],[4,3,8]],"p":8,"h":1},
+  {"j":[7,10,8,7],"s":[[1,4,3,2],[2,1,5],[5,3,4,2]],"p":11,"h":1},
+  {"j":[14,7,11,9],"s":[[9,5],[2,2,5,9],[5,2,2]],"p":9,"h":1},
+  {"j":[6,13,6,6,10],"s":[[3],[3,2,2,4],[4],[6,4,7,6]],"p":10,"h":1},
+  {"j":[10,6,7,8,10],"s":[[3,2],[2,3,4,3],[2,3,7,4],[1,2,3,2]],"p":14,"h":1},
+  {"j":[11,10,8,9,9],"s":[[4,2,4],[3,2,4,3],[1,5,3,3],[4,5,4]],"p":14,"h":1},
+  {"j":[7,10,11,9,11],"s":[[3,2,7,9],[3,2,6],[3,4],[2,2,5]],"p":12,"h":1},
+  {"j":[10,10,6,6,12],"s":[[9,6],[1],[4,2,4,4],[2,1,6,5]],"p":11,"l":[0,1,0,0,0]},
+  {"j":[7,13,13,6,7],"s":[[2,6],[2,4,7],[5],[4,3,9,4]],"p":10,"l":[0,0,0,1,0]},
+  {"j":[6,9,7,7,9],"s":[[2,4],[4,5,2],[2,3,3,2],[2,5,2,2]],"p":13,"l":[0,0,0,1,0]},
+  {"j":[7,11,7,6,7],"s":[[1,4,7,2],[4],[1,4,3],[5,2,3,2]],"p":12,"l":[0,0,1,0,0]},
+  {"j":[9,13,8,8,11],"s":[[2,6],[3,2,6],[3,5,5,8],[3,6]],"p":11,"l":[2,0,0,1,0]},
+  {"j":[9,8,7,6,7],"s":[[2,2,2],[2,2,3,7],[3,2,2],[1,7,2]],"p":13,"l":[1,2,0,0,0],"h":1},
+  {"j":[7,14,7,13,9],"s":[[4,2],[5,5,5],[5,4,9],[2,4,2,3]],"p":12,"l":[1,2,0,0,0],"h":1},
+  {"j":[11,6,6,9,11],"s":[[4,3,1,3],[2,3,2],[3,3,1,8],[4,6]],"p":13,"l":[0,0,1,2,0],"h":1},
+  {"j":[17,14,8,8,14],"s":[[6,8,3],[3,2,3],[3,8,9],[3,2,5,6]],"p":13,"h":1},
+  {"j":[12,8,8,7,10,8],"s":[[4,6,4,6],[2,2,6],[5,1,4],[3],[3,1,2,4]],"p":15,"l":[1,0,0,0,0,0],"h":1},
+  {"j":[8,11,16,8,7],"s":[[2,5,8,2],[3,3,6],[8,5],[3,5]],"p":11,"l":[0,2,0,1,0]},
+  {"j":[11,9,10,7,12],"s":[[8,7,3],[1,4,5],[2,2,4,3],[3,1,4,2]],"p":14,"l":[0,1,0,0,0],"h":1},
+  {"j":[10,8,10,14,10,7],"s":[[2,5,4,3],[3,7],[3,5,3],[4,2,6,3],[4,5]],"p":15,"h":1},
+  {"j":[11,12,11,13,15],"s":[[8,2,8],[1,4,5,2],[1,3,4,7],[2,7,5,3]],"p":15,"l":[1,0,0,0,0]},
+  {"j":[8,16,11,9,14],"s":[[2,9],[9,4,8],[3,2,5,2],[6,8]],"p":11,"l":[0,0,2,0,1],"h":1},
+  {"j":[11,10,12,7,7,10],"s":[[3,4,6,1],[3,4],[5,1,2,4],[4,5,2],[2,7,2,2]],"p":17,"l":[0,0,0,0,1,0],"h":1},
+  {"j":[10,14,11,13,9],"s":[[3,4,9],[5,2],[4,3,8,5],[2,7,5]],"p":12},
+  {"j":[10,8,9,7,11],"s":[[2,3,3],[2,3,2,4],[2,4,3],[4,2,5,6]],"p":14,"l":[0,0,1,0,0],"h":1},
+  {"j":[11,7,12,13,10,9],"s":[[1,2,4],[5,9],[4,2,3,6],[3,2],[2,7,3,9]],"p":15,"l":[2,0,0,0,0,1],"h":1},
+  {"j":[11,9,7,10,7],"s":[[6,1,2,2],[5,2,6,3],[2,3,4,2],[1,3,2]],"p":15,"l":[0,0,0,0,1]},
+  {"j":[7,17,7,7,11],"s":[[3,4,1],[2,3,2,8],[5,2,6,3],[1,9]],"p":13,"h":1},
+  {"j":[9,7,14,11,15,11],"s":[[2,3,4,3],[5,4,9],[4,4,3,3],[6,4],[1,2,5,5]],"p":17,"l":[1,0,0,0,0,0],"h":1},
+  {"j":[14,11,12,10,8],"s":[[3,2,3,5],[2,5,7,2],[6,5],[3,3,9]],"p":13,"l":[0,0,0,1,2]},
+  {"j":[15,9,12,12,11],"s":[[5,2,3],[2,2,9],[8,4,5],[3,4,5,7]],"p":13,"l":[0,0,0,0,1],"h":1},
+  {"j":[10,10,7,8,9,16],"s":[[3,8],[2,5,8],[6,5,6],[4,5],[1,2,5]],"p":13,"h":1},
+  {"j":[10,10,8,7,8],"s":[[5,2,8,7],[3,2,2],[5,2,1,2],[1,3]],"p":13,"l":[0,0,1,0,0]},
+  {"j":[17,8,15,17,16],"s":[[6,9],[7,9],[2,8,8],[7,3,8,6]],"p":11,"l":[1,2,0,0,0],"h":1},
+  {"j":[12,11,8,11,11,7],"s":[[3,3,2,6],[4,5],[2,1,9,3],[5,2,5,5],[5]],"p":15,"l":[1,0,0,0,0,0],"h":1},
+  {"j":[10,17,12,17,17],"s":[[1,8,2,7],[6,9,8],[6,4],[2,3,9,8]],"p":13},
+  {"j":[7,10,8,12,13],"s":[[2,2],[3,4,2,4],[7,3],[4,6,5,8]],"p":12,"l":[0,1,0,0,0],"h":1},
+  {"j":[7,7,8,9,11,11],"s":[[4,6,2],[2,4,5],[1,9],[2,5,2,4],[5,2]],"p":14,"l":[0,0,0,2,1,0],"h":1},
+  {"j":[8,12,13,15,13],"s":[[6,8],[4,2,5,3],[3,5,8,4],[4,5,2,2]],"p":14,"l":[1,0,0,0,0]},
+  {"j":[10,8,11,14,8],"s":[[6,5,3,8],[4,4,4],[2,8],[1,2,2,2]],"p":13,"h":1},
+  {"j":[10,12,12,11,11,13],"s":[[2,3,7,6],[4,3,7],[2,2],[1,6,6,7],[2,3,4,4]],"p":17,"l":[0,0,0,0,0,1],"h":1},
+  {"j":[7,7,10,9,11],"s":[[4,2,4,3],[6,3,5],[3,3,3],[2,1,5]],"p":13,"l":[0,2,0,1,0]},
+  {"j":[9,10,13,11,9],"s":[[2,7],[3,8,7],[1,6,3,6],[3,3,3]],"p":12,"l":[0,0,1,0,0],"h":1},
+  {"j":[13,11,9,8,13,15],"s":[[3,5],[7,4,8,9],[6,2,6],[5],[1,6,7]],"p":13,"h":1},
+  {"j":[11,13,10,10,7],"s":[[4,1,7],[7],[2,1,3,3],[4,6,8,5]],"p":12,"l":[0,0,0,0,1]},
+  {"j":[13,8,9,10,7],"s":[[3,7,4],[4,4,9],[4,2,3,2],[5]],"p":11,"l":[0,0,0,2,1],"h":1},
+  {"j":[9,12,10,11,7,10],"s":[[3,8],[6,2,5,9],[4,2],[1,2,4],[2,2,6,3]],"p":15,"l":[0,0,0,0,1,0],"h":1},
+  {"j":[8,12,17,12,10],"s":[[3,9],[4,5,7,8],[3,5,3,2],[7,3]],"p":12},
+  {"j":[8,10,10,15,13],"s":[[3,5,2,5],[3,1,7,6],[4,2,3,4],[4,5,2]],"p":15,"l":[0,0,0,1,0],"h":1},
+  {"j":[11,10,8,7,11,10],"s":[[6],[1,2,5,9],[8,3,4],[5,2,2,5],[1,2,2]],"p":15,"l":[0,0,1,2,0,0],"h":1},
+  {"j":[9,9,14,13,10],"s":[[2,8,4,2],[2,4,8,3],[1,3,5,7],[6]],"p":13,"l":[0,1,0,0,0]},
+  {"j":[9,7,8,13,9],"s":[[2,2,8,4],[2,3,6,2],[3,4],[1,2,5,2]],"p":14,"h":1},
+  {"j":[7,8,11,9,11,9],"s":[[2,1,3,2],[1,4,2,3],[2,4,3],[7,5,5],[3,4,2,2]],"p":18,"l":[1,0,0,0,0,0],"h":1},
+  {"j":[16,15,13,10,9],"s":[[3,3],[6,3,9],[4,2,7,7],[4,6,9]],"p":12,"l":[0,2,1,0,0]},
+  {"j":[10,13,13,8,13],"s":[[3,3,8,5],[2,5,3,8],[1,2,4],[4,6,3]],"p":14,"l":[0,0,0,1,0],"h":1},
+  {"j":[8,7,7,9,11,14],"s":[[7],[2,1,7,3],[2,6,2,7],[2,7],[6,4]],"p":13,"h":1},
+  {"j":[12,12,10,7,11],"s":[[3,2,5],[1,5,8,4],[6,4,2,2],[1,3,3,3]],"p":15,"l":[1,0,0,0,0]},
+  {"j":[14,10,16,11,11],"s":[[4,4,9,8],[8,3,2],[2,6,5],[1,2,3,5]],"p":14,"l":[0,0,0,2,1],"h":1},
+  {"j":[13,13,10,10,9,7],"s":[[1,3],[3,4,3],[2,7,8,4],[2,4,5,2],[6,2,6]],"p":16,"l":[0,0,0,1,0,0],"h":1},
+  {"j":[8,9,14,7,8],"s":[[2,5],[4,3,5,4],[5,4,2,9],[1,2]],"p":12},
+  {"j":[9,7,13,8,8],"s":[[1,3,1,6],[2,2,3],[7,5,3,2],[2,2,6]],"p":14,"l":[0,0,0,0,1],"h":1},
+  {"j":[13,11,13,10,13,11],"s":[[3,3],[2,3,7,5],[3,8,2,3],[5,6],[5,8,8]],"p":15,"l":[0,1,0,0,0,2],"h":1},
+  {"j":[12,11,14,7,14],"s":[[2,3,9],[5,3,7,4],[3,5,5,4],[4,2,2]],"p":14,"l":[0,0,0,0,1]},
+  {"j":[7,17,13,8,10],"s":[[1,8,5],[3,7],[2,4,3,9],[7,4,2]],"p":12,"h":1},
+  {"j":[7,9,12,8,10,15],"s":[[1,4,3,6],[4,8,9],[3],[2,5,9],[1,4,2]],"p":14,"l":[0,0,0,0,1,0],"h":1},
+  {"j":[12,7,8,8,12],"s":[[3,3,4,5],[6,2,5],[3,4],[8,4]],"p":11,"l":[2,0,0,0,1]},
+  {"j":[9,9,8,12,16],"s":[[2,1,2,2],[7,7,2,7],[5,5,7],[7]],"p":12,"l":[0,0,0,1,0],"h":1},
+  {"j":[7,14,10,7,7,11],"s":[[1,3,3],[4,7,7,5],[4,4],[2,3],[5,5,3]],"p":14,"h":1},
+  {"j":[14,10,7,14,10],"s":[[3,1,3],[8,2,5],[5,2,7],[4,6,7,2]],"p":13,"l":[0,0,1,0,0]}
+];
+const levelCache = new Map();
+function getLevel(n) {
+  if (levelCache.has(n)) return levelCache.get(n);
+  const raw = LEVELS[n - 1];
+  const def = raw ? { jars: raw.j, stacks: raw.s, par: raw.p, locks: raw.l || null, hidden: !!raw.h, exact: !!raw.x, fill: raw.f || null, teach: raw.t || null, rule: raw.r || null }
+    : generate(n, { tries: 40, runs: 400, tol: 0.07 });
+  levelCache.set(n, def); return def;
+}
+
+/* ---------------- constants ---------------- */
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const SPEED = REDUCED ? 0.45 : 1;
+const DISPLAY_FONT = '"Fredoka","Arial Rounded MT Bold","Trebuchet MS",sans-serif';
+const INK = '#3B2747', INK_SOFT = '#6A5676', RASP = '#E8456B', GOLD = '#F5B83D', CHERRY = '#E63946';
+/* Tile palette (Taste File tokens). hex = the colour the tile must show on screen; mat = the material colour that
+   renders as that hex under this scene's light; ink = the digit, a deep shade at 3.4:1 or better against hex. */
+const FLAVOURS = [null,
+  { name: 'Lemon', hex: '#F4DE3D', mat: '#B0A203', ink: '#453E03' },
+  { name: 'Grape', hex: '#9063F6', mat: '#6036B6', ink: '#332354' },
+  { name: 'Tangerine', hex: '#F68741', mat: '#B55903', ink: '#613112' },
+  { name: 'Blueberry', hex: '#6891E9', mat: '#385C9F', ink: '#1E3D70' },
+  { name: 'Lime', hex: '#83F572', mat: '#53B445', ink: '#1D4618' },
+  { name: 'Bubblegum', hex: '#F683CE', mat: '#B65A98', ink: '#632850' },
+  { name: 'Mint', hex: '#3EBFA0', mat: '#18816A', ink: '#1B453A' },
+  { name: 'Cherry', hex: '#DD4A3D', mat: '#942517', ink: '#541711' },
+  { name: 'Cola', hex: '#A67566', mat: '#6D4A3E', ink: '#482116' }];
+const SUGAR = '#F4EEF8';
+const TILE_W = 0.9, TILE_H = 0.44, STEP = 0.455;
+const JAR_FLOOR = 0.095, DISH_FLOOR = 0.085, LID_Y = 2.31, BADGE_Y = 3.08;
+const jarSlotY = k => JAR_FLOOR + TILE_H / 2 + 0.005 + k * STEP;
+const dishSlotY = k => DISH_FLOOR + TILE_H / 2 + 0.005 + k * STEP;
+const ALLOW = { undo: 5, spare: 1, split: 1, hint: 3 };
+/* boosters arrive one at a time, on the level where each first helps; chapter 1 cannot go wrong and has none */
+const BOOSTERS = ['undo', 'spare', 'split', 'hint'];
+const UNLOCK = { undo: 11, hint: 13, spare: 15, split: 21 };
+const INTRO = {
+  13: 'New: Hint lifts the next good tile and shows where it goes.',
+  15: 'New: +1 Jar adds a spare jar that holds any 4 tiles.',
+  21: 'New: Split cuts the top tile in two, like a 7 into 4 and 3.' };
+const MATCH_TIP = 'Match each tile to the jar with its number.';
+const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z" stroke-linejoin="round"/></svg>';
+const CHAPTER_TINT = { match: 'c-gold', pairs: 'c-orange', sums: 'c-pink', frosted: 'c-grape', ribbons: 'c-rasp', mix: 'c-mint' };
+const DEFAULT_TIP = 'The badge shows what a jar still needs. Hit it exactly to seal the jar.';
+
+/* ---------------- dom ---------------- */
+const $ = id => document.getElementById(id);
+const stage = $('stage'), canvas = $('scene');
+const ui = {
+  levelNum: $('levelNum'), chapterName: $('chapterName'), moves: $('movesPill'), par: $('parPill'),
+  tip: $('tip'), strip: $('strip'), top: $('topUi'), bottom: $('bottomUi'), refill: $('refillBtn'), stripRestart: $('stripRestart'),
+  win: $('win'), winText: $('winText'), winEyebrow: $('winEyebrow'), winTitle: $('winTitle'), winStars: $('winStars'),
+  winMoves: $('winMoves'), winPar: $('winPar'), tally: $('starTally'), winCard: $('winCard'), winChapter: $('winChapter'),
+  winStats: $('winStats'), nextLabel: $('nextLabel'), tray: $('tray'), hud: $('hud'),
+  next: $('nextBtn'), winHome: $('winHomeBtn'),
+  undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
+  undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
+  sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
+  homeSound: $('homeSound'), play: $('playBtn')
+};
+
+/* ---------------- saved progress (this browser only) ---------------- */
+const STORE = 'sumsort.proto.v1';
+let save = { stars: {}, last: 1, sound: true };
+try { const raw = localStorage.getItem(STORE); if (raw) save = Object.assign(save, JSON.parse(raw)); } catch (e) { /* play without saving */ }
+function persist() { try { localStorage.setItem(STORE, JSON.stringify(save)); } catch (e) { /* play without saving */ } }
+
+/* ---------------- helpers ---------------- */
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const ease = {
+  linear: k => k,
+  inOutCubic: k => k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2,
+  outCubic: k => 1 - Math.pow(1 - k, 3),
+  inQuad: k => k * k,
+  outBack: k => { const s = 1.70158, c = s + 1; return 1 + c * Math.pow(k - 1, 3) + s * Math.pow(k - 1, 2); },
+  outBounce: k => {
+    const n = 7.5625, d = 2.75;
+    if (k < 1 / d) return n * k * k;
+    if (k < 2 / d) return n * (k -= 1.5 / d) * k + .75;
+    if (k < 2.5 / d) return n * (k -= 2.25 / d) * k + .9375;
+    return n * (k -= 2.625 / d) * k + .984375;
+  }
+};
+function mixHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const ch = (p, s) => (p >> s) & 255;
+  const m = s => Math.round(ch(pa, s) + (ch(pb, s) - ch(pa, s)) * t);
+  return '#' + ((1 << 24) + (m(16) << 16) + (m(8) << 8) + m(0)).toString(16).slice(1);
+}
+const rand = (a, b) => a + Math.random() * (b - a);
+const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+
+const tweens = new Set();
+function tween(ms, fn, e = ease.linear) {
+  return new Promise(res => tweens.add({ t0: performance.now(), dur: Math.max(1, ms * SPEED), fn, e, res }));
+}
+const wait = ms => new Promise(r => setTimeout(r, ms * SPEED));
+
+/* short messages take over the coach strip for a moment, so nothing ever covers the board */
+let toastTimer = 0, toastMsg = '';
+function toast(msg) {
+  toastMsg = msg; renderStrip();
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastMsg = ''; renderStrip(); }, 2800);
+}
+
+/* ---------------- sound (synthesised, no files) ---------------- */
+let actx = null, soundOn = save.sound !== false;
+function tone(freq, dur, { type = 'sine', gain = 0.07, to = null, delay = 0 } = {}) {
+  if (!soundOn) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    const t = actx.currentTime + delay, o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(actx.destination); o.start(t); o.stop(t + dur + 0.02);
+  } catch (e) { /* audio is optional */ }
+}
+const NOTES = [523.25, 587.33, 659.25, 783.99, 880, 1046.5];
+const sfx = {
+  select: v => tone(420 + v * 35, 0.1, { to: 700 + v * 40, gain: 0.05 }),
+  drop: k => { tone(NOTES[Math.min(k, 5)] * 2, 0.16, { type: 'triangle', gain: 0.05 }); tone(140, 0.08, { gain: 0.05, to: 90 }); },
+  reject: () => { tone(200, 0.12, { type: 'triangle', gain: 0.06, to: 150 }); tone(180, 0.12, { type: 'triangle', gain: 0.05, to: 140, delay: 0.09 }); },
+  lid: () => tone(160, 0.12, { type: 'square', gain: 0.025, to: 90 }),
+  seal: n => [0, 2, 4].forEach((s, i) => tone(NOTES[Math.min(s + n, 5)] * 2, 0.35, { gain: 0.045, delay: i * 0.06 })),
+  win: () => [0, 2, 4, 3, 5].forEach((s, i) => tone(NOTES[s] * 2, 0.4, { type: 'triangle', gain: 0.05, delay: i * 0.1 })),
+  crack: () => { tone(2100, 0.05, { type: 'triangle', gain: 0.035, to: 1200 }); tone(1500, 0.07, { type: 'triangle', gain: 0.03, to: 800, delay: 0.04 }); },
+  untie: () => tone(480, 0.22, { gain: 0.05, to: 960 }),
+  split: () => { tone(700, 0.09, { type: 'triangle', gain: 0.05 }); tone(940, 0.11, { type: 'triangle', gain: 0.05, delay: 0.08 }); },
+  stuck: () => { tone(330, 0.2, { gain: 0.05, to: 290 }); tone(247, 0.3, { gain: 0.05, to: 220, delay: 0.16 }); },
+  nudge: () => tone(392, 0.22, { gain: 0.045, to: 440 }),
+  perfect: () => [2, 4, 5, 4, 5].forEach((s, i) => tone(NOTES[s] * (i > 2 ? 4 : 2), 0.42, { gain: 0.045, delay: i * 0.085 })),
+  chapter: () => [0, 2, 4, 5, 4, 5, 5].forEach((s, i) => { tone(NOTES[s] * 2, 0.5, { type: 'triangle', gain: 0.05, delay: i * 0.12 }); tone(NOTES[s], 0.5, { gain: 0.03, delay: i * 0.12 }); })
+};
+const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* haptics are optional */ } };
+
+/* ---------------- renderer & scene ---------------- */
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+} catch (e) {
+  const d = document.createElement('div'); d.className = 'fallback';
+  d.textContent = 'Sum Sort needs WebGL, which this browser has turned off.';
+  stage.appendChild(d); throw e;
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = (() => {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256;
+  const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256);
+  gr.addColorStop(0, '#E9DCFF'); gr.addColorStop(0.55, '#FFE0D2'); gr.addColorStop(1, '#FFD3C2');
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const pmrem = new THREE.PMREMGenerator(renderer);
+// a well-blurred room: reflections on the candy become soft gradients instead of hard window shapes
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.14).texture;
+scene.environmentIntensity = 0.85;
+
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 120);
+const camLook = new THREE.Vector3();
+
+scene.add(new THREE.HemisphereLight(0xF3E8FF, 0xFFD9C7, 1.05));
+const sun = new THREE.DirectionalLight(0xFFF1E2, 2.3);
+sun.position.set(-4.5, 10, 6.5); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 1, far: 40 });
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.04;
+scene.add(sun); scene.add(sun.target);
+/* Keep the shadow map tight around the board, so every texel is spent where the candy is. */
+function fitShadow(L) {
+  const cx = (L.minX + L.maxX) / 2, cz = (L.minZ + L.maxZ) / 2, half = Math.max(L.maxX - L.minX, L.maxZ - L.minZ) / 2 + 2.6;
+  sun.target.position.set(cx, 0, cz); sun.position.set(cx - 4.5, 10, cz + 6.5);
+  Object.assign(sun.shadow.camera, { left: -half, right: half, top: half, bottom: -half }); sun.shadow.camera.updateProjectionMatrix();
+}
+const rim = new THREE.DirectionalLight(0xE7D6FF, 0.9); rim.position.set(6, 4, -7); scene.add(rim);
+
+const counter = new THREE.Mesh(
+  new RoundedBoxGeometry(120, 1, 120, 4, 0.45),
+  new THREE.MeshPhysicalMaterial({ color: 0xF6D8CF, roughness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.45 }));
+counter.position.set(0, -0.5, -4); counter.receiveShadow = true; scene.add(counter);
+
+const playGroup = new THREE.Group(); scene.add(playGroup);
+
+/* ---------------- shared geometry & materials (the Candy Jar asset set) ---------------- */
+const tileGeo = new RoundedBoxGeometry(TILE_W, TILE_H, TILE_W, 9, 0.13);
+const v2 = (x, y) => new THREE.Vector2(x, y);
+/* Turn a rough outline into a smooth lathe profile: a centripetal spline through the points (no kinks, no overshoot). */
+function turned(points, samples, segments) {
+  const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(p.x, p.y, 0)), false, 'centripetal');
+  return new THREE.LatheGeometry(curve.getPoints(samples).map(p => v2(Math.max(0, p.x), p.y)), segments);
+}
+const jarGeo = turned([
+  v2(0, 0), v2(0.6, 0), v2(0.74, 0.03), v2(0.8, 0.12), v2(0.82, 0.3), v2(0.82, 1.72), v2(0.79, 1.86), v2(0.72, 1.96),
+  v2(0.7, 2.02), v2(0.7, 2.14), v2(0.745, 2.16), v2(0.745, 2.27), v2(0.66, 2.27), v2(0.66, 2.02), v2(0.7, 1.95),
+  v2(0.76, 1.85), v2(0.765, 1.72), v2(0.765, 0.3), v2(0.735, 0.16), v2(0.6, JAR_FLOOR), v2(0, JAR_FLOOR)], 72, 88);
+const dishGeo = turned([
+  v2(0, 0), v2(0.62, 0), v2(0.78, 0.03), v2(0.92, 0.1), v2(0.99, 0.17), v2(0.96, 0.19), v2(0.85, 0.125),
+  v2(0.66, DISH_FLOOR), v2(0, DISH_FLOOR)], 40, 96);
+/* Stylised glass, as the art spec asks for on mobile: a faintly tinted clear body, a darker edge where the wall turns
+   away from the eye, and painted highlights. No refraction pass, so it costs almost nothing and reads on a pale counter. */
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: new THREE.Color('#D9C8FF'), transparent: true, opacity: 0.11, depthWrite: false, metalness: 0, roughness: 0.04,
+  clearcoat: 1, clearcoatRoughness: 0.04, specularIntensity: 1, envMapIntensity: 1.5 });
+const edgeMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false,
+  uniforms: { tint: { value: new THREE.Color('#9479D8') }, power: { value: 2.3 }, strength: { value: 0.82 } },
+  vertexShader: `varying vec3 vN; varying vec3 vV;
+    void main() { vec4 mv = modelViewMatrix * vec4(position, 1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `uniform vec3 tint; uniform float power; uniform float strength; varying vec3 vN; varying vec3 vV;
+    void main() { float f = pow(1.0 - abs(dot(normalize(vN), normalize(vV))), power); gl_FragColor = vec4(tint, f * strength);
+      #include <colorspace_fragment>
+    }` });
+const shineTex = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 256; const g = c.getContext('2d');
+  const v = g.createLinearGradient(0, 0, 0, 256);
+  v.addColorStop(0, 'rgba(255,255,255,0)'); v.addColorStop(0.16, 'rgba(255,255,255,1)'); v.addColorStop(0.8, 'rgba(255,255,255,1)'); v.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = v; g.fillRect(0, 0, 64, 256);
+  g.globalCompositeOperation = 'destination-in';
+  const h = g.createLinearGradient(0, 0, 64, 0);
+  h.addColorStop(0, 'rgba(255,255,255,0)'); h.addColorStop(0.3, 'rgba(255,255,255,1)'); h.addColorStop(0.7, 'rgba(255,255,255,1)'); h.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = h; g.fillRect(0, 0, 64, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const paint = opacity => new THREE.MeshBasicMaterial({ color: 0xFFFFFF, map: shineTex, transparent: true, opacity, depthWrite: false, toneMapped: false });
+const shineMat = paint(0.9), shineSoftMat = paint(0.36);
+const rimMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.62, depthWrite: false, toneMapped: false });
+const jarBaseMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#BFA6EE'), transparent: true, opacity: 0.2, depthWrite: false, toneMapped: false });
+// the jar wall is straight from y 0.3 to 1.72 at radius 0.82; highlights sit just outside it, on the side the key light hits
+const shineGeo = new THREE.CylinderGeometry(0.842, 0.842, 1.22, 24, 1, true, -1.05, 0.44),
+  shineDotGeo = new THREE.CylinderGeometry(0.842, 0.842, 0.42, 10, 1, true, -0.54, 0.11),
+  shineBackGeo = new THREE.CylinderGeometry(0.842, 0.842, 1.0, 12, 1, true, 0.82, 0.17),
+  rimGeo = new THREE.RingGeometry(0.668, 0.742, 128), jarBaseGeo = new THREE.CircleGeometry(0.75, 96);
+const porcelainMat = new THREE.MeshPhysicalMaterial({ color: 0xFFF8F4, roughness: 0.16, clearcoat: 1, clearcoatRoughness: 0.08 });
+const lidMat = new THREE.MeshPhysicalMaterial({ color: 0xFFF1DC, roughness: 0.2, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.08 });
+const goldMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(GOLD), roughness: 0.16, metalness: 0.85, clearcoat: 0.6, clearcoatRoughness: 0.08 });
+const ribbonMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(RASP), roughness: 0.45, sheen: 1, sheenColor: new THREE.Color('#FFC2D1'), sheenRoughness: 0.35 });
+const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+const blobTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(90,40,90,0.30)'); gr.addColorStop(0.55, 'rgba(90,40,90,0.12)'); gr.addColorStop(1, 'rgba(90,40,90,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, toneMapped: false });
+const blobGeo = new THREE.PlaneGeometry(1, 1);
+function blob(size) {
+  const m = new THREE.Mesh(blobGeo, blobMat);
+  m.scale.set(size, size, 1); m.rotation.x = -Math.PI / 2; m.position.y = 0.004; m.renderOrder = -1; return m;
+}
+/* per-level GPU resources (badge textures, ring materials) are released when the next level is built */
+let levelTrash = [];
+const trash = x => { levelTrash.push(x); return x; };
+/* Slow device: render fewer pixels and a smaller shadow map. The look stays the same. */
+let lowQuality = false;
+function dropQuality() {
+  if (lowQuality) return; lowQuality = true;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  sun.shadow.mapSize.set(1024, 1024); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+  fitCamera(false);
+}
+
+/* tile materials and embossed digit decals; '?' is the sugar-frosted hidden tile */
+const tileMatCache = new Map(), digitCache = new Map();
+function tileMaterial(v) {
+  if (tileMatCache.has(v)) return tileMatCache.get(v);
+  let m;
+  if (v === '?') {
+    m = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(SUGAR), roughness: 0.85, sheen: 1, sheenColor: new THREE.Color('#FFFFFF'), sheenRoughness: 0.6, clearcoat: 0.2 });
+  } else {
+    // no emissive and a toned-down reflection: the top face must show the palette colour, not a washed version of it
+    m = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(FLAVOURS[v].mat), roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05, envMapIntensity: 0.55 });
+  }
+  tileMatCache.set(v, m); return m;
+}
+/* Digits are unlit: a dark fill in a deep shade of the tile colour, so the contrast is the same in light and in shadow.
+   The light emboss survives only as a thin highlight under the digit. `front` is the larger cut used on the side face,
+   the only part of a buried tile that shows. */
+function digitMaterial(v, front = false) {
+  const key = v + (front ? 'f' : 't');
+  if (digitCache.has(key)) return digitCache.get(key);
+  const ink = v === '?' ? '#6B4AA8' : FLAVOURS[v].ink, glint = v === '?' ? '#FFFFFF' : mixHex(FLAVOURS[v].hex, '#FFFFFF', 0.6);
+  const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d');
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `700 ${front ? 500 : 440}px ${DISPLAY_FONT}`;
+  const label = String(v), y = front ? 286 : 280;
+  g.fillStyle = glint; g.globalAlpha = 0.85; g.fillText(label, 256, y + 9);
+  g.fillStyle = ink; g.globalAlpha = 1; g.fillText(label, 256, y);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const m = new THREE.MeshBasicMaterial({ map: t, transparent: true, alphaTest: 0.02, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  digitCache.set(key, m); return m;
+}
+const frontDecalGeo = new THREE.PlaneGeometry(0.44, 0.44), topDecalGeo = new THREE.PlaneGeometry(0.72, 0.72);
+function makeTileMesh(v, hidden = false) {
+  const g = new THREE.Group(), face = hidden ? '?' : v;
+  const body = new THREE.Mesh(tileGeo, tileMaterial(face)); body.castShadow = true; body.receiveShadow = true; g.add(body);
+  const front = new THREE.Mesh(frontDecalGeo, digitMaterial(face, true)); front.position.z = TILE_W / 2 + 0.002; g.add(front);
+  const top = new THREE.Mesh(topDecalGeo, digitMaterial(face)); top.rotation.x = -Math.PI / 2; top.position.y = TILE_H / 2 + 0.002; g.add(top);
+  g.userData = { body, front, top }; return g;
+}
+function showFace(mesh, face) {
+  const u = mesh.userData; u.body.material = tileMaterial(face); u.front.material = digitMaterial(face, true); u.top.material = digitMaterial(face);
+}
+
+/* The badge counts down: it shows what the jar still needs, so nobody has to subtract. */
+function drawBadge(view) {
+  const { ctx: g, tex } = view.badge.userData, s = view.state;
+  g.clearRect(0, 0, 256, 256);
+  const cx = 128, cy = 124;
+  g.save(); g.shadowColor = 'rgba(110,40,90,0.28)'; g.shadowBlur = 14; g.shadowOffsetY = 6;
+  g.beginPath(); g.arc(cx, cy, 92, 0, Math.PI * 2);
+  g.fillStyle = s.sealed ? GOLD : s.locked ? '#FBEFF3' : '#FFFFFF'; g.fill(); g.restore();
+  g.lineCap = 'round';
+  if (!s.sealed) {
+    g.lineWidth = 13; g.strokeStyle = '#F3E3EC';
+    if (s.spare) g.setLineDash([14, 14]);
+    g.beginPath(); g.arc(cx, cy, 108, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
+    if (s.target != null && s.sum > 0) {
+      g.strokeStyle = s.flash ? CHERRY : RASP;
+      g.beginPath(); g.arc(cx, cy, 108, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, s.sum / s.target)); g.stroke();
+    }
+  }
+  if (s.flash) { g.lineWidth = 13; g.strokeStyle = CHERRY; g.beginPath(); g.arc(cx, cy, 108, 0, Math.PI * 2); g.stroke(); }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = s.flash && !s.sealed ? CHERRY : s.locked && !s.sealed ? INK_SOFT : INK;   // ink on gold reads at 7.5:1
+  if (s.spare) { g.font = `600 70px ${DISPLAY_FONT}`; g.fillText('any', cx, cy + 4); }
+  else {
+    const n = s.sealed ? s.target : s.target - s.sum;
+    g.font = `700 ${n >= 10 ? 104 : 116}px ${DISPLAY_FONT}`; g.fillText(String(n), cx, cy + (s.sealed ? -6 : 6));
+  }
+  if (s.sealed) {
+    g.strokeStyle = INK; g.lineWidth = 11; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(cx - 22, cy + 52); g.lineTo(cx - 6, cy + 66); g.lineTo(cx + 24, cy + 38); g.stroke();
+  }
+  if (s.locked && !s.sealed) {   // small padlock tag, lower right
+    const lx = 196, ly = 190;
+    g.beginPath(); g.arc(lx, ly, 40, 0, Math.PI * 2); g.fillStyle = RASP; g.fill();
+    g.strokeStyle = '#FFFFFF'; g.lineWidth = 8; g.beginPath(); g.arc(lx, ly - 8, 11, Math.PI, 0); g.stroke();
+    g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(lx - 17, ly - 8, 34, 26, 6); g.fill();
+  }
+  tex.needsUpdate = true;
+}
+function makeBadge() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const ctx = c.getContext('2d');
+  const tex = trash(new THREE.CanvasTexture(c)); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(trash(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false })));
+  sp.scale.set(0.98, 0.98, 1); sp.position.y = BADGE_Y; sp.renderOrder = 5; sp.userData = { ctx, tex, base: 0.98 };
+  return sp;
+}
+
+/* jar / dish / lid builders */
+const lidCapGeo = new THREE.CylinderGeometry(0.79, 0.81, 0.17, 112), lidDomeGeo = new THREE.SphereGeometry(0.79, 112, 16, 0, Math.PI * 2, 0, 0.32),
+  lidBandGeo = new THREE.TorusGeometry(0.81, 0.035, 16, 128), ringGeo = new THREE.TorusGeometry(1, 0.05, 16, 128),
+  ribbonGeo = new THREE.TorusGeometry(0.835, 0.07, 18, 128), bowGeo = new THREE.TorusGeometry(0.17, 0.055, 16, 48), knotGeo = new THREE.SphereGeometry(0.08, 28, 20),
+  jarHitGeo = new THREE.CylinderGeometry(0.98, 0.98, 3.6, 16), dishHitGeo = new THREE.CylinderGeometry(1.02, 1.02, 3.2, 16),
+  dishRimGeo = new THREE.TorusGeometry(0.975, 0.016, 12, 128);
+function makeLid() {
+  const lid = new THREE.Group();
+  const cap = new THREE.Mesh(lidCapGeo, lidMat); cap.castShadow = true; lid.add(cap);
+  const dome = new THREE.Mesh(lidDomeGeo, lidMat);
+  dome.scale.y = 0.6; dome.position.y = 0.085 - 0.79 * 0.6 * Math.cos(0.32); dome.castShadow = true; lid.add(dome);
+  const band = new THREE.Mesh(lidBandGeo, goldMat); band.rotation.x = Math.PI / 2; band.position.y = -0.02; lid.add(band);
+  const knob = new THREE.Mesh(knotGeo, goldMat); knob.scale.set(2.1, 1.5, 2.1); knob.position.y = 0.2; knob.castShadow = true; lid.add(knob);
+  return lid;
+}
+function ringMesh(radius, color, y) {
+  const m = new THREE.Mesh(ringGeo, trash(new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0, toneMapped: false })));
+  m.scale.set(radius, radius, 1); m.rotation.x = -Math.PI / 2; m.position.y = y; return m;
+}
+function makeJarView({ target = null, spare = false, locked = false } = {}) {
+  const group = new THREE.Group();
+  const glass = new THREE.Mesh(jarGeo, glassMat); glass.renderOrder = 1; group.add(glass);
+  const edge = new THREE.Mesh(jarGeo, edgeMat); edge.renderOrder = 2; group.add(edge);
+  const base = new THREE.Mesh(jarBaseGeo, jarBaseMat); base.rotation.x = -Math.PI / 2; base.position.y = JAR_FLOOR + 0.004; group.add(base);
+  const rim = new THREE.Mesh(rimGeo, rimMat); rim.rotation.x = -Math.PI / 2; rim.position.y = 2.274; rim.renderOrder = 3; group.add(rim);
+  [[shineGeo, shineMat, 1.02], [shineDotGeo, shineMat, 1.36], [shineBackGeo, shineSoftMat, 1.0]].forEach(([geo, mat, y]) => {
+    const m = new THREE.Mesh(geo, mat); m.position.y = y; m.renderOrder = 3; group.add(m);
+  });
+  group.add(blob(2.4));
+  const goldRing = ringMesh(0.88, GOLD, 0.03); group.add(goldRing);
+  const selRing = ringMesh(0.9, RASP, 0.035); group.add(selRing);
+  const lid = makeLid(); lid.position.y = LID_Y; lid.visible = false; group.add(lid);
+  const badge = makeBadge(); group.add(badge);
+  const hit = new THREE.Mesh(jarHitGeo, hitMat); hit.position.y = 1.7; group.add(hit);
+  let ribbon = null;
+  if (locked) {
+    ribbon = new THREE.Group(); ribbon.position.y = 1.15;
+    const r = new THREE.Mesh(ribbonGeo, ribbonMat); r.rotation.x = Math.PI / 2; r.castShadow = true; ribbon.add(r);
+    const bow = new THREE.Group(); bow.position.set(0, 0, 0.88);
+    [-1, 1].forEach(sx => { const loop = new THREE.Mesh(bowGeo, ribbonMat); loop.position.x = sx * 0.17; loop.rotation.z = sx * 0.5; loop.scale.y = 0.7; bow.add(loop); });
+    bow.add(new THREE.Mesh(knotGeo, ribbonMat)); ribbon.add(bow); group.add(ribbon);
+  }
+  const view = { group, glass, goldRing, selRing, lid, badge, hit, ribbon, state: { target, sum: 0, sealed: false, spare, flash: false, locked } };
+  drawBadge(view); return view;
+}
+function makeDishView() {
+  const group = new THREE.Group();
+  const dish = new THREE.Mesh(dishGeo, porcelainMat); dish.castShadow = true; dish.receiveShadow = true; group.add(dish);
+  const gilt = new THREE.Mesh(dishRimGeo, goldMat); gilt.rotation.x = Math.PI / 2; gilt.position.y = 0.178; group.add(gilt);
+  group.add(blob(2.5));
+  const selRing = ringMesh(1.0, RASP, 0.04); group.add(selRing);
+  const hit = new THREE.Mesh(dishHitGeo, hitMat); hit.position.y = 1.5; group.add(hit);
+  return { group, selRing, hit };
+}
+
+/* particles: sugar sparkles */
+const sparkTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 30); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.65)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#FFFFFF'; g.beginPath();
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = i % 2 ? 6 : 30; g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r); }
+  g.closePath(); g.fill();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const PAL_GOLD = [GOLD, '#FFFFFF', '#FFD6E2', '#FFE9A8'], PAL_SUGAR = ['#FFFFFF', '#F4EEF8', '#E3D2F7'], PAL_RIBBON = [RASP, '#FFC2D1', '#FFFFFF'];
+const bursts = [];
+function burst(pos, n = 28, palette = PAL_GOLD, power = 1) {
+  const geo = new THREE.BufferGeometry(), p = new Float32Array(n * 3), col = new Float32Array(n * 3), vel = [];
+  const cols = palette.map(h => new THREE.Color(h));
+  for (let i = 0; i < n; i++) {
+    p.set([pos.x, pos.y, pos.z], i * 3);
+    const a = Math.random() * Math.PI * 2, up = rand(2.2, 4.6) * power, out = rand(1.2, 2.8) * power;
+    vel.push(new THREE.Vector3(Math.cos(a) * out, up, Math.sin(a) * out));
+    const c = cols[i % cols.length]; col.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(p, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({ size: 0.34, map: sparkTex, vertexColors: true, transparent: true, depthWrite: false, toneMapped: false });
+  const pts = new THREE.Points(geo, mat); pts.renderOrder = 6; pts.frustumCulled = false; scene.add(pts);
+  bursts.push({ pts, vel, age: 0, life: 0.95 });
+}
+function updateBursts(dt) {
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const b = bursts[i]; b.age += dt; const arr = b.pts.geometry.attributes.position.array;
+    b.vel.forEach((v, j) => { v.y -= 7.5 * dt; v.multiplyScalar(0.985); arr[j * 3] += v.x * dt; arr[j * 3 + 1] += v.y * dt; arr[j * 3 + 2] += v.z * dt; });
+    b.pts.geometry.attributes.position.needsUpdate = true;
+    b.pts.material.opacity = 1 - clamp01(b.age / b.life) ** 2;
+    if (b.age >= b.life) { scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose(); bursts.splice(i, 1); }
+  }
+}
+
+/* win confetti: mini gummies (instanced) */
+const miniGeo = new RoundedBoxGeometry(0.34, 0.17, 0.34, 4, 0.06);
+const miniMat = new THREE.MeshPhysicalMaterial({ color: 0xFFFFFF, roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.06 });
+let confetti = null;
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(1, 1, 1);
+function writeConfetti(c) {
+  c.bodies.forEach((b, i) => { _q.setFromEuler(b.q); _m4.compose(b.p, _q, _s); c.mesh.setMatrixAt(i, _m4); });
+  c.mesh.instanceMatrix.needsUpdate = true;
+}
+function makeConfetti(n, area, firstWave = n) {
+  const mesh = new THREE.InstancedMesh(miniGeo, miniMat, n); mesh.castShadow = true; mesh.frustumCulled = false;
+  const bodies = [];
+  for (let i = 0; i < n; i++) {
+    mesh.setColorAt(i, new THREE.Color(FLAVOURS[1 + (i % 9)].mat));
+    bodies.push({
+      p: new THREE.Vector3(rand(area.x0, area.x1), rand(5, 10), rand(area.z0, area.z1)),
+      v: new THREE.Vector3(rand(-0.6, 0.6), rand(-2, 0), rand(-0.6, 0.6)),
+      q: new THREE.Euler(rand(0, 6), rand(0, 6), rand(0, 6)),
+      w: new THREE.Vector3(rand(-6, 6), rand(-6, 6), rand(-6, 6)), rest: false,
+      hold: firstWave && i >= firstWave ? 0.7 : 0 });   // a second wave waits above the frame, then falls
+  }
+  bodies.forEach(b => { if (b.hold) b.p.y += 30; });
+  mesh.instanceColor.needsUpdate = true; playGroup.add(mesh);
+  const obj = { mesh, bodies }; writeConfetti(obj); return obj;
+}
+function updateConfetti(c, dt) {
+  if (!c) return; let moving = false;
+  c.bodies.forEach(b => {
+    if (b.rest) return; moving = true;
+    if (b.hold > 0) { b.hold -= dt; if (b.hold <= 0) b.p.y -= 30; return; }
+    b.v.y -= 14 * dt; b.p.addScaledVector(b.v, dt);
+    b.q.x += b.w.x * dt; b.q.y += b.w.y * dt; b.q.z += b.w.z * dt;
+    if (b.p.y < 0.085) {
+      b.p.y = 0.085; b.v.y *= -0.32; b.v.x *= 0.6; b.v.z *= 0.6; b.w.multiplyScalar(0.5);
+      if (Math.abs(b.v.y) < 0.6) { b.rest = true; b.q.x = 0; b.q.z = 0; b.v.set(0, 0, 0); }
+    }
+  });
+  if (moving) writeConfetti(c);
+}
+
+/* ---------------- game state ---------------- */
+let levelNo = 1, def = null, jars = [], stacks = [], sel = null, history = [], busy = 0, won = false;
+let moveCount = 0, spareUsed = false, rescued = false, allow = { ...ALLOW };
+let dead = false, softDead = false, plan = null, spareRescues = false, splitArmed = false, tipText = DEFAULT_TIP, buildId = 0;
+let flights = 0;      // tiles in the air: they never block input
+let pending = null;   // one remembered tap, replayed as soon as the board can take it
+let deferred = null;  // one booster press waiting for flying tiles to land
+let hitMeshes = [];
+
+const jarSum = j => { let s = 0; for (const t of j.tiles) s += t.v; return s; };
+const landedSum = j => { let s = 0; for (const t of j.tiles) if (!t.flying) s += t.v; return s; };
+const sealedCount = () => jars.filter(j => j.sealed).length;
+const isLocked = j => j.lock > 0 && sealedCount() < j.lock;
+const srcList = src => src.kind === 'stack' ? stacks[src.i].tiles : jars[src.i].tiles;
+const srcView = src => src.kind === 'stack' ? stacks[src.i].view : jars[src.i].view;
+const srcSlotY = (src, k) => src.kind === 'stack' ? dishSlotY(k) : jarSlotY(k);
+const topOf = src => { const l = srcList(src); return l[l.length - 1]; };
+const unlocked = b => levelNo >= UNLOCK[b];
+const solverState = () => ({
+  J: jars.map(j => ({ t: j.t, tiles: j.tiles.map(x => x.v), sealed: j.sealed, lock: j.lock, exact: j.exact })),
+  S: stacks.map(s => s.tiles.map(x => x.v)) });
+
+function buildLevel(n) {
+  buildId++;
+  [...playGroup.children].forEach(ch => playGroup.remove(ch));
+  if (confetti) { confetti.mesh.dispose(); confetti = null; }
+  levelTrash.forEach(x => x.dispose()); levelTrash = [];
+  levelNo = n; def = getLevel(n);
+  toastMsg = ''; clearTimeout(toastTimer);
+  sel = null; history = []; busy = 0; flights = 0; pending = null; deferred = null;
+  won = false; moveCount = 0; spareUsed = false; rescued = false; allow = { ...ALLOW };
+  dead = false; softDead = false; plan = null; spareRescues = false; setSplitArmed(false);
+  jars = def.jars.map((t, i) => {
+    const lock = def.locks ? def.locks[i] : 0, view = makeJarView({ target: t, locked: lock > 0 });
+    const tiles = (def.fill ? def.fill[i] : []).map((v, k) => {
+      const mesh = makeTileMesh(v); mesh.position.y = jarSlotY(k); view.group.add(mesh);
+      return { v, hidden: false, mesh };
+    });
+    return { t, lock, exact: !!def.exact, tiles, sealed: false, spare: false, view };
+  });
+  stacks = def.stacks.map(vals => {
+    const view = makeDishView();
+    const tiles = vals.map((v, k) => {
+      const hidden = def.hidden && k < vals.length - 1;
+      const mesh = makeTileMesh(v, hidden); mesh.position.y = dishSlotY(k); view.group.add(mesh);
+      return { v, hidden, mesh };
+    });
+    return { tiles, view };
+  });
+  jars.forEach(j => { playGroup.add(j.view.group); if (j.tiles.length) syncBadge(j); });
+  stacks.forEach(s => playGroup.add(s.view.group));
+  layoutPlay(false); refreshHits();
+  const ch = chapterOf(n);
+  tipText = def.rule || (n === ch.from ? ch.rule : INTRO[n] || (def.exact ? MATCH_TIP : DEFAULT_TIP));
+  ui.levelNum.textContent = String(n); ui.chapterName.textContent = ch.name;
+  ui.win.hidden = true;
+  // chapter 1 shows nothing but the board; each booster arrives on the level where it first helps
+  ui.hud.hidden = !!def.exact;
+  let shown = 0;
+  for (const b of BOOSTERS) { const on = unlocked(b); ui[b].hidden = !on; ui[b].classList.toggle('fresh', levelNo === UNLOCK[b]); if (on) shown++; }
+  ui.tray.hidden = shown === 0; ui.tray.style.setProperty('--cols', Math.max(1, shown));
+  if (n !== TEST_LEVEL) { save.last = n; persist(); }
+  // entrance: jars and dishes pop in, back row first
+  if (!REDUCED) {
+    const groups = [...jars, ...stacks].map(o => o.view.group);
+    groups.forEach((g, i) => {
+      g.scale.setScalar(0.001);
+      setTimeout(() => tween(300, k => g.scale.setScalar(Math.max(0.001, k)), ease.outBack), 40 * i);
+    });
+  }
+  analyse(); updateHud(); armIdle();
+}
+function refreshHits() {
+  hitMeshes = [];
+  const own = (view, owner) => { view.group.userData.owner = owner; view.hit.userData = { volume: true, owner }; hitMeshes.push(view.hit); };
+  jars.forEach((j, i) => own(j.view, { kind: 'jar', i }));
+  stacks.forEach((s, i) => own(s.view, { kind: 'stack', i }));
+}
+
+/* ---------------- board layout ---------------- */
+let narrow = false, lastLayout = null;
+const viewDir = () => new THREE.Vector3(0, narrow ? 0.79 : 0.66, narrow ? 0.61 : 0.75).normalize();
+function gridPos(n, perRow, i, gapX, z0, gapZ) {
+  const r = Math.floor(i / perRow), c = i % perRow, inRow = Math.min(perRow, n - r * perRow);
+  return [(c - (inRow - 1) / 2) * gapX, z0 + r * gapZ];
+}
+function arrange(jPer, sPer) {
+  const nJ = jars.length, nS = stacks.length, jRows = Math.ceil(nJ / jPer), sRows = Math.ceil(nS / sPer), spots = [];
+  const sZ0 = (jRows - 1) * 2.9 + 3.1;
+  for (let i = 0; i < nJ; i++) spots.push(gridPos(nJ, jPer, i, 2.1, 0, 2.9));
+  for (let i = 0; i < nS; i++) spots.push(gridPos(nS, sPer, i, 2.2, sZ0, 2.5));
+  // two zones to keep in frame: tall jars with their badges at the back, low stacks in front
+  const zone = (list, padX, back, front, h) => {
+    const xs = list.map(m => m[0]), zs = list.map(m => m[1]);
+    return new THREE.Box3(new THREE.Vector3(Math.min(...xs) - padX, 0, Math.min(...zs) - back), new THREE.Vector3(Math.max(...xs) + padX, h, Math.max(...zs) + front));
+  };
+  const zones = [zone(spots.slice(0, nJ), 1.0, 1.0, 0.9, 3.7), zone(spots.slice(nJ), 1.1, 1.0, 1.1, 2.7)];
+  return { spots, zones, rows: jRows + sRows };
+}
+/* Try every sensible grid and keep the one that lets the camera come closest, so the board fills the stage
+   in both directions instead of fitting the width and leaving the height empty. */
+function layoutPlay(animated) {
+  const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
+  camera.aspect = w / h; camera.updateProjectionMatrix(); narrow = camera.aspect < 0.95;
+  const keepPos = camera.position.clone(), keepQuat = camera.quaternion.clone();
+  const nJ = jars.length, nS = stacks.length, dir = viewDir(), lim = boardLimits(); let best = null;
+  for (let jPer = 2; jPer <= Math.max(2, Math.min(nJ, 7)); jPer++) {
+    for (let sPer = 2; sPer <= Math.max(2, Math.min(nS, 5)); sPer++) {
+      if (Math.ceil(nJ / jPer) > 3 || Math.ceil(nS / sPer) > 2) continue;
+      const a = arrange(Math.min(jPer, nJ), Math.min(sPer, nS));
+      const fit = fitToPoints(zonePoints(a.zones), dir, lim);
+      const dist = fit.pos.distanceTo(fit.center) + a.rows * 0.05;   // on a tie, prefer fewer rows
+      if (!best || dist < best.dist - 1e-3) best = { ...a, dist };
+    }
+  }
+  camera.position.copy(keepPos); camera.quaternion.copy(keepQuat);
+  const groups = [...jars, ...stacks].map(o => o.view.group), all = best.zones[0].clone().union(best.zones[1]);
+  lastLayout = { zones: best.zones, minX: all.min.x, maxX: all.max.x, minZ: all.min.z, maxZ: all.max.z };
+  fitShadow(lastLayout);
+  if (!animated) { groups.forEach((g, i) => g.position.set(best.spots[i][0], 0, best.spots[i][1])); return Promise.resolve(); }
+  const from = groups.map(g => g.position.clone());
+  return tween(360, k => groups.forEach((g, i) => { g.position.x = from[i].x + (best.spots[i][0] - from[i].x) * k; g.position.z = from[i].z + (best.spots[i][1] - from[i].z) * k; }), ease.inOutCubic);
+}
+function syncBadge(j, extra = {}) {
+  const before = j.view.state.sum;
+  // the badge follows what has landed, and turns gold only once the lid is on
+  Object.assign(j.view.state, { target: j.t, sum: landedSum(j), spare: j.spare, sealed: j.sealed && !!j.view.lidDown, locked: isLocked(j) }, extra);
+  drawBadge(j.view);
+  if (before !== j.view.state.sum && !REDUCED) {
+    const b = j.view.badge, base = b.userData.base;
+    tween(220, k => { const s = base * (1 + 0.2 * Math.sin(Math.PI * k)); b.scale.set(s, s, 1); }).then(() => b.scale.set(base, base, 1));
+  }
+}
+function refreshLocks(animated = true) {
+  jars.forEach(j => {
+    if (!j.lock) return;
+    const locked = isLocked(j), r = j.view.ribbon;
+    if (locked === j.view.state.locked) return;
+    j.view.state.locked = locked; drawBadge(j.view);
+    if (!animated || REDUCED) { r.visible = locked; r.scale.setScalar(1); return; }
+    if (locked) { r.visible = true; tween(220, k => r.scale.setScalar(Math.max(0.001, k)), ease.outBack); }
+    else {
+      sfx.untie(); toast('Ribbon untied. That jar is open now.');
+      burst(new THREE.Vector3(j.view.group.position.x, 1.3, j.view.group.position.z + 0.6), 16, PAL_RIBBON, 0.7);
+      tween(260, k => r.scale.setScalar(Math.max(0.001, 1 - k)), ease.inQuad).then(() => { r.visible = false; });
+    }
+  });
+}
+function updateHud() {
+  ui.moves.innerHTML = `Moves <b>${moveCount}</b>`;
+  ui.par.innerHTML = `Par <b>${def.par}</b>`;
+  ui.undoCount.textContent = allow.undo; ui.spareCount.textContent = allow.spare;
+  ui.splitCount.textContent = allow.split; ui.hintCount.textContent = allow.hint;
+  ui.undo.disabled = won || !history.length || allow.undo <= 0;
+  ui.spare.disabled = won || spareUsed || allow.spare <= 0;
+  ui.split.disabled = won || allow.split <= 0;
+  ui.hint.disabled = won || allow.hint <= 0;
+  renderStrip();
+}
+/* The coach strip doubles as the fail state. A hard dead end names the booster that gets out;
+   a soft one (the stacks alone cannot finish, but tiles in jars can still move) says so. */
+function renderStrip() {
+  if (!def) return;
+  const stuck = dead && !won, soft = softDead && !won && !stuck;
+  const canUndo = unlocked('undo') && history.length > 0 && allow.undo > 0;
+  const canSpare = unlocked('spare') && spareRescues && !spareUsed && allow.spare > 0;
+  ui.strip.classList.toggle('stuck', stuck && !toastMsg);
+  ui.strip.classList.toggle('soft', soft && !toastMsg && !splitArmed);
+  ui.strip.classList.toggle('note', !!toastMsg);
+  ui.tip.textContent = toastMsg ? toastMsg
+    : splitArmed && !stuck ? 'Tap a stack or jar to split its top tile in two.'
+    : soft ? 'The stacks alone cannot finish this. Tiles in jars can move too: tap a jar to lift its top tile.'
+    : !stuck ? tipText
+    : canUndo && canSpare ? 'Dead end. Undo, or add a spare jar to get out.'
+    : canUndo ? 'Dead end. Undo to get back on track.'
+    : canSpare ? 'Dead end. A spare jar gets you out.'
+    : 'Dead end, and no booster left that fixes it.';
+  ui.undo.classList.toggle('rescue', stuck && canUndo);
+  ui.spare.classList.toggle('rescue', stuck && canSpare);
+  ui.stripRestart.hidden = !stuck;
+  ui.refill.hidden = !(stuck && !canUndo && !canSpare && history.length > 0 && unlocked('undo'));
+}
+/* After every change: is the board still winnable? Stack-only search first (fast), then the full search. */
+function analyse(move) {
+  if (won) return;
+  // a move that follows the known plan keeps the board winnable: no search needed
+  if (move && plan && plan.length > 1 && !dead && !softDead) {
+    const p = plan[0];
+    if (p.src.kind === move.src.kind && p.src.i === move.src.i && p.dst === move.dst) { plan = plan.slice(1); return; }
+  }
+  const st = solverState();
+  const clean = solve(st, 8000, true);
+  const r = clean.status === 'solved' ? clean : solve(st, 15000);
+  plan = r.status === 'solved' ? r.path : null;
+  const wasDead = dead, wasSoft = softDead;
+  dead = r.status === 'dead';
+  softDead = !def.teach && clean.status === 'dead' && r.status === 'solved';
+  spareRescues = dead && !spareUsed &&
+    solve({ J: st.J.concat([{ t: null, tiles: [], sealed: false, lock: 0 }]), S: st.S }, 15000).status === 'solved';
+  if (dead && !wasDead) { sfx.stuck(); buzz(30); }
+  else if (softDead && !wasSoft) sfx.nudge();
+}
+function afterChange(move) { refreshLocks(); analyse(move); updateHud(); armIdle(); }
+/* Input is only ever held by a booster animation, and never for more than half a second.
+   A tap that arrives meanwhile is remembered; a booster pressed while tiles are flying waits for them to land. */
+function settle() {
+  if (busy) return;
+  if (!flights && deferred) { const f = deferred; deferred = null; f(); if (busy) return; }
+  if (pending) { const p = pending; pending = null; tap(p.h); }
+}
+function whenSettled(fn) { if (flights || busy) deferred = fn; else fn(); }
+
+/* rules */
+function placeCheck(j, v) {
+  if (j.sealed) return 'sealed';
+  if (isLocked(j)) return 'locked';
+  if (j.tiles.length >= JAR_CAP) return 'full';
+  if (j.exact && v !== j.t) return 'exact';
+  if (j.t != null && jarSum(j) + v > j.t) return 'over';
+  return null;
+}
+
+/* ---------------- animations ---------------- */
+function squash(mesh) {
+  return tween(280, k => {
+    const d = Math.exp(-4.5 * k) * Math.cos(13 * k) * (1 - k);
+    mesh.scale.set(1 + 0.15 * d, 1 - 0.25 * d, 1 + 0.15 * d);
+  }).then(() => mesh.scale.set(1, 1, 1));
+}
+async function flyTo(mesh, group, slotY, aboveY = 3.35) {
+  playGroup.attach(mesh);
+  const p0 = mesh.position.clone(), gp = group.position.clone();
+  const above = new THREE.Vector3(gp.x, aboveY, gp.z);
+  const ctrl = p0.clone().lerp(above, 0.5); ctrl.y = Math.max(p0.y, aboveY) + 1.0;
+  mesh.rotation.set(0, 0, 0);
+  await tween(310, k => {
+    const a = (1 - k) * (1 - k), b = 2 * (1 - k) * k, c = k * k;
+    mesh.position.set(a * p0.x + b * ctrl.x + c * above.x, a * p0.y + b * ctrl.y + c * above.y, a * p0.z + b * ctrl.z + c * above.z);
+    mesh.rotation.y = Math.sin(k * Math.PI) * 0.7;
+  }, ease.inOutCubic);
+  mesh.rotation.set(0, 0, 0);
+  const target = group.position.y + slotY;
+  await tween(170, k => { mesh.position.y = aboveY + (target - aboveY) * k; }, ease.inQuad);
+  group.attach(mesh); mesh.position.set(0, slotY, 0); mesh.rotation.set(0, 0, 0);
+  squash(mesh);
+}
+function lift(tile, src, up) {
+  const base = srcSlotY(src, srcList(src).indexOf(tile));
+  const y0 = tile.mesh.position.y, y1 = base + (up ? 0.42 : 0);
+  return tween(up ? 190 : 150, k => { if (!tile.flying) tile.mesh.position.y = y0 + (y1 - y0) * k; }, up ? ease.outBack : ease.outCubic)
+    .then(() => { if (!up && !tile.flying) tile.mesh.rotation.z = 0; });
+}
+function ringTo(ring, to, ms = 180) { const o = ring.material.opacity; return tween(ms, k => { ring.material.opacity = o + (to - o) * k; }); }
+function pulseBadge(view, times = 3) {
+  const b = view.badge, base = b.userData.base;
+  return tween(1000, k => { const s = base * (1 + 0.28 * Math.abs(Math.sin(k * Math.PI * times))); b.scale.set(s, s, 1); })
+    .then(() => b.scale.set(base, base, 1));
+}
+function hop(group, h = 0.24, ms = 380) { return tween(ms, k => { group.position.y = h * Math.sin(Math.PI * k); }, ease.outCubic).then(() => { group.position.y = 0; }); }
+function popIn(mesh) { return tween(240, k => mesh.scale.setScalar(Math.max(0.001, k)), ease.outBack).then(() => mesh.scale.set(1, 1, 1)); }
+function reveal(tile) {
+  if (!tile || !tile.hidden) return;
+  tile.hidden = false; showFace(tile.mesh, tile.v); sfx.crack();
+  burst(tile.mesh.getWorldPosition(new THREE.Vector3()), 12, PAL_SUGAR, 0.5);
+  tween(260, k => tile.mesh.scale.setScalar(1 + 0.2 * Math.sin(Math.PI * k))).then(() => tile.mesh.scale.set(1, 1, 1));
+}
+
+/* ---------------- selection & moves ---------------- */
+function select(src) {
+  const tile = topOf(src); if (!tile) return;
+  sel = { ...src, tile };
+  lift(tile, src, true); ringTo(srcView(src).selRing, 0.9); sfx.select(tile.v); buzz(6);
+}
+function deselect() {
+  if (!sel) return;
+  const s = sel; sel = null;
+  lift(s.tile, s, false); ringTo(srcView(s).selRing, 0);
+}
+function reject(j, reason) {
+  sfx.reject(); buzz([12, 40, 12]);
+  syncBadge(j, { flash: true }); setTimeout(() => syncBadge(j, { flash: false }), 480);
+  const g = j.view.group;
+  tween(340, k => { g.rotation.z = 0.09 * Math.sin(k * Math.PI * 5) * (1 - k); }).then(() => { g.rotation.z = 0; });
+  if (sel) { const m = sel.tile.mesh; tween(280, k => { m.rotation.y = 0.4 * Math.sin(k * Math.PI * 4) * (1 - k); }).then(() => { m.rotation.y = 0; }); }
+  const left = j.lock - sealedCount();
+  toast(reason === 'sealed' ? 'That jar is sealed.'
+    : reason === 'locked' ? `Tied shut. Seal ${plural(left, 'more jar')} to open it.`
+    : reason === 'full' ? 'A jar holds 4 tiles at most.'
+    : reason === 'exact' ? `This jar wants the ${j.t}.`
+    : `Too big. This jar only needs ${j.t - jarSum(j)}.`);
+}
+/* A move changes the board at once and then plays out: the tile flies and the lid drops over whatever the player
+   does next. Nothing here holds input. */
+function moveTo(di) {
+  const src = sel, tile = src.tile, dst = jars[di], id = buildId;
+  const why = placeCheck(dst, tile.v);
+  if (why) { reject(dst, why); return; }
+  srcList(src).pop(); ringTo(srcView(src).selRing, 0); sel = null;
+  tile.flying = true; flights++;
+  if (src.kind === 'jar') syncBadge(jars[src.i]); else reveal(topOf(src));
+  const slot = dst.tiles.length; dst.tiles.push(tile);
+  const seals = dst.t != null && jarSum(dst) === dst.t;
+  if (seals) dst.sealed = true;
+  history.push({ type: 'move', src: { kind: src.kind, i: src.i }, dst: di, seals });
+  moveCount++;
+  const finishing = jars.every(j => j.t == null || j.sealed);
+  if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
+  updateHud();
+  flyTo(tile.mesh, dst.view.group, jarSlotY(slot)).then(async () => {
+    if (id !== buildId) return;
+    tile.flying = false; flights--;
+    sfx.drop(slot); buzz(8); syncBadge(dst);
+    if (seals) { const lid = sealAnim(dst); if (finishing) { await lid; if (id === buildId) winLevel(); return; } }
+    if (!won) afterChange({ src, dst: di });
+    settle();
+  });
+}
+async function sealAnim(j) {
+  const v = j.view, token = v.lidToken = (v.lidToken || 0) + 1;
+  v.lid.visible = true; v.lid.position.y = 4.1; v.lid.rotation.z = 0.3;
+  sfx.lid();
+  await tween(440, k => { if (v.lidToken !== token) return; v.lid.position.y = 4.1 + (LID_Y - 4.1) * k; v.lid.rotation.z = 0.3 * (1 - k); }, ease.outBounce);
+  if (v.lidToken !== token) return;   // an undo took the lid back off
+  v.lidDown = true;
+  burst(new THREE.Vector3(v.group.position.x, 2.55, v.group.position.z));
+  syncBadge(j); sfx.seal(sealedCount() - 1); buzz(18);
+  ringTo(v.goldRing, 0.9, 420); hop(v.group, 0.22, 400);
+  await wait(160);
+}
+async function unsealAnim(j) {
+  const v = j.view; v.lidToken = (v.lidToken || 0) + 1; v.lidDown = false;
+  j.sealed = false; syncBadge(j); ringTo(v.goldRing, 0, 200);
+  const y0 = v.lid.position.y, token = v.lidToken;
+  await tween(260, k => { if (v.lidToken !== token) return; v.lid.position.y = y0 + 2 * k; v.lid.rotation.z = 0.4 * k; }, ease.inQuad);
+  if (v.lidToken !== token) return;
+  v.lid.visible = false; v.lid.rotation.z = 0;
+}
+
+/* ---------------- boosters ---------------- */
+async function undo() {
+  if (busy || won || !history.length || allow.undo <= 0 || !unlocked('undo')) return;
+  const id = buildId;
+  deselect(); setSplitArmed(false); busy++; allow.undo--;
+  const h = history.pop();
+  if (h.type === 'split') {
+    const list = srcList(h.loc), view = srcView(h.loc);
+    list.splice(list.length - 2, 2).forEach(p => view.group.remove(p.mesh));
+    list.push(h.orig); h.orig.mesh.position.set(0, srcSlotY(h.loc, list.length - 1), 0); h.orig.mesh.rotation.set(0, 0, 0);
+    view.group.add(h.orig.mesh); popIn(h.orig.mesh); sfx.split();
+    allow.split++;
+  } else {
+    const dst = jars[h.dst], tile = dst.tiles.pop();
+    if (h.seals) unsealAnim(dst);   // the lid lifts while the tile is already on its way back
+    tile.flying = true; syncBadge(dst);
+    const back = srcList(h.src), slot = back.length; back.push(tile);
+    await flyTo(tile.mesh, srcView(h.src).group, srcSlotY(h.src, slot), h.src.kind === 'stack' ? 3.0 : 3.35);
+    if (id !== buildId) return;
+    tile.flying = false;
+    if (h.src.kind === 'jar') syncBadge(jars[h.src.i]);
+  }
+  busy--; afterChange(); settle();
+}
+async function addSpare() {
+  if (busy || won || spareUsed || allow.spare <= 0 || !unlocked('spare')) return;
+  const id = buildId;
+  deselect(); setSplitArmed(false); busy++; spareUsed = true; rescued = true; allow.spare--; updateHud();
+  const j = { t: null, lock: 0, exact: false, tiles: [], sealed: false, spare: true, view: makeJarView({ spare: true }) };
+  jars.push(j); j.view.group.scale.setScalar(0.001); playGroup.add(j.view.group);
+  refreshHits();
+  const slide = layoutPlay(true); fitCamera(true);
+  tween(380, k => j.view.group.scale.setScalar(Math.max(0.001, k)), ease.outBack);
+  await slide;
+  if (id !== buildId) return;
+  busy--;
+  toast('Spare jar added. It holds any 4 tiles.');
+  afterChange(); settle();
+}
+function setSplitArmed(on) {
+  splitArmed = on; ui.split.setAttribute('aria-pressed', String(on));
+}
+function onSplitButton() {
+  if (busy || won || allow.split <= 0 || !unlocked('split')) return;
+  if (sel) { doSplit({ kind: sel.kind, i: sel.i }); return; }
+  toastMsg = ''; setSplitArmed(!splitArmed); renderStrip();
+}
+async function doSplit(loc) {
+  setSplitArmed(false);
+  const list = srcList(loc), tile = list[list.length - 1], view = srcView(loc), id = buildId;
+  const fail = msg => { toast(msg); sfx.reject(); renderStrip(); };
+  if (loc.kind === 'jar' && jars[loc.i].sealed) return fail('That jar is sealed.');
+  if (!tile) return fail('Nothing to split there.');
+  if (tile.flying) return fail('Let that tile land first.');
+  if (tile.v < 2) return fail('A 1 is as small as it gets.');
+  if (loc.kind === 'jar' && list.length >= JAR_CAP) return fail('No room in that jar for two tiles.');
+  if (sel) { ringTo(srcView(sel).selRing, 0); sel = null; }
+  busy++; allow.split--; rescued = true; updateHud();
+  const small = Math.floor(tile.v / 2), big = tile.v - small;
+  list.pop(); const k = list.length;
+  await tween(140, t => tile.mesh.scale.setScalar(1 - 0.6 * t), ease.inQuad);
+  if (id !== buildId) return;
+  view.group.remove(tile.mesh); tile.mesh.scale.set(1, 1, 1);
+  const parts = [big, small].map((v, i) => {
+    const mesh = makeTileMesh(v); mesh.position.y = srcSlotY(loc, k + i); view.group.add(mesh); popIn(mesh);
+    return { v, hidden: false, mesh };
+  });
+  list.push(...parts);
+  burst(new THREE.Vector3(view.group.position.x, srcSlotY(loc, k) + 0.4, view.group.position.z), 14, PAL_SUGAR, 0.6);
+  sfx.split(); buzz(12);
+  history.push({ type: 'split', loc, orig: tile });
+  toast(`Split the ${tile.v} into ${big} and ${small}.`);
+  await wait(240);
+  if (id !== buildId) return;
+  busy--; afterChange(); settle();
+}
+function hint() {
+  if (busy || won || allow.hint <= 0 || !unlocked('hint')) return;
+  setSplitArmed(false);
+  if (dead) { toast('No way out from here. Undo a move first.'); return; }
+  if (!plan) { toast('This one is too tangled to read. Try an undo.'); return; }
+  const m = plan[0];
+  allow.hint--; updateHud();
+  if (!sel || sel.kind !== m.src.kind || sel.i !== m.src.i) { deselect(); select(m.src); }
+  pulseBadge(jars[m.dst].view);
+}
+function refill() {
+  allow = { ...ALLOW, spare: spareUsed ? 0 : ALLOW.spare }; rescued = true;
+  toast('Boosters refilled. In the real game this is a rewarded ad.');
+  updateHud();
+}
+function goLevel(n) { buildLevel(n); fitCamera(false); }
+function restart() { goLevel(levelNo); }
+
+/* idle coaching: after 8 s without a tap (sooner while a rule is being learned) the next good move pulses, free of charge */
+let idleTimer = 0;
+function armIdle() {
+  clearTimeout(idleTimer);
+  if (won) return;
+  const id = buildId, delay = def.exact || def.teach || softDead ? 2200 : 8000;
+  idleTimer = setTimeout(() => {
+    if (id !== buildId || won || dead || !plan || homeOpen) return;
+    if (!busy && !flights && !sel && !splitArmed) {
+      const m = plan[0], ring = srcView(m.src).selRing;
+      ringTo(ring, 0.8, 260).then(() => wait(380)).then(() => { if (!sel) ringTo(ring, 0, 300); });
+      pulseBadge(jars[m.dst].view, 2);
+    }
+    armIdle();
+  }, delay);
+}
+
+/* ---------------- winning: the celebration ladder ----------------
+   tile lands < jar seals < level cleared < cleared with three stars < chapter finished. Each rung adds to the one below. */
+async function winLevel() {
+  won = true; dead = false; softDead = false; clearTimeout(idleTimer); refreshLocks(false); updateHud();
+  const id = buildId, ch = chapterOf(levelNo), tiles = def.par, L = lastLayout;
+  const stars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
+  const perfect = stars === 3 && !def.exact && !def.teach;      // tutorial levels cannot be played badly, so they stay on the plain rung
+  const chapterDone = levelNo === ch.to;
+  // the level is done the moment it is won: leaving now and coming back later starts the next one
+  save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; persist();
+  // rung 3: level cleared
+  sfx.win(); buzz([20, 40, 30]);
+  jars.forEach((j, i) => setTimeout(() => { if (id === buildId) hop(j.view.group, 0.3, 420); }, i * 70 * SPEED));
+  const area = { x0: L.minX, x1: L.maxX, z0: L.minZ, z1: L.maxZ };
+  const rain = Math.round(Math.min(60, 20 + tiles * 3) * (perfect ? 1.5 : 1) * (lowQuality ? 0.5 : 1));
+  if (!REDUCED) confetti = makeConfetti(rain + (chapterDone ? 60 : 0), area, chapterDone ? rain : 0);
+  // rung 4: three stars. Every jar fires its sparks again and the flourish climbs higher.
+  if (perfect) {
+    jars.forEach((j, i) => setTimeout(() => {
+      if (id !== buildId || j.t == null) return;
+      burst(new THREE.Vector3(j.view.group.position.x, 2.7, j.view.group.position.z), 22, PAL_GOLD, 1.15);
+    }, (260 + i * 90) * SPEED));
+    setTimeout(() => { if (id === buildId) { sfx.perfect(); buzz([20, 40, 30, 40, 60]); } }, 520 * SPEED);
+  }
+  // rung 5: chapter finished. A second wave of candy and a longer flourish.
+  if (chapterDone) setTimeout(() => { if (id === buildId) { sfx.chapter(); buzz([30, 50, 30, 50, 90]); } }, (perfect ? 1000 : 560) * SPEED);
+  await wait(chapterDone ? 1500 : perfect ? 1300 : 1100);
+  if (id !== buildId) return;
+  const next = CHAPTERS[CHAPTERS.indexOf(ch) + 1];
+  ui.winCard.classList.toggle('perfect', perfect); ui.winCard.classList.toggle('chapter-done', chapterDone);
+  ui.winEyebrow.textContent = `Level ${levelNo} cleared`;
+  ui.winTitle.textContent = chapterDone ? `${ch.name} done!` : perfect ? 'Perfect!' : stars >= 2 ? 'Sweet!' : 'Sealed!';
+  ui.winStars.innerHTML = [1, 2, 3].map(i => STAR.replace('<svg', `<svg class="${i <= stars ? 'on' : ''}"`)).join('');
+  ui.winStars.setAttribute('aria-label', `${stars} of 3 stars`);
+  ui.winChapter.hidden = !chapterDone;
+  if (chapterDone) { ui.winChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.winChapter.textContent = `Chapter complete: ${ch.name}`; }
+  ui.winStats.hidden = !!def.exact || !!def.teach;
+  ui.winMoves.textContent = moveCount; ui.winPar.textContent = def.par;
+  ui.winText.textContent = chapterDone && next ? `Next up: ${next.name}. ${next.rule}`
+    : def.exact || def.teach ? 'All jars sealed.'
+    : stars === 3 ? 'No wasted moves.'
+    : rescued ? 'Solved with a booster. Go without one for 3 stars.'
+    : `${plural(moveCount - def.par, 'move')} over par. Match par for 3 stars.`;
+  ui.nextLabel.textContent = chapterDone && next ? 'Next chapter' : 'Next level';
+  ui.win.hidden = false; ui.next.focus({ preventScroll: true });
+  // past the stored levels, build the next one now, while nobody is mid-move
+  if (levelNo >= LEVELS.length) setTimeout(() => getLevel(levelNo + 1), 400);
+}
+
+/* ---------------- home ----------------
+   One level at a time, forward only: home shows the level that is waiting and a Play button, nothing to browse. */
+const TEST_LEVEL = 999;
+let homeOpen = false, homeRenderUntil = 0;
+function showHome(focus = true) {
+  const ch = chapterOf(levelNo), total = Object.values(save.stars).reduce((a, b) => a + (Number(b) || 0), 0);
+  ui.homeNum.textContent = String(levelNo);
+  ui.homeChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.homeChapter.textContent = ch.name;
+  ui.tally.hidden = total === 0; ui.tally.innerHTML = STAR + total;
+  homeOpen = true; homeRenderUntil = performance.now() + 1600;
+  ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
+  stage.classList.add('at-home'); clearTimeout(idleTimer); if (focus) ui.play.focus({ preventScroll: true });
+}
+function play() {
+  if (!homeOpen) return;
+  homeOpen = false; ui.home.classList.add('off'); stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false;
+  sfx.select(5); buzz(8);
+  if (moveCount === 0 && !won) goLevel(levelNo); else armIdle();   // a fresh board makes its entrance again; a level in progress just carries on
+}
+/* Home from a finished level leaves that level behind: the next one is set up to wait. */
+function goHome() {
+  if (won) { buildLevel(levelNo === TEST_LEVEL ? Math.max(1, Number(save.last) || 1) : levelNo + 1); fitCamera(false); }
+  showHome();
+}
+
+/* ---------------- camera ---------------- */
+const _p = new THREE.Vector3(), _up = new THREE.Vector3(), _right = new THREE.Vector3();
+function zonePoints(zones) {
+  const pts = [];
+  zones.forEach(({ min, max }) => { for (let i = 0; i < 8; i++) pts.push(new THREE.Vector3(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z)); });
+  return pts;
+}
+/* Room the level bar and the booster tray take, as limits for fitting the board (clip space: -1 bottom, 1 top).
+   The coach line counts as a fixed 50 px so the board does not shift when its text changes. */
+function boardLimits() {
+  const s = stage.getBoundingClientRect(), H = Math.max(1, s.height);
+  const top = ui.top.getBoundingClientRect().bottom - s.top + 4;
+  const bottom = s.bottom - ui.bottom.getBoundingClientRect().bottom + (ui.tray.hidden ? 0 : ui.tray.offsetHeight + 10) + 50 + 4;
+  return { x: 1 / (narrow ? 1.03 : 1.08), y0: -1 + 2 * bottom / H, y1: 1 - 2 * top / H };
+}
+/* Closest camera along `dir` that keeps every point inside `lim` (the screen minus the room the controls take),
+   re-centred so the board fills that room. */
+function fitToPoints(pts, dir, lim) {
+  const center = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3());
+  let dist = 20;
+  const place = d => { camera.position.copy(center).addScaledVector(dir, d); camera.lookAt(center); camera.updateMatrixWorld(); camera.updateProjectionMatrix(); };
+  const bounds = () => {
+    const b = { x0: Infinity, x1: -Infinity, y0: Infinity, y1: -Infinity, behind: false };
+    for (const p of pts) { _p.copy(p).project(camera); if (_p.z > 1) b.behind = true; b.x0 = Math.min(b.x0, _p.x); b.x1 = Math.max(b.x1, _p.x); b.y0 = Math.min(b.y0, _p.y); b.y1 = Math.max(b.y1, _p.y); }
+    return b;
+  };
+  for (let pass = 0; pass < 4; pass++) {
+    let lo = 2, hi = 90;
+    for (let it = 0; it < 22; it++) {
+      const mid = (lo + hi) / 2; place(mid);
+      const b = bounds();
+      if (b.behind || b.x0 < -lim.x || b.x1 > lim.x || b.y0 < lim.y0 || b.y1 > lim.y1) lo = mid; else hi = mid;
+    }
+    dist = hi; place(dist);
+    const b = bounds(), mx = (b.x0 + b.x1) / 2, my = (b.y0 + b.y1) / 2 - (lim.y0 + lim.y1) / 2;
+    if (Math.abs(mx) < 0.01 && Math.abs(my) < 0.01) break;
+    const half = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist;
+    _up.setFromMatrixColumn(camera.matrixWorld, 1); _right.setFromMatrixColumn(camera.matrixWorld, 0);
+    center.addScaledVector(_up, my * half).addScaledVector(_right, mx * half * camera.aspect);
+  }
+  return { pos: center.clone().addScaledVector(dir, dist), center };
+}
+let camTween = 0, lastAspect = 0;
+function fitCamera(animated) {
+  const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  // a different stage shape can suit a different grid, as long as nothing is in the air
+  if (jars.length && Math.abs(camera.aspect - lastAspect) > 0.005 && !flights && !busy) layoutPlay(false);
+  lastAspect = camera.aspect;
+  if (!lastLayout) return;
+  const L = lastLayout, from = camera.position.clone(), fromLook = camLook.clone();
+  const { pos, center } = fitToPoints(zonePoints(L.zones), viewDir(), boardLimits());
+  const id = ++camTween;
+  if (animated && !REDUCED) {
+    tween(360, k => {
+      if (id !== camTween) return;
+      camera.position.lerpVectors(from, pos, k); camLook.lerpVectors(fromLook, center, k); camera.lookAt(camLook);
+    }, ease.inOutCubic);
+    camera.position.copy(from); camera.lookAt(fromLook);
+  } else { camera.position.copy(pos); camLook.copy(center); camera.lookAt(camLook); }
+  camera.updateProjectionMatrix();
+}
+
+/* ---------------- input ---------------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function aim(e) {
+  const r = canvas.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+}
+function pick(e) {
+  aim(e);
+  // what you see is what you tap: the nearest drawn surface (tile, glass, dish, badge) decides the owner
+  for (const h of ray.intersectObjects(playGroup.children, true)) {
+    if (h.object.userData.volume) continue;
+    for (let o = h.object; o; o = o.parent) if (o.userData.owner) return o.userData.owner;
+  }
+  // near miss: fall back to a generous volume around each jar and stack
+  const near = ray.intersectObjects(hitMeshes, false)[0];
+  return near ? near.object.userData.owner : null;
+}
+function tap(h) {
+  if (won) return;
+  if (busy) { pending = { h }; return; }   // a booster is mid-animation: remember the tap, play it when it ends
+  armIdle();
+  if (splitArmed) {
+    if (h) doSplit({ kind: h.kind, i: h.i }); else { setSplitArmed(false); renderStrip(); }
+    return;
+  }
+  if (!h) { deselect(); return; }
+  if (h.kind === 'stack') {
+    if (sel && sel.kind === 'stack' && sel.i === h.i) { deselect(); return; }
+    deselect();
+    if (stacks[h.i].tiles.length) select({ kind: 'stack', i: h.i });
+    return;
+  }
+  const j = jars[h.i];
+  if (sel) {
+    if (sel.kind === 'jar' && sel.i === h.i) { deselect(); return; }
+    moveTo(h.i); return;
+  }
+  if (j.sealed) toast('Sealed. Pick a tile from a stack.');
+  else if (j.tiles.length) {
+    if (topOf(h).flying) { pending = { h }; return; }   // its top tile is still in the air: pick it up when it lands
+    select({ kind: 'jar', i: h.i });
+  }
+  else if (isLocked(j)) toast(`Tied shut. Seal ${plural(j.lock - sealedCount(), 'more jar')} to open it.`);
+  else toast('Pick a tile from a stack first.');
+}
+// act on finger-down: the answer starts in the frame the finger lands
+canvas.addEventListener('pointerdown', e => { if (e.button === 0 || e.pointerType !== 'mouse') tap(pick(e)); });
+canvas.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  aim(e); canvas.style.cursor = ray.intersectObjects(hitMeshes, false).length ? 'pointer' : 'default';
+});
+ui.undo.addEventListener('click', () => whenSettled(undo));
+ui.spare.addEventListener('click', () => whenSettled(addSpare));
+ui.split.addEventListener('click', () => whenSettled(onSplitButton));
+ui.hint.addEventListener('click', () => whenSettled(hint));
+ui.restart.addEventListener('click', restart);
+ui.stripRestart.addEventListener('click', restart);
+ui.refill.addEventListener('click', refill);
+ui.next.addEventListener('click', () => goLevel(levelNo + 1));
+ui.winHome.addEventListener('click', goHome);
+ui.homeBtn.addEventListener('click', goHome);
+ui.play.addEventListener('click', play);
+function setSound(on) { soundOn = on; for (const b of [ui.sound, ui.homeSound]) b.setAttribute('aria-pressed', String(on)); save.sound = on; persist(); }
+for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { setSound(!soundOn); if (soundOn) sfx.select(5); }); b.setAttribute('aria-pressed', String(soundOn)); }
+
+/* ---------------- loop ---------------- */
+const clock = new THREE.Clock(); let frames = 0, slowMs = 0;
+function loop() {
+  const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime, now = performance.now();
+  for (const tw of [...tweens]) {
+    const k = clamp01((now - tw.t0) / tw.dur); tw.fn(tw.e(k), k);
+    if (k >= 1) { tweens.delete(tw); tw.res(); }
+  }
+  if (sel && !REDUCED) sel.tile.mesh.rotation.z = 0.05 * Math.sin(t * 9);
+  if (!REDUCED) jars.forEach((j, i) => { j.view.badge.position.y = BADGE_Y + 0.035 * Math.sin(t * 2 + i); });
+  updateBursts(dt); updateConfetti(confetti, dt);
+  if (!homeOpen || now < homeRenderUntil) renderer.render(scene, camera);   // behind the home wash the settled board is a still picture
+  // frames 20-80 decide whether this device renders at reduced resolution
+  if (!lowQuality && !window.__sumSortKeepQuality && ++frames > 20 && frames <= 80) {
+    slowMs += raw * 1000;
+    if (frames === 80 && slowMs / 60 > 30) dropQuality();
+  }
+}
+
+/* ---------------- boot ---------------- */
+async function start(hot) {
+  try {
+    await Promise.race([
+      Promise.all([document.fonts.load(`700 120px "Fredoka"`), document.fonts.load(`600 54px "Fredoka"`)]),
+      new Promise(r => setTimeout(r, 2500))]);
+  } catch (e) { /* fall back to system rounded fonts */ }
+  const first = Number(hot && hot.level) || Number(save.last) || 1;
+  buildLevel(Math.max(1, Math.floor(first)));
+  fitCamera(false);
+  if (hot && hot.level) ui.home.classList.add('off'); else showHome(false);   // a republish mid-game keeps the player in the game
+  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); }).observe(stage);
+  renderer.setAnimationLoop(loop);
+  // hooks for automated play-tests and for measuring the build against the Taste File rubric
+  const toPage = v => { const p = v.project(camera), r = canvas.getBoundingClientRect(); return { x: r.left + (p.x + 1) / 2 * r.width, y: r.top + (1 - p.y) / 2 * r.height }; };
+  window.__sumSort = {
+    get jars() { return jars; }, get stacks() { return stacks; }, get busy() { return busy; }, get flights() { return flights; }, get won() { return won; },
+    get dead() { return dead; }, get softDead() { return softDead; }, get plan() { return plan; }, get level() { return levelNo; }, get moves() { return moveCount; },
+    get lowQuality() { return lowQuality; }, get allow() { return allow; }, get pending() { return !!pending; },
+    get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
+    loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
+    setTileColor(v, hex) { tileMaterial(v).color.set(hex); },
+    screenOf(kind, i, y = 0.9) { const g = (kind === 'jar' ? jars : stacks)[i].view.group; return toPage(new THREE.Vector3(g.position.x, y, g.position.z)); },
+    screenAt(x, y, z) { return toPage(new THREE.Vector3(x, y, z)); }
+  };
+}
+/* a republish while someone is playing keeps them on their level */
+const hotApi = window.claude && window.claude.hot;
+try { if (hotApi && hotApi.snapshot) hotApi.snapshot(() => ({ level: levelNo })); } catch (e) { /* optional */ }
+if (hotApi && hotApi.ready) hotApi.ready(start); else start((hotApi && hotApi.data) || {});
+</script>
+
+</body>
+</html>

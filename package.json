@@ -1,0 +1,16 @@
+{
+  "name": "sum-sort",
+  "version": "0.7.0",
+  "private": true,
+  "type": "module",
+  "description": "Sum Sort: a sorting puzzle with glass candy jars and numbered gummy tiles (web prototype).",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "levels": "node scripts/generate-levels.mjs",
+    "serve": "python3 -m http.server 8080",
+    "test": "node tests/playtest.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.50.0"
+  }
+}

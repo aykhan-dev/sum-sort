@@ -1,0 +1,170 @@
+// Play-test: drives the built index.html in headless Chromium with real touches.
+// Run: npm i && npx playwright install chromium && npm test     (set PLAYWRIGHT=/path/to/playwright/index.js to reuse an install)
+import fs from 'node:fs'; import http from 'node:http'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+const pw = await import(process.env.PLAYWRIGHT || 'playwright'); const { chromium } = pw.default || pw;
+const ROOT = fileURLToPath(new URL('..', import.meta.url)), SHOTS = path.join(ROOT, 'shots'); fs.mkdirSync(SHOTS, { recursive: true });
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.json': 'application/json' };
+const server = http.createServer((req, res) => { const f = path.join(ROOT, decodeURIComponent(req.url.split('?')[0]).replace(/\/$/, '/index.html'));
+  if (!f.startsWith(ROOT) || !fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+  res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
+await new Promise(r => server.listen(0, '127.0.0.1', r)); const URL_ = `http://127.0.0.1:${server.address().port}/index.html`;
+const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const ctx = await browser.newContext({ viewport: { width: 390, height: 760 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+const page = await ctx.newPage(); page.setDefaultTimeout(180000);
+await page.addInitScript(() => { window.__sumSortKeepQuality = true; });   // the test decides the render quality itself
+await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());   // system fonts are enough here, and the run stays offline
+const errors = [];
+page.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_FAILED/.test(m.text())) errors.push(m.text()); });
+page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+await page.goto(URL_);
+await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
+await page.evaluate(() => __sumSort.dropQuality());
+let fails = 0;
+const pass = (name, ok, extra = '') => { if (!ok) fails++; console.log((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); };
+// 0. home: the game opens on it, shows the current level, and Play is the only way in
+const H = () => page.evaluate(() => ({ open: __sumSort.home, off: document.getElementById('home').classList.contains('off'), num: document.getElementById('homeNum').textContent, chapter: document.getElementById('homeChapter').textContent, tally: document.getElementById('starTally').hidden ? null : document.getElementById('starTally').textContent, level: __sumSort.level, moves: __sumSort.moves }));
+const tapEl = async sel => { const p = await page.evaluate(sel => { const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === el || el.contains(hit)) }; }, sel);
+  if (!p.ok) console.log('COVERED: ' + sel); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(450); };
+let h0 = await H(); console.log('home at start'.padEnd(30), JSON.stringify(h0));
+pass('game opens on home with level 1 and no star tally', h0.open && !h0.off && h0.num === '1' && h0.chapter === 'Match' && h0.tally === null);
+{ const p = await page.evaluate(() => __sumSort.screenOf('stack', 0, 0.5)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
+  pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel))); }
+pass('no level list, no replay of old levels', (await page.evaluate(() => ['levelBtn', 'levels', 'replayBtn'].every(id => !document.getElementById(id)))));
+await page.screenshot({ path: SHOTS + '/home-1.png' });
+await tapEl('#playBtn'); h0 = await H();
+pass('Play opens the current level', !h0.open && h0.off && h0.level === 1);
+const settled = () => page.waitForFunction(() => __sumSort.busy === 0 && __sumSort.flights === 0);
+const S = () => page.evaluate(() => ({
+  jars: __sumSort.jars.map(j => (j.sealed ? '#' : '') + j.t + ':' + j.tiles.map(x => x.v).join('+')).join(' '),
+  stacks: __sumSort.stacks.map(s => s.tiles.map(x => (x.hidden ? '?' : '') + x.v).join(',')).join(' | '),
+  dead: __sumSort.dead, soft: __sumSort.softDead, won: __sumSort.won, moves: __sumSort.moves, sel: __sumSort.sel, flights: __sumSort.flights, busy: __sumSort.busy,
+  tip: document.getElementById('tip').textContent, strip: document.getElementById('strip').className,
+  tray: [...document.querySelectorAll('#tray button')].filter(b => !b.hidden).map(b => b.id.replace('Btn', '') + (b.classList.contains('fresh') ? '*' : '')).join(','),
+  trayHidden: document.getElementById('tray').hidden, hudHidden: document.getElementById('hud').hidden }));
+const log = (label, v) => console.log(label.padEnd(30), typeof v === 'string' ? v : JSON.stringify(v));
+const go = async n => { await page.evaluate(n => __sumSort.goLevel(n), n); await page.waitForTimeout(900); };
+const touch = async (kind, i, y) => { const p = await page.evaluate(([k, i, y]) => __sumSort.screenOf(k, i, y), [kind, i, y ?? (kind === 'jar' ? 0.9 : 0.5)]); await page.touchscreen.tap(p.x, p.y); };
+
+// 1. chapter 1: nothing but the board; a wrong jar says which tile it wants; cannot dead-end
+await go(1); let s = await S(); log('L1', s);
+pass('chapter 1 hides boosters and Moves/Par', s.trayHidden && s.hudHidden);
+await touch('stack', 0); await page.waitForTimeout(250);
+const wrong = await page.evaluate(() => { const v = __sumSort.stacks[0].tiles.at(-1).v; return __sumSort.jars.findIndex(j => j.t !== v); });
+await touch('jar', wrong); await page.waitForTimeout(250); s = await S();
+pass('exact-fit jar rejects the wrong tile', s.moves === 0 && /wants the/.test(s.tip), s.tip);
+await page.evaluate(() => __sumSort.tap(null));
+// 2. finger-down + overlapping moves: fire three full moves 60 ms apart on level 5 and check none is lost
+await go(5); await settled();
+const plan = await page.evaluate(() => __sumSort.plan.slice(0, 3).map(m => ({ s: m.src.i, d: m.dst })));
+const t0 = Date.now();
+for (const m of plan) { await page.evaluate(m => { __sumSort.tap({ kind: 'stack', i: m.s }); __sumSort.tap({ kind: 'jar', i: m.d }); }, m); await page.waitForTimeout(60); }
+s = await S(); log('3 moves in ' + (Date.now() - t0) + ' ms', { moves: s.moves, flights: s.flights, busy: s.busy });
+pass('no tap is dropped while tiles fly', s.moves === 3);
+await settled(); await page.waitForTimeout(700); log('L5 after landing', (await S()).jars);
+// real touch acts on finger-down
+await go(2); await settled();
+const p0 = await page.evaluate(() => __sumSort.screenOf('stack', 0, 0.5));
+const cdp = await ctx.newCDPSession(page);
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: p0.x, y: p0.y }] });
+await page.waitForTimeout(120); const selDown = (await S()).sel;
+await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+pass('selection starts on finger-down', !!selDown, JSON.stringify(selDown));
+// 3. booster unlocks
+const trays = {};
+for (const n of [10, 11, 12, 13, 15, 21]) { await go(n); trays[n] = (await S()).tray; }
+log('boosters by level', trays);
+pass('boosters arrive one at a time', trays[10] === '' && trays[11] === 'undo*' && trays[13] === 'undo,hint*' && trays[15] === 'undo,spare*,hint' && trays[21] === 'undo,spare,split*,hint');
+// 4. jar-to-jar tutorial level: only legal move is jar to jar
+await go(12); await settled(); s = await S(); log('L12', s);
+await touch('stack', 0); await page.waitForTimeout(200); await touch('jar', 0); await page.waitForTimeout(300); const rej = (await S()).tip;
+await page.evaluate(() => __sumSort.tap(null));
+await touch('jar', 0); await page.waitForTimeout(250); await touch('jar', 1); await settled(); await page.waitForTimeout(800);
+await touch('stack', 0); await page.waitForTimeout(250); await touch('jar', 0); await page.waitForTimeout(2800);
+s = await S(); pass('tutorial: stack tile rejected, jar-to-jar move wins the level', /Too big/.test(rej) && s.won, rej);
+log('L12 win card', await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, statsHidden: document.getElementById('winStats').hidden, text: document.getElementById('winText').textContent })));
+// 5. soft dead end and hard dead end on level 11
+await go(11); await settled(); s = await S(); log('L11', s);
+// play random non-plan stack moves until the board is soft-dead or dead
+let seenSoft = false, seenDead = false;
+for (let tryNo = 0; tryNo < 12 && !(seenSoft && seenDead); tryNo++) {
+  await go(11 + (tryNo % 6 === 1 ? 2 : tryNo % 6)); await settled();
+  for (let k = 0; k < 14; k++) {
+    const mv = await page.evaluate(() => { const S = __sumSort.stacks, J = __sumSort.jars, out = [];
+      S.forEach((s, si) => { const t = s.tiles.at(-1); if (!t) return; J.forEach((j, di) => { const sum = j.tiles.reduce((a, x) => a + x.v, 0); if (!j.sealed && j.tiles.length < 4 && sum + t.v <= j.t && sum + t.v !== j.t) out.push([si, di]); }); });
+      return out.length ? out[Math.floor(Math.random() * out.length)] : null; });
+    if (!mv) break;
+    await page.evaluate(([a, b]) => { __sumSort.tap({ kind: 'stack', i: a }); __sumSort.tap({ kind: 'jar', i: b }); }, mv); await settled(); await page.waitForTimeout(80);
+    s = await S();
+    if (s.soft && !seenSoft) { seenSoft = true; log('soft dead end', { level: await page.evaluate(() => __sumSort.level), tip: s.tip, strip: s.strip, jars: s.jars, stacks: s.stacks }); await page.screenshot({ path: SHOTS + '/soft.png' }); }
+    if (s.dead && !seenDead) { seenDead = true; log('hard dead end', { tip: s.tip, strip: s.strip }); await page.waitForTimeout(600); await page.screenshot({ path: SHOTS + '/dead.png' }); }
+    if (s.dead || s.won) break;
+  }
+}
+pass('soft dead end has its own message', seenSoft); pass('hard dead end still reported', seenDead);
+// 6. remembered tap during an undo, and undo lock time
+await go(14); await settled();
+let m = await page.evaluate(() => __sumSort.plan[0]);
+await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled();
+const lock = await page.evaluate(() => new Promise(res => { const t = performance.now(); document.getElementById('undoBtn').click(); __sumSort.tap({ kind: 'stack', i: 0 });
+  const was = __sumSort.pending; const iv = setInterval(() => { if (__sumSort.busy === 0) { clearInterval(iv); setTimeout(() => res({ ms: Math.round(performance.now() - t), remembered: was, sel: __sumSort.sel, moves: __sumSort.moves }), 60); } }, 10); }));
+log('undo', lock); pass('tap during undo is remembered and replayed', lock.remembered && lock.sel && lock.sel.kind === 'stack');
+console.log('(undo lock time is inflated by the software renderer; design value 480 ms)');
+// 7. celebration ladder: plain clear, perfect, chapter done
+const playOut = async () => { for (let k = 0; k < 40; k++) { const st = await page.evaluate(() => ({ won: __sumSort.won, m: __sumSort.plan && __sumSort.plan[0] })); if (st.won || !st.m) break;
+  await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, st.m); await settled(); } await page.waitForTimeout(5000);
+  return page.evaluate(() => ({ cls: document.getElementById('winCard').className, title: document.getElementById('winTitle').textContent, stars: document.getElementById('winStars').getAttribute('aria-label'), tag: document.getElementById('winChapter').hidden ? null : document.getElementById('winChapter').textContent, next: document.getElementById('nextLabel').textContent, text: document.getElementById('winText').textContent, shown: !document.getElementById('win').hidden })); };
+await go(3); await settled(); const w3 = await playOut(); log('win L3 (tutorial)', w3);
+await go(16); await settled(); const w16 = await playOut(); log('win L16 (3 stars)', w16); await page.screenshot({ path: SHOTS + '/win-perfect.png' });
+await go(10); await settled(); const w10 = await playOut(); log('win L10 (chapter end)', w10); await page.screenshot({ path: SHOTS + '/win-chapter.png' });
+pass('ladder: tutorial clear < perfect < chapter', !/perfect/.test(w3.cls) && /perfect/.test(w16.cls) && /chapter-done/.test(w10.cls) && w10.next === 'Next chapter');
+await page.click('#nextBtn', { force: true }); await page.waitForTimeout(1200);
+log('after Next chapter', { level: await page.evaluate(() => __sumSort.level), tip: (await S()).tip });
+// 7b. controls floating over the counter: real touches on the buttons
+await go(21); await settled();
+const SEL = { undo: '#undoBtn', hint: '#hintBtn', spare: '#spareBtn', split: '#splitBtn', sound: '#soundBtn', home: '#homeBtn', restart: '#restartBtn' };
+// a real touch at the centre of the button, only counted if the button is what the finger actually lands on
+const tapProp = async id => { const p = await page.evaluate(sel => { const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === el || el.contains(hit)) }; }, SEL[id]);
+  if (!p.ok) console.log('COVERED: ' + id); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(350); };
+let m7 = await page.evaluate(() => __sumSort.plan[0]);
+await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m7); await settled();
+await tapProp('undo'); await settled(); await page.waitForTimeout(300); s = await S();
+pass('Undo button undoes the move', s.jars.split(' ').every(j => j.endsWith(':')), s.jars);
+await tapProp('hint'); await page.waitForTimeout(300); pass('Hint button lifts a tile', !!(await S()).sel);
+await page.evaluate(() => __sumSort.tap(null));
+await tapProp('spare'); await settled(); await page.waitForTimeout(600); pass('+1 Jar button adds a jar', (await S()).jars.split(' ').length === (await page.evaluate(() => __sumSort.getLevel(21).jars.length)) + 1);
+await tapProp('sound'); pass('sound button toggles sound', (await page.evaluate(() => document.getElementById('soundBtn').getAttribute('aria-pressed'))) === 'false'); await tapProp('sound');
+// home in the middle of a level keeps the level as it is
+m7 = await page.evaluate(() => __sumSort.plan[0]);
+await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m7); await settled();
+const before = await S();
+await tapProp('home'); let h7 = await H(); await page.waitForTimeout(2500); await page.screenshot({ path: SHOTS + '/home-21.png' });
+log('home wash after 2.5 s', await page.evaluate(() => ({ opacity: getComputedStyle(document.getElementById('home')).opacity, bands: getComputedStyle(document.getElementById('topUi')).opacity })));
+pass('home button opens home on the same level', h7.open && h7.num === '21' && h7.chapter === 'Sums', JSON.stringify(h7));
+await tapEl('#playBtn'); const after = await S(); h7 = await H();
+pass('Play resumes the level in progress', !h7.open && after.jars === before.jars && after.stacks === before.stacks && after.moves === before.moves, after.jars);
+await tapProp('restart'); await page.waitForTimeout(900); pass('restart button restarts', (await S()).moves === 0);
+const sizes = await page.evaluate(sel => Object.fromEntries(Object.entries(sel).map(([k, q]) => { const r = document.querySelector(q).getBoundingClientRect(); return [k, Math.round(r.width) + 'x' + Math.round(r.height)]; })), SEL);
+log('touch targets (px)', sizes);
+pass('every control is at least 48 px to the finger', Object.values(sizes).every(v => v.split('x').every(n => +n >= 48)));
+// the board must stay clear of the two bands of controls, and a tap between the buttons must reach the board
+const clear = await page.evaluate(() => { const top = document.getElementById('topUi').getBoundingClientRect().bottom, strip = document.getElementById('strip').getBoundingClientRect().top;
+  const hi = Math.min(...__sumSort.jars.map((j, i) => __sumSort.screenOf('jar', i, 3.6).y)), lo = Math.max(...__sumSort.stacks.map((j, i) => __sumSort.screenOf('stack', i, 0).y));
+  return { top: Math.round(top), jarBadgeTop: Math.round(hi), stackBase: Math.round(lo), strip: Math.round(strip) }; });
+pass('board sits between the level bar and the coach line', clear.jarBadgeTop > clear.top && clear.stackBase < clear.strip, JSON.stringify(clear));
+await page.screenshot({ path: SHOTS + '/surface-21.png' });
+// 7c. winning moves progress on; home from the win card waits on the next level
+await go(3); await settled(); await playOut();
+await tapEl('#winHomeBtn'); await page.waitForTimeout(500); let h8 = await H(); await page.screenshot({ path: SHOTS + '/home-4.png' });
+pass('home from the win card shows the next level and the stars', h8.open && h8.num === '4' && h8.level === 4 && Number(h8.tally) > 0 && (await page.evaluate(() => document.getElementById('win').hidden)), JSON.stringify(h8));
+const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
+pass('home controls are at least 48 px', Object.values(homeSizes).every(v => v.split('x').every(n => +n >= 48)), JSON.stringify(homeSizes));
+await tapEl('#homeSound'); pass('home sound button toggles both sound buttons', (await page.evaluate(() => ['soundBtn', 'homeSound'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join())) === 'false,false'); await tapEl('#homeSound');
+await tapEl('#playBtn'); h8 = await H(); pass('Play starts the next level', !h8.open && h8.level === 4 && h8.moves === 0);
+// 8. generated level beyond the stored range, and reload
+await go(101); await settled(); const w101 = await playOut(); log('win L101 (generated)', { shown: w101.shown, title: w101.title });
+await page.reload(); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
+{ const h = await H(); pass('after a win and a reload, home waits on the next level', h.open && h.num === '102' && h.level === 102, JSON.stringify(h)); await page.screenshot({ path: SHOTS + '/home-102.png' }); }
+log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
+console.log('errors:', errors.join('\n') || 'none');
+await browser.close(); server.close();
+console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
