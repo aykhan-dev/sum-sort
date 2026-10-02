@@ -302,6 +302,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .reward small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9A6A0A}
 .reward b{font:600 15px var(--display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reward .chip{padding:0 12px}
+.install{display:inline-flex;align-items:center;gap:6px;padding:0 16px 0 12px;font-size:14px}
+.install svg.i{width:18px;height:18px}
 .home-mid{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;min-height:0;width:100%}
 .wordmark{
   margin:0;display:grid;justify-items:center;rotate:-4deg;
@@ -485,7 +487,9 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   <section class="home" id="home" aria-labelledby="homeTitle">
     <div class="home-top">
       <button class="tally raised" id="starTally" type="button" hidden></button>
-      <span></span>
+      <button class="chip install" id="installBtn" type="button" hidden>
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></svg>Install
+      </button>
       <button id="homeSound" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Sound">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/><path class="mute" d="m16 9 5 6M21 9l-5 6"/></svg>
       </button>
@@ -621,7 +625,7 @@ const ui = {
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
   homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
-  dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'),
+  dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
   homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
   winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext'),
   shop: $('shop'), shopClose: $('shopClose'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
@@ -1723,7 +1727,7 @@ function showHome(focus = true) {
   ui.homeCount.textContent = `${st.done + 1} of ${st.size}`;
   ui.homeNext.innerHTML = nextText(levelNo - 1) || 'Endless levels: every one is new.';
   ui.homeJourney.setAttribute('aria-label', `${ch.name}, level ${st.done + 1} of ${st.size}. ${ui.homeNext.textContent}`);
-  renderTally();
+  renderTally(); renderInstall();
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
   homeOpen = true; homeRenderUntil = performance.now() + 1600;
   ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
@@ -1914,6 +1918,20 @@ ui.winHome.addEventListener('click', goHome);
 ui.homeBtn.addEventListener('click', goHome);
 ui.play.addEventListener('click', play);
 ui.tally.addEventListener('click', openShop);
+
+/* Installing and playing offline, for the page served from the web (the built index.html links the manifest).
+   The browser decides when the game may be installed; the chip waits until a few levels are behind the player. */
+let installPrompt = null;
+function renderInstall() { ui.install.hidden = !installPrompt || levelNo < 6; }
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; renderInstall(); });
+addEventListener('appinstalled', () => { installPrompt = null; renderInstall(); });
+ui.install.addEventListener('click', async () => {
+  if (!installPrompt) return;
+  const p = installPrompt; installPrompt = null; renderInstall();
+  try { await p.prompt(); } catch (e) { /* the browser said no */ }
+});
+if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]') && (location.protocol === 'https:' || /[?&]sw=1\b/.test(location.search)))
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => { /* plays fine online */ }));
 ui.shopClose.addEventListener('click', closeShop);
 ui.shop.addEventListener('click', e => { if (e.target === ui.shop) closeShop(); });
 ui.themes.addEventListener('click', e => { const b = e.target.closest('.theme'); if (b && !b.disabled) { useTheme(b.dataset.id); renderShop(); } });

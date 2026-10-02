@@ -30,6 +30,8 @@ On GitHub Pages: repository Settings → Pages → Deploy from a branch → `mai
 | `tests/unit/` | Unit tests for the pure modules (node's built-in runner, about a second). |
 | `tests/playtest.mjs` | Plays the built page in headless Chromium with real touches. |
 | `docs/ROADMAP.md` | What gets built next, and why. |
+| `src/sw.src.js` | Service worker source. The build stamps its version and writes `sw.js`. |
+| `manifest.webmanifest`, `icons/`, `og.png` | Install manifest, app icons and the link-preview image. `scripts/make-art.mjs` draws them from the game. |
 | `vendor/three/` | three.js r170 (MIT), so the page needs no CDN for code. |
 
 ## Build and test
@@ -63,6 +65,10 @@ From level 19 the home screen offers one extra board a day, the same for everyon
 ## Stars and candy boxes
 
 Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop.
+
+## Install and offline
+
+Served over https (GitHub Pages), the page registers a service worker: after one visit the game opens and plays with no network, and browsers that support it offer to install it. A new build reaches players on their next visit. Shared links show `og.png` as their preview; its address is set by `SITE` in `scripts/build.mjs`.
 
 ## Status
 

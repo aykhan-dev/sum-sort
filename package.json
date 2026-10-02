@@ -10,7 +10,7 @@
     "serve": "python3 -m http.server 8080",
     "test:unit": "node --test 'tests/unit/*.test.mjs'",
     "test": "node tests/playtest.mjs",
-    "check": "node scripts/build.mjs && git diff --exit-code index.html && node --test 'tests/unit/*.test.mjs'"
+    "check": "node scripts/build.mjs && git diff --exit-code index.html sw.js && node --test 'tests/unit/*.test.mjs'"
   },
   "devDependencies": {
     "playwright": "^1.50.0"

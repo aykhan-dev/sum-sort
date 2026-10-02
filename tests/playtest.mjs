@@ -212,6 +212,17 @@ await page.evaluate(() => __sumSort.play()); await go(3); await settled(); await
   pass('crossing 15 stars opens the first box, and Use it repaints the room', r.shown && r.name === 'Mint Parlour' && r.total === 17 && t.theme === 'mint' && t.stage === '#D0EDE2', JSON.stringify({ r, t }));
   await page.screenshot({ path: SHOTS + '/win-box.png' }); }
 log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
+// 11. installed and offline: a manifest to install from, and after one visit the game opens with no network
+{ const head = await page.evaluate(() => ({ manifest: !!document.querySelector('link[rel="manifest"]'), og: document.querySelector('meta[property="og:image"]')?.content }));
+  const off = await browser.newContext({ viewport: { width: 390, height: 760 }, hasTouch: true, isMobile: true });
+  const p2 = await off.newPage(); p2.setDefaultTimeout(180000);
+  await p2.addInitScript(() => { window.__sumSortKeepQuality = true; });
+  await p2.goto(URL_ + '?sw=1'); await p2.evaluate(() => navigator.serviceWorker.ready);
+  await p2.reload(); await p2.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await off.setOffline(true); await p2.reload();
+  const ok = await p2.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0, null, { timeout: 120000 }).then(() => true, () => false);
+  pass('the built page can be installed, previews well, and plays offline after one visit', head.manifest && /\/og\.png$/.test(head.og || '') && ok, JSON.stringify({ ...head, offline: ok }));
+  await off.close(); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
