@@ -1707,7 +1707,8 @@ const solverState = () => ({
   J: jars.map(j => ({ t: j.t, tiles: j.tiles.map(x => x.v), sealed: j.sealed, lock: j.lock, exact: j.exact })),
   S: stacks.map(s => s.tiles.map(x => x.v)) });
 
-function buildLevel(n) {
+/* Build a board: fresh from the level, or from a snapshot of one in progress (see keepBoard). */
+function buildLevel(n, resume = null) {
   buildId++;
   [...playGroup.children].forEach(ch => playGroup.remove(ch));
   if (confetti) { confetti.mesh.dispose(); confetti = null; }
@@ -1719,24 +1720,35 @@ function buildLevel(n) {
   finaleJar = null; stage.classList.remove('finale');
   dead = false; softDead = false; plan = null; spareRescues = false; setSplitArmed(false);
   chain = 0; bestChain = 0; callouts = 0; sealLog = []; boostersUsed = 0;
-  jars = def.jars.map((t, i) => {
-    const lock = def.locks ? def.locks[i] : 0, view = makeJarView({ target: t, locked: lock > 0 });
-    const tiles = (def.fill ? def.fill[i] : []).map((v, k) => {
-      const mesh = makeTileMesh(v); mesh.position.y = jarSlotY(k); view.group.add(mesh);
-      return { v, hidden: false, mesh };
+  // the board as data: tiles are [value, hidden]
+  const board = resume || {
+    jars: def.jars.map((t, i) => ({ t, lock: def.locks ? def.locks[i] : 0, exact: !!def.exact, spare: false, sealed: false, tiles: (def.fill ? def.fill[i] : []).map(v => [v, 0]) })),
+    stacks: def.stacks.map(vals => vals.map((v, k) => [v, def.hidden && k < vals.length - 1 ? 1 : 0]))
+  };
+  jars = board.jars.map(b => {
+    const view = makeJarView({ target: b.t, spare: b.spare, locked: b.lock > 0 });
+    const tiles = b.tiles.map(([v, h], k) => {
+      const mesh = makeTileMesh(v, !!h); mesh.position.y = jarSlotY(k); view.group.add(mesh);
+      return { v, hidden: !!h, mesh };
     });
-    return { t, lock, exact: !!def.exact, tiles, sealed: false, spare: false, view };
+    if (b.sealed) { view.lid.visible = true; view.lid.position.y = LID_Y; view.lidDown = true; view.goldRing.material.opacity = 0.9; }
+    return { t: b.t, lock: b.lock, exact: b.exact, tiles, sealed: b.sealed, spare: b.spare, view };
   });
-  stacks = def.stacks.map(vals => {
+  stacks = board.stacks.map(vals => {
     const view = makeDishView();
-    const tiles = vals.map((v, k) => {
-      const hidden = def.hidden && k < vals.length - 1;
-      const mesh = makeTileMesh(v, hidden); mesh.position.y = dishSlotY(k); view.group.add(mesh);
-      return { v, hidden, mesh };
+    const tiles = vals.map(([v, h], k) => {
+      const mesh = makeTileMesh(v, !!h); mesh.position.y = dishSlotY(k); view.group.add(mesh);
+      return { v, hidden: !!h, mesh };
     });
     return { tiles, view };
   });
-  jars.forEach(j => { playGroup.add(j.view.group); if (j.tiles.length) syncBadge(j); });
+  if (resume) {
+    moveCount = resume.moves; allow = { ...ALLOW, ...resume.allow }; spareUsed = resume.spareUsed; rescued = resume.rescued;
+    chain = resume.chain; bestChain = resume.bestChain; sealLog = resume.sealLog.slice(); boostersUsed = resume.boostersUsed;
+    history = resume.history.map(h => h.type === 'split' ? { ...h, orig: { v: h.orig[0], hidden: !!h.orig[1], mesh: makeTileMesh(h.orig[0], !!h.orig[1]) } } : { ...h });
+  }
+  jars.forEach(j => { playGroup.add(j.view.group); if (j.tiles.length || j.sealed) syncBadge(j); });
+  if (resume) refreshLocks(false);
   stacks.forEach(s => playGroup.add(s.view.group));
   layoutPlay(false); refreshHits();
   const ch = chapterOf(n);
@@ -1900,7 +1912,26 @@ function analyse(move) {
   if (dead && !wasDead) { sfx.stuck(); buzz(30); }
   else if (softDead && !wasSoft) sfx.nudge();
 }
-function afterChange(move) { refreshLocks(); analyse(move); updateHud(); armIdle(); updateFinale(); }
+function afterChange(move) { refreshLocks(); analyse(move); updateHud(); armIdle(); updateFinale(); keepBoard(); }
+/* A level in progress is written down after every change, so a detour to the daily or a rush, or closing the tab,
+   comes back to the same tiles, sealed jars and undo steps. A snapshot carries the level's content and is dropped
+   if the level it was made for has changed since (a new version of the game). */
+const levelSig = d => JSON.stringify([d.jars, d.stacks, d.locks || null, d.fill || null, !!d.hidden]);
+function boardSnapshot() {
+  return { level: levelNo, sig: levelSig(def),
+    jars: jars.map(j => ({ t: j.t, lock: j.lock, exact: j.exact, spare: j.spare, sealed: j.sealed, tiles: j.tiles.map(x => [x.v, x.hidden ? 1 : 0]) })),
+    stacks: stacks.map(s => s.tiles.map(x => [x.v, x.hidden ? 1 : 0])),
+    moves: moveCount, allow: { ...allow }, spareUsed, rescued, chain, bestChain, sealLog: sealLog.slice(), boostersUsed,
+    history: history.map(h => h.type === 'split' ? { type: 'split', loc: h.loc, orig: [h.orig.v, h.orig.hidden ? 1 : 0] } : h) };
+}
+function keepBoard() {
+  if (daily || rush || won || levelNo === TEST_LEVEL || !def) return;
+  save.board = moveCount ? boardSnapshot() : null; persist();
+}
+function resumable(n) {
+  const b = save.board;
+  try { return b && b.level === n && b.sig === levelSig(getLevel(n)) ? b : null; } catch (e) { return null; }
+}
 /* One numbered jar left: its badge track turns gold and breathes, and the room dims at the edges. */
 function updateFinale() {
   const numbered = jars.filter(j => j.t != null), open = numbered.filter(j => !j.sealed);
@@ -2181,7 +2212,7 @@ function refill() {
   updateHud();
 }
 function goLevel(n) { buildLevel(n); fitCamera(false); }
-function restart() { goLevel(levelNo); }
+function restart() { if (!daily && !rush) { save.board = null; persist(); } goLevel(levelNo); }
 
 /* idle coaching: after 8 s without a tap (sooner while a rule is being learned) the next good move pulses, free of charge */
 let idleTimer = 0;
@@ -2219,7 +2250,7 @@ async function winLevel() {
     save.daily[daily] = prev && prev.stars >= stars ? prev : { stars, moves: moveCount, par: def.par, seals: sealLog.slice(), boosters: boostersUsed };
     const before = save.streak ? save.streak.count : 0;
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
-  } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; }
+  } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; save.board = null; }
   const opened = boxesOpened(starsBefore, totalStars());
   persist();
   if (opened.length) sfx.box();
@@ -2471,8 +2502,9 @@ function play() {
 }
 /* Home from a finished level leaves that level behind: the next one is set up to wait. */
 function goHome() {
-  if (rush) { rush = null; ui.hud.classList.remove('hurry'); buildLevel(levelNo); fitCamera(false); }   // a rush left early is not scored
-  else if (daily) { daily = null; buildLevel(levelNo); fitCamera(false); }   // a daily left half-done starts over next time
+  // a rush left early is not scored, a daily left half-done starts over; the level waiting behind them comes back as it was
+  if (rush) { rush = null; ui.hud.classList.remove('hurry'); buildLevel(levelNo, resumable(levelNo)); fitCamera(false); }
+  else if (daily) { daily = null; buildLevel(levelNo, resumable(levelNo)); fitCamera(false); }
   else if (won) { buildLevel(levelNo === TEST_LEVEL ? Math.max(1, Number(save.last) || 1) : levelNo + 1); fitCamera(false); }
   showHome();
 }
@@ -2719,7 +2751,8 @@ async function start(hot) {
       new Promise(r => setTimeout(r, 2500))]);
   } catch (e) { /* fall back to system rounded fonts */ }
   const first = Number(hot && hot.level) || Number(save.last) || 1;
-  buildLevel(Math.max(1, Math.floor(first)));
+  const n = Math.max(1, Math.floor(first));
+  buildLevel(n, resumable(n));   // a level left half-played comes back as it was
   fitCamera(false);
   if (hot && hot.level) ui.home.classList.add('off'); else showHome(false);   // a republish mid-game keeps the player in the game
   new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); }).observe(stage);

@@ -259,6 +259,18 @@ await page.evaluate(() => { window.__sumSortRushSeed = 4242; __sumSort.goLevel(3
   pass('a cleared rush board scores and wins time; the clock ends the run, keeps the best and shares it', r1.boards === 1 && r1.score >= 3 * 10 + 25 && end.title === 'New best!' && end.score === r1.score && end.best.best === r1.score && end.next === 'Play again' && /^Sum Sort Sugar Rush ⚡ \d+/.test(shared), JSON.stringify({ r1, end, shared }));
   await tapEl('#winHomeBtn'); const hr = await H();
   pass('home after a rush: the level waits, the best score shows', hr.open && hr.level === 30 && /^Best \d+$/.test(await page.evaluate(() => document.getElementById('rushSub').textContent)), JSON.stringify(hr)); }
+// 13. a level in progress survives a detour to the daily, and closing the tab
+await page.evaluate(() => { window.__sumSortToday = '2026-10-07'; }); await go(26); await page.evaluate(() => __sumSort.play()); await settled();
+{ for (let k = 0; k < 3; k++) { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  const board = st => ({ jars: st.jars, stacks: st.stacks, moves: st.moves }), before = board(await S());
+  await page.evaluate(() => __sumSort.showHome()); await tapEl('#dailyBtn'); await settled();
+  const inDaily = await page.evaluate(() => __sumSort.daily);
+  await tapProp('home'); await tapEl('#playBtn'); await settled();
+  const back = board(await S());
+  await page.reload(); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0); await page.evaluate(() => __sumSort.dropQuality());
+  const h13 = await H(); await tapEl('#playBtn'); await settled();
+  const reloaded = board(await S());
+  pass('a half-played level comes back as it was after the daily, and after closing the tab', inDaily === '2026-10-07' && before.moves === 3 && JSON.stringify(back) === JSON.stringify(before) && h13.level === 26 && JSON.stringify(reloaded) === JSON.stringify(before), JSON.stringify({ before, back, reloaded })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
