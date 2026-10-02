@@ -241,10 +241,14 @@ await page.evaluate(() => { window.__sumSortRushSeed = 4242; __sumSort.goLevel(3
 { const card = await page.evaluate(() => ({ two: document.getElementById('modes').classList.contains('two'), shown: !document.getElementById('rushBtn').hidden }));
   await tapEl('#rushBtn'); await settled();
   const r0 = await page.evaluate(() => ({ r: __sumSort.rush, hud: document.getElementById('hud').innerText.replace(/\n/g, ' '), tray: document.getElementById('tray').hidden, last: __sumSort.save.last }));
-  for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.rush.round === 0 && __sumSort.plan && __sumSort.plan[0]); if (!m) break;
+  const restartHidden = await page.evaluate(() => document.getElementById('restartBtn').hidden);
+  // play the board to its last move, then let the clock nearly run out: the winning move must still count
+  for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.plan && __sumSort.plan.length > 1 && __sumSort.plan[0]); if (!m) break;
     await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.evaluate(() => { __sumSort.setRushLeft(0.4); const m = __sumSort.plan[0]; __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); });
   await page.waitForFunction(() => __sumSort.rush.round === 1, null, { timeout: 30000 });
   const r1 = await page.evaluate(() => __sumSort.rush);
+  pass('in a rush: no restart button, and a board won in the last second still counts and wins time', restartHidden && !r1.over && r1.boards === 1 && r1.left > 0, JSON.stringify({ restartHidden, r1 }));
   await page.evaluate(() => __sumSort.setRushLeft(0.2));
   await page.waitForFunction(() => !document.getElementById('win').hidden, null, { timeout: 30000 }); await page.waitForTimeout(600);
   const end = await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, score: Number(document.getElementById('winMoves').textContent), best: __sumSort.save.rush, next: document.getElementById('nextLabel').textContent }));

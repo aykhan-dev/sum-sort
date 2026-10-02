@@ -173,7 +173,19 @@ test('every counter is light enough for the ink to keep its contrast', () => {
   }
 });
 
-import { RUSH, RUSH_OPENS, rushRecipe, rushBoard, rushSealPoints, rushTimeAfterClear, rushShareText } from '../../src/meta.mjs';
+import { RUSH, RUSH_OPENS, rushRecipe, rushBoard, rushTry, RUSH_SALTS, rushSealPoints, rushTimeAfterClear, rushShareText, DAILY_FIRST } from '../../src/meta.mjs';
+
+test('rush attempts: rushBoard is the first good attempt, so spreading attempts over idle moments gives the same board', () => {
+  for (const [seed, round] of [[5, 0], [99, 4], [2024, 10]]) {
+    let pick = null, any = null;
+    for (let salt = 0; salt < RUSH_SALTS && !pick; salt++) { const t = rushTry(seed, round, salt); if (t.good) pick = t.def; any = any || t.def; }
+    assert.deepEqual(rushBoard(seed, round), pick || any);
+  }
+});
+
+test('the daily pool and the numbering start on the same day', () => {
+  assert.equal(dailyNumber(DAILY_FIRST), 1);
+});
 
 test('sugar rush: opens after the daily and every booster, as a milestone', () => {
   assert.ok(RUSH_OPENS > DAILY_OPENS && RUSH_OPENS > 21);
@@ -198,6 +210,6 @@ test('sugar rush: score and clock', () => {
   assert.equal(rushSealPoints(0), RUSH.seal); assert.equal(rushSealPoints(1), RUSH.seal); assert.equal(rushSealPoints(4), 4 * RUSH.seal);
   assert.equal(rushTimeAfterClear(10), 10 + RUSH.perBoard);
   assert.equal(rushTimeAfterClear(RUSH.cap - 1), RUSH.cap);
-  assert.equal(rushShareText({ score: 340, boards: 7, best: 300, url: 'https://x/' }), 'Sum Sort Sugar Rush ⚡ 340\n7 boards in the rush · new best\nhttps://x/');
-  assert.equal(rushShareText({ score: 120, boards: 1, best: 300 }), 'Sum Sort Sugar Rush ⚡ 120\n1 board in the rush');
+  assert.equal(rushShareText({ score: 340, boards: 7, newBest: true, url: 'https://x/' }), 'Sum Sort Sugar Rush ⚡ 340\n7 boards in the rush · new best\nhttps://x/');
+  assert.equal(rushShareText({ score: 120, boards: 1 }), 'Sum Sort Sugar Rush ⚡ 120\n1 board in the rush');
 });

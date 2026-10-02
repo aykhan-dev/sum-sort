@@ -20,8 +20,12 @@ self.addEventListener('fetch', e => {
   if (url.origin !== location.origin && !font) return;
   const keep = r => { if (r && (r.ok || r.type === 'opaque')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); } return r; };
   if (req.mode === 'navigate') {
-    e.respondWith(fetch(req).then(r => { if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); } return r; })
-      .catch(() => caches.match('index.html')));
+    // only the game itself is kept as the offline page, never another file opened in a tab (og.png, the manifest)
+    const game = url.origin === location.origin && /\/(index\.html)?$/.test(url.pathname);
+    e.respondWith(fetch(req).then(r => {
+      if (game && r.ok && /text\/html/.test(r.headers.get('content-type') || '')) { const copy = r.clone(); caches.open(CACHE).then(c => c.put('index.html', copy)); }
+      return r;
+    }).catch(() => game ? caches.match('index.html') : Response.error()));
     return;
   }
   e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(keep)));

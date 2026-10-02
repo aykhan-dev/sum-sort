@@ -16,7 +16,7 @@ export const comboStep = (chain, { clean, seals }) => !clean ? 0 : seals ? chain
    the way newspaper puzzles do. Only rules every player has learned by the time the daily opens: sums, no frosted
    tiles, no ribbons. The model fail rate stays under the game's 65% cap. */
 export const DAILY_OPENS = 19;            // the first Sums level: everything a daily asks for has been taught
-const DAILY_EPOCH = Date.UTC(2026, 9, 1);  // daily #1
+export const DAILY_FIRST = '2026-10-01';   // daily #1; the pool in src/dailies.json starts here
 export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DAILY_RECIPES = [   // Monday first; `want` is the model fail rate, measured offline (scripts/generate-dailies.mjs)
@@ -33,6 +33,7 @@ const pad2 = n => String(n).padStart(2, '0');
 /* the player's own calendar date, as text */
 export const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const keyUTC = key => { const [y, m, d] = key.split('-').map(Number); return Date.UTC(y, m - 1, d); };
+const DAILY_EPOCH = keyUTC(DAILY_FIRST);
 export const addDays = (key, n) => { const d = new Date(keyUTC(key) + n * 86400000); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`; };
 export const dailyNumber = key => Math.round((keyUTC(key) - DAILY_EPOCH) / 86400000) + 1;
 export const weekdayOf = key => (new Date(keyUTC(key)).getUTCDay() + 6) % 7;   // 0 = Monday
@@ -153,22 +154,28 @@ const RUSH_STEPS = [   // [from round, recipe]: small and kind first, a little b
   [9, { jars: 4, stacks: 4, parts: [2, 3], minT: 6, maxT: 13, want: 0.35 }]
 ];
 export const rushRecipe = round => ({ ch: 'rush', ...RUSH_STEPS.filter(([from]) => round >= from).at(-1)[1] });
-/* a board for this run and round: quick to make (a few ms, rarely a quarter second), within 10 points of its target */
+/* One attempt at a board for this run, round and salt: { def, good } where good = within 10 points of the target.
+   An attempt takes a few ms, rarely a quarter second, so the page can spread attempts over idle moments. */
+export const RUSH_SALTS = 8;
+export function rushTry(seed, round, salt) {
+  const r = rushRecipe(round), def = generateWith(r, mulberry32((seed + round * 7919 + salt * 104729) >>> 0), { tries: 80, runs: 120, tol: 0.08 });
+  return { def, good: !!def && Math.abs(def.fail - r.want) <= 0.1 };
+}
+/* a board for this run and round, all at once: the first good attempt, or failing that the first board made */
 export function rushBoard(seed, round) {
-  const r = rushRecipe(round);
   let any = null;
-  for (let salt = 0; salt < 8; salt++) {
-    const d = generateWith(r, mulberry32((seed + round * 7919 + salt * 104729) >>> 0), { tries: 80, runs: 120, tol: 0.08 });
-    if (d && Math.abs(d.fail - r.want) <= 0.1) return d;
-    any = any || d;
+  for (let salt = 0; salt < RUSH_SALTS; salt++) {
+    const { def, good } = rushTry(seed, round, salt);
+    if (good) return def;
+    any = any || def;
   }
   return any;
 }
 export const rushSealPoints = chain => RUSH.seal * Math.max(1, chain);
 /* seconds on the clock after a board is cleared, never past the cap */
 export const rushTimeAfterClear = left => Math.min(RUSH.cap, left + RUSH.perBoard);
-export function rushShareText({ score, boards, best, url = '' }) {
-  const lines = [`Sum Sort Sugar Rush ⚡ ${score}`, `${boards} board${boards === 1 ? '' : 's'} in the rush${score >= best && score > 0 ? ' · new best' : ''}`];
+export function rushShareText({ score, boards, newBest = false, url = '' }) {
+  const lines = [`Sum Sort Sugar Rush ⚡ ${score}`, `${boards} board${boards === 1 ? '' : 's'} in the rush${newBest ? ' · new best' : ''}`];
   if (url) lines.push(url);
   return lines.join('\n');
 }

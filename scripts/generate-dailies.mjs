@@ -5,8 +5,8 @@
 // lets boards through that are harder than they measured.
 import fs from 'node:fs';
 import { generateWith, mulberry32, solve, toState, failRate } from '../src/logic.mjs';
-import { dailyRecipe, dailySeed, addDays, weekdayOf, WEEKDAYS, DAILY_CAP } from '../src/meta.mjs';
-const DAYS = Number(process.argv[2]) || 366, FIRST = '2026-10-01';
+import { dailyRecipe, dailySeed, addDays, weekdayOf, WEEKDAYS, DAILY_CAP, DAILY_FIRST as FIRST } from '../src/meta.mjs';
+const DAYS = Number(process.argv[2]) || 366;
 const rows = [], by = WEEKDAYS.map(() => []);
 let key = FIRST, slowest = 0;
 for (let i = 0; i < DAYS; i++, key = addDays(key, 1)) {
@@ -25,5 +25,5 @@ for (let i = 0; i < DAYS; i++, key = addDays(key, 1)) {
   if (i % 30 === 0) console.log(key, WEEKDAYS[weekdayOf(key)].padEnd(9), 'want', r.want, 'fail', pick.check.toFixed(3), Math.round(performance.now() - t0) + 'ms');
 }
 fs.writeFileSync(new URL('../src/dailies.json', import.meta.url), '[\n' + rows.join(',\n') + '\n]\n');
-by.forEach((a, w) => { a.sort((x, y) => x - y); console.log(WEEKDAYS[w].padEnd(9), 'want', dailyRecipe(addDays('2026-10-05', w)).want, 'min', a[0].toFixed(2), 'median', a[a.length >> 1].toFixed(2), 'max', a.at(-1).toFixed(2)); });
+by.forEach((a, w) => { if (!a.length) return; a.sort((x, y) => x - y); console.log(WEEKDAYS[w].padEnd(9), 'want', dailyRecipe(addDays('2026-10-05', w)).want, 'min', a[0].toFixed(2), 'median', a[a.length >> 1].toFixed(2), 'max', a.at(-1).toFixed(2)); });
 console.log(DAYS, 'dailies from', FIRST, 'slowest', Math.round(slowest) + 'ms');

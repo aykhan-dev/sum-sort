@@ -1217,6 +1217,7 @@ function buildLevel(n) {
   let shown = 0;
   for (const b of BOOSTERS) { const on = unlocked(b); ui[b].hidden = !on; ui[b].classList.toggle('fresh', !daily && levelNo === UNLOCK[b]); if (on) shown++; }
   ui.tray.hidden = shown === 0 || !!rush; ui.tray.style.setProperty('--cols', Math.max(1, shown));   // a rush is played without boosters
+  ui.restart.hidden = !!rush;   // and without restarts: a dead end costs a skip
   if (n !== TEST_LEVEL && !daily && !rush) { save.last = n; persist(); }
   // entrance: jars and dishes pop in, back row first
   if (!REDUCED) {
@@ -1481,6 +1482,7 @@ function moveTo(di) {
   if (seals && rush) { rush.score += rushSealPoints(chain); renderRushHud(true); }
   const finishing = jars.every(j => j.t == null || j.sealed);
   if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
+  if (finishing && rush) rushCredit();   // the board counts now, not when the lid lands: the clock may run out meanwhile
   updateHud();
   // the winning tile flies in slow motion while the camera leans toward its jar
   // the winning tile flies in slow motion while the camera leans toward its jar (not in a rush: the clock is running)
@@ -1748,26 +1750,40 @@ function renderRushHud(gain = false) {
   ui.hud.classList.toggle('hurry', left <= 10 && !rush.over);
   if (left <= 5 && left > 0 && left !== rushTick && !rush.over) { rushTick = left; sfx.tick(); }
 }
-function prefetchRush() { setTimeout(() => { if (rush && !rush.next && !rush.over) rush.next = rushBoard(rush.seed, rush.round + 1); }, 450); }
+/* the next board, one attempt per idle moment, so a slow attempt never lands in the middle of a tile's flight */
+const idle = fn => window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 1500 }) : setTimeout(fn, 60);
+function prefetchRush() {
+  const run = rush, round = rush.round + 1; let salt = 0, any = null;
+  const step = () => {
+    if (rush !== run || run.over || run.round + 1 !== round || run.next) return;
+    const t = rushTry(run.seed, round, salt); any = any || t.def;
+    if (t.good || ++salt >= RUSH_SALTS) run.next = t.good ? t.def : any; else idle(step);
+  };
+  setTimeout(() => idle(step), 450);
+}
 function startRush() {
   if (levelNo < RUSH_OPENS) return;
   const seed = window.__sumSortRushSeed || ((Date.now() ^ Math.floor(Math.random() * 0x7FFFFFFF)) >>> 0);
   daily = null;
   rush = { seed, round: 0, score: 0, boards: 0, endsAt: 0, pausedLeft: null, over: false, def: rushBoard(seed, 0), next: null };
-  if (homeOpen) { leaveHome(); stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false; }
+  if (homeOpen) leaveHome();
   rush.endsAt = performance.now() + RUSH.start * 1000; rushTick = -1;
   buildLevel(levelNo); fitCamera(false);
   sfx.select(9); buzz(10); prefetchRush();
 }
 function nextRushBoard() {
-  rush.round++; rush.def = rush.next || rushBoard(rush.seed, rush.round); rush.next = null;
+  rush.round++; rush.def = rush.next || rushBoard(rush.seed, rush.round); rush.next = null;   // the same board either way
   buildLevel(levelNo); fitCamera(false); prefetchRush();
+}
+function rushCredit() {
+  if (!rush || rush.over) return;
+  rush.boards++; rush.score += RUSH.clear;
+  rush.endsAt = performance.now() + rushTimeAfterClear(rushLeft()) * 1000;
+  renderRushHud(true);
 }
 async function rushCleared() {
   if (!rush || rush.over) return;
-  won = true; rush.boards++; rush.score += RUSH.clear;
-  rush.endsAt = performance.now() + rushTimeAfterClear(rushLeft()) * 1000;
-  sfx.win(); buzz([20, 40, 30]); renderRushHud(true);
+  sfx.win(); buzz([20, 40, 30]);
   jars.forEach((j, i) => setTimeout(() => { if (rush && !rush.over) hop(j.view.group, 0.3, 380); }, i * 60 * SPEED));
   await wait(620);
   if (!rush || rush.over) return;
@@ -1781,6 +1797,7 @@ function endRush() {
   if (!rush || rush.over) return;
   rush.over = true; won = true; clearTimeout(idleTimer); deselect(); setSplitArmed(false);
   const prev = save.rush || { best: 0, plays: 0 }, isBest = rush.score > (prev.best || 0);
+  rush.newBest = isBest && rush.score > 0;
   save.rush = { best: Math.max(prev.best || 0, rush.score), plays: (prev.plays || 0) + 1, last: rush.score };
   persist(); renderRushHud(true);
   if (isBest && rush.score > 0) { sfx.perfect(); buzz([20, 40, 30, 40, 60]); } else { sfx.win(); buzz([20, 40, 30]); }
@@ -1808,7 +1825,7 @@ document.addEventListener('visibilitychange', () => {
 /* ---------------- sharing ----------------
    The phone's share sheet where there is one, the clipboard everywhere else. */
 function resultText() {
-  if (rush) return rushShareText({ score: rush.score, boards: rush.boards, best: (save.rush && save.rush.best) || 0, url: shareUrl(location) });
+  if (rush) return rushShareText({ score: rush.score, boards: rush.boards, newBest: !!rush.newBest, url: shareUrl(location) });
   if (daily) return dailyShareText(daily);
   return shareText({ title: `Sum Sort Level ${levelNo}`, stars: winStars, moves: moveCount, par: def.par, seals: sealLog, boosters: boostersUsed, url: shareUrl(location) });
 }
@@ -1895,7 +1912,7 @@ function showHome(focus = true) {
   ui.homeChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.homeChapter.textContent = ch.name;
   const st = drawJourney(ui.homeBar, levelNo);
   ui.homeCount.textContent = `${st.done + 1} of ${st.size}`;
-  ui.homeNext.innerHTML = nextText(levelNo - 1) || 'Endless levels: every one is new.';
+  ui.homeNext.innerHTML = nextText(levelNo) || 'Endless levels: every one is new.';
   ui.homeJourney.setAttribute('aria-label', `${ch.name}, level ${st.done + 1} of ${st.size}. ${ui.homeNext.textContent}`);
   renderTally(); renderInstall(); renderRush();
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
@@ -1903,10 +1920,13 @@ function showHome(focus = true) {
   ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
   stage.classList.add('at-home'); clearTimeout(idleTimer); if (focus) ui.play.focus({ preventScroll: true });
 }
-function leaveHome() { homeOpen = false; clearInterval(dailyTimer); ui.home.classList.add('off'); }
+function leaveHome() {
+  homeOpen = false; clearInterval(dailyTimer); ui.home.classList.add('off');
+  stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false;
+}
 function play() {
   if (!homeOpen) return;
-  leaveHome(); stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false;
+  leaveHome();
   sfx.select(5); buzz(8);
   if (moveCount === 0 && !won) goLevel(levelNo); else armIdle();   // a fresh board makes its entrance again; a level in progress just carries on
 }
@@ -1963,7 +1983,7 @@ function playDaily() {
     shareOut(dailyShareText(key), how => { ui.dailySub.textContent = how === 'Copied' ? 'Copied!' : how; sfx.select(8); setTimeout(renderDaily, 2600); });
     return;
   }
-  leaveHome(); stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false;
+  leaveHome();
   sfx.select(7); buzz(8);
   daily = key; buildLevel(levelNo); fitCamera(false);
 }
