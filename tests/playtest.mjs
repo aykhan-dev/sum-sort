@@ -92,14 +92,16 @@ s = await S(); pass('tutorial: stack tile rejected, jar-to-jar move wins the lev
 log('L12 win card', await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, statsHidden: document.getElementById('winStats').hidden, text: document.getElementById('winText').textContent })));
 // 5. soft dead end and hard dead end on level 11
 await go(11); await settled(); s = await S(); log('L11', s);
-// play random non-plan stack moves until the board is soft-dead or dead
+// play random non-plan stack moves until the board is soft-dead or dead. The random source is seeded, so every run
+// plays the same moves and reaches the same dead ends.
+await page.evaluate(() => { let a = 20261002; window.__rnd = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; });
 let seenSoft = false, seenDead = false;
-for (let tryNo = 0; tryNo < 12 && !(seenSoft && seenDead); tryNo++) {
+for (let tryNo = 0; tryNo < 24 && !(seenSoft && seenDead); tryNo++) {
   await go(11 + (tryNo % 6 === 1 ? 2 : tryNo % 6)); await settled();
   for (let k = 0; k < 14; k++) {
     const mv = await page.evaluate(() => { const S = __sumSort.stacks, J = __sumSort.jars, out = [];
       S.forEach((s, si) => { const t = s.tiles.at(-1); if (!t) return; J.forEach((j, di) => { const sum = j.tiles.reduce((a, x) => a + x.v, 0); if (!j.sealed && j.tiles.length < 4 && sum + t.v <= j.t && sum + t.v !== j.t) out.push([si, di]); }); });
-      return out.length ? out[Math.floor(Math.random() * out.length)] : null; });
+      return out.length ? out[Math.floor(window.__rnd() * out.length)] : null; });
     if (!mv) break;
     await page.evaluate(([a, b]) => { __sumSort.tap({ kind: 'stack', i: a }); __sumSort.tap({ kind: 'jar', i: b }); }, mv); await settled(); await page.waitForTimeout(80);
     s = await S();

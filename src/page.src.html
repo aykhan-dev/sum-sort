@@ -334,6 +334,27 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font:700 25px var(--display);color:var(--ink);
   background:#FFFFFF;border:3px solid #EADDF0;box-shadow:0 3px 8px -3px rgba(110,40,90,.45);
 }
+/* The motif plays the whole game on a loop: the 2 hops into the jar's badge (5 left, then 3), the 3 follows, and the
+   badge seals gold. Fixed widths keep the hops exact: the 2 travels 157 px, the 3 travels 79 px. */
+.motif .op{width:16px;text-align:center}
+.motif .badge{position:relative}
+.motif .badge b{grid-area:1/1;font:inherit;opacity:0}
+.motif .badge b:first-child{opacity:1}
+.motif .badge svg{grid-area:1/1;width:24px;height:24px;fill:none;stroke:var(--ink);stroke-width:3.4;stroke-linecap:round;stroke-linejoin:round;opacity:0}
+@media (prefers-reduced-motion:no-preference){
+  .motif .t,.motif .badge,.motif .badge b,.motif .badge svg{animation:5.2s cubic-bezier(.45,0,.3,1) infinite both}
+  .motif .t2{animation-name:hop2}.motif .t3{animation-name:hop3}.motif .badge{animation-name:seal}
+  .motif .badge b:nth-child(1){animation-name:n5}.motif .badge b:nth-child(2){animation-name:n3}.motif .badge svg{animation-name:ok}
+}
+@keyframes hop2{0%,14%{transform:none;opacity:1}22%{transform:translate(78px,-34px) scale(.92) rotate(-8deg)}30%{transform:translate(157px,0) scale(.3);opacity:0}
+  88%{transform:translate(0,10px) scale(.6);opacity:0}96%,100%{transform:none;opacity:1}}
+@keyframes hop3{0%,38%{transform:none;opacity:1}46%{transform:translate(40px,-30px) scale(.92) rotate(8deg)}54%{transform:translate(79px,0) scale(.3);opacity:0}
+  90%{transform:translate(0,10px) scale(.6);opacity:0}98%,100%{transform:none;opacity:1}}
+@keyframes seal{0%,29%{scale:1;background:#FFFFFF;border-color:#EADDF0}33%{scale:1.14}37%{scale:1}53%{scale:1;background:#FFFFFF;border-color:#EADDF0}
+  58%{scale:1.22;background:var(--gold);border-color:var(--gold-deep)}64%,86%{scale:1;background:var(--gold);border-color:var(--gold-deep)}92%,100%{background:#FFFFFF;border-color:#EADDF0}}
+@keyframes n5{0%,29%{opacity:1}31%,90%{opacity:0}96%,100%{opacity:1}}
+@keyframes n3{0%,29%{opacity:0}31%,52%{opacity:1}54%,100%{opacity:0}}
+@keyframes ok{0%,54%{opacity:0;scale:.4}60%{opacity:1;scale:1.15}64%,86%{opacity:1;scale:1}90%,100%{opacity:0}}
 .home-level{display:grid;justify-items:center;gap:8px}
 .home-level .eyebrow{font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
 .home-level .num{
@@ -388,6 +409,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .daily.locked .cal{filter:grayscale(.8) opacity(.6)}
 .daily.locked .dname{color:var(--ink-soft)}
 .level-tag.is-daily .eyebrow{color:#7848E0}
+/* shorter phones: the level number gives up some size, so the motif (the game in one line) keeps its room */
+@media (max-height:700px){
+  .home-level .num{min-width:88px;height:88px;font-size:50px;border-radius:28px}
+  .wordmark{font-size:clamp(46px,min(17vw,11vh),92px)}
+}
 @media (max-height:600px){
   .motif{display:none}
   .home-level .num{min-width:84px;height:84px;font-size:46px;border-radius:26px}
@@ -511,7 +537,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
     <div class="home-mid">
       <h1 class="wordmark" id="homeTitle"><span>Sum</span><span>Sort</span></h1>
       <div class="motif" role="img" aria-label="A 2 tile and a 3 tile fill a jar that needs 5">
-        <span class="t t2">2</span>+<span class="t t3">3</span>=<span class="badge">5</span>
+        <span class="t t2">2</span><span class="op">+</span><span class="t t3">3</span><span class="op">=</span><span class="badge"><b>5</b><b>3</b><svg viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
       </div>
       <div class="home-level">
         <span class="eyebrow">Level</span>
