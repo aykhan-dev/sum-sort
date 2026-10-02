@@ -33,14 +33,16 @@ pass('game opens on home with level 1 and no star tally', h0.open && !h0.off && 
 { const d = await page.evaluate(() => ({ dis: document.getElementById('dailyBtn').getAttribute('aria-disabled'), label: document.getElementById('dailyBtn').getAttribute('aria-label') }));
   await page.evaluate(() => document.getElementById('dailyBtn').click()); await page.waitForTimeout(300);
   pass('a new player sees the daily locked, with how far to go', d.dis === 'true' && /opens at level 19, 18 levels to go/.test(d.label) && await page.evaluate(() => __sumSort.home && !__sumSort.daily), d.label); }
-{ const p = await page.evaluate(() => __sumSort.screenOf('stack', 0, 0.5)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
-  pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel))); }
+// (a jar: it sits under the wordmark, where home has nothing to press; a stack sits under the Play button)
+{ const p = await page.evaluate(() => __sumSort.screenOf('jar', 0, 1.2)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
+  pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel)) && await page.evaluate(() => __sumSort.home)); }
 { const j = await page.evaluate(() => ({ count: homeCount.textContent, next: homeNext.textContent, segs: homeBar.children.length, now: homeBar.querySelectorAll('.now').length }));
   pass('home shows the chapter journey and what opens next', j.count === '1 of 10' && j.segs === 10 && j.now === 1 && j.next === 'Up next: two-tile jars and the Undo booster at level 11', JSON.stringify(j)); }
 pass('no level list, no replay of old levels', (await page.evaluate(() => ['levelBtn', 'levels', 'replayBtn'].every(id => !document.getElementById(id)))));
 await page.screenshot({ path: SHOTS + '/home-1.png' });
 await tapEl('#playBtn'); h0 = await H();
 pass('Play opens the current level', !h0.open && h0.off && h0.level === 1);
+const handL1 = await page.waitForFunction(() => __sumSort.hand, null, { timeout: 10000 }).then(() => true, () => false);
 const settled = () => page.waitForFunction(() => __sumSort.busy === 0 && __sumSort.flights === 0);
 const S = () => page.evaluate(() => ({
   jars: __sumSort.jars.map(j => (j.sealed ? '#' : '') + j.t + ':' + j.tiles.map(x => x.v).join('+')).join(' '),
@@ -57,6 +59,8 @@ const touch = async (kind, i, y) => { const p = await page.evaluate(([k, i, y]) 
 await go(1); let s = await S(); log('L1', s);
 pass('chapter 1 hides boosters and Moves/Par', s.trayHidden && s.hudHidden);
 await touch('stack', 0); await page.waitForTimeout(250);
+{ const after = await page.evaluate(() => __sumSort.hand); await page.waitForTimeout(1200); const later = await page.evaluate(() => __sumSort.hand);
+  pass('the first level shows the first move with a hand, gone at the first touch and not back', handL1 && !after && !later, JSON.stringify({ handL1, after, later })); }
 const wrong = await page.evaluate(() => { const v = __sumSort.stacks[0].tiles.at(-1).v; return __sumSort.jars.findIndex(j => j.t !== v); });
 await touch('jar', wrong); await page.waitForTimeout(250); s = await S();
 pass('exact-fit jar rejects the wrong tile', s.moves === 0 && /wants the/.test(s.tip), s.tip);

@@ -138,6 +138,22 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .vignette::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .6s ease;
   background:radial-gradient(110% 80% at 50% 42%,rgba(255,255,255,0) 40%,rgba(110,50,100,.34) 100%)}
 .stage.finale .vignette::after{opacity:1}
+/* the first move, shown by a hand: tap this tile, then this jar. The fingertip is the hotspot (24% 6% of the box). */
+.hand{position:absolute;left:0;top:0;width:58px;height:58px;margin:-3px 0 0 -14px;pointer-events:none;opacity:0;z-index:2;
+  transform-origin:24% 6%;filter:drop-shadow(0 8px 10px rgba(59,39,71,.32))}
+.hand svg{width:100%;height:100%}
+.hand.go{animation:handmove 2.8s ease-in-out .2s infinite both}
+@keyframes handmove{
+  0%{opacity:0;transform:translate(var(--x0),var(--y0)) translateY(18px)}
+  12%{opacity:1;transform:translate(var(--x0),var(--y0))}
+  19%{transform:translate(var(--x0),var(--y0)) scale(.84)}
+  27%{transform:translate(var(--x0),var(--y0))}
+  62%{transform:translate(var(--x1),var(--y1))}
+  69%{transform:translate(var(--x1),var(--y1)) scale(.84)}
+  77%{opacity:1;transform:translate(var(--x1),var(--y1))}
+  92%,100%{opacity:0;transform:translate(var(--x1),var(--y1))}
+}
+.hand.still{opacity:1;transform:translate(var(--x0),var(--y0))}
 /* the winning seal: one soft flash of light */
 .flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 40%,#FFFFFF 0%,rgba(255,255,255,.6) 40%,rgba(255,255,255,0) 75%);opacity:0}
 .flash.go{animation:flash .5s ease-out}
@@ -484,6 +500,10 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
     <canvas id="scene" aria-label="Sum Sort level: glass jars with number badges and stacks of numbered gummy tiles on a candy counter"></canvas>
     <div class="vignette" aria-hidden="true"></div>
     <div class="flash" id="flash" aria-hidden="true"></div>
+    <div class="hand" id="hand" aria-hidden="true"><svg viewBox="0 0 48 48">
+      <path d="M14.5 4.5c2.2 0 4 1.8 4 4v13.2l1.6-.5c1.9-.6 3.9.4 4.6 2.2l.2.5 1.2-.3c2-.5 4 .6 4.6 2.5l.2.6.9-.1c2.3-.2 4.3 1.5 4.5 3.8l.6 6.4c.4 4.6-2.6 8.7-7.1 9.6l-4.4.9c-3.4.7-6.9-.5-9.2-3.1L6.6 33.8c-1.3-1.5-1.1-3.7.4-5 1.4-1.2 3.4-1.2 4.8 0l-1.3-15.3V8.5c0-2.2 1.8-4 4-4z" fill="#FFFFFF" stroke="#3B2747" stroke-width="2.2" stroke-linejoin="round"/>
+      <path d="M18.5 21.7v6.8M24.9 23.9v5.4M31 27.3v3.6" fill="none" stroke="#3B2747" stroke-width="2" stroke-linecap="round" opacity=".55"/>
+    </svg></div>
     <div class="callouts" id="callouts" aria-hidden="true"></div>
     <div class="top" id="topUi">
       <header class="bar">
@@ -1229,7 +1249,7 @@ const ui = {
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
-  homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'),
+  homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'), hand: $('hand'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
   modes: $('modes'), rush: $('rushBtn'), rushSub: $('rushSub'), winMovesLabel: $('winMovesLabel'), winParLabel: $('winParLabel'),
@@ -1779,7 +1799,26 @@ function buildLevel(n, resume = null) {
     });
   }
   analyse(); updateHud(); armIdle();
+  hideHand(); boardTouched = false; if (showsHand()) handTimer = setTimeout(showHand, 900);
 }
+/* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made. */
+let handTimer = 0, handOn = false, boardTouched = false;   // a player who has already touched the board needs no hand
+const showsHand = () => !daily && !rush && moveCount === 0 && !boardTouched && !sel && (levelNo <= 2 || !!def.teach);
+function placeHand() {
+  const m = plan && plan[0]; if (!m) return false;
+  const top = m.src.kind === 'stack' ? dishSlotY(stacks[m.src.i].tiles.length - 1) : jarSlotY(jars[m.src.i].tiles.length - 1);
+  const g0 = srcView(m.src).group.position, g1 = jars[m.dst].view.group.position, box = stage.getBoundingClientRect();
+  const a = screenPoint(new THREE.Vector3(g0.x, top + 0.25, g0.z)), b = screenPoint(new THREE.Vector3(g1.x, 1.4, g1.z));
+  const h = ui.hand.style;
+  h.setProperty('--x0', (a.x - box.left) + 'px'); h.setProperty('--y0', (a.y - box.top) + 'px');
+  h.setProperty('--x1', (b.x - box.left) + 'px'); h.setProperty('--y1', (b.y - box.top) + 'px');
+  return true;
+}
+function showHand() {
+  if (homeOpen || !showsHand() || !placeHand()) return;
+  handOn = true; ui.hand.classList.add(REDUCED ? 'still' : 'go');
+}
+function hideHand() { clearTimeout(handTimer); handOn = false; ui.hand.classList.remove('go', 'still'); }
 function refreshHits() {
   hitMeshes = [];
   const own = (view, owner) => { view.group.userData.owner = owner; view.hit.userData = { volume: true, owner }; hitMeshes.push(view.hit); };
@@ -1912,7 +1951,7 @@ function analyse(move) {
   if (dead && !wasDead) { sfx.stuck(); buzz(30); }
   else if (softDead && !wasSoft) sfx.nudge();
 }
-function afterChange(move) { refreshLocks(); analyse(move); updateHud(); armIdle(); updateFinale(); keepBoard(); }
+function afterChange(move) { if (handOn) hideHand(); refreshLocks(); analyse(move); updateHud(); armIdle(); updateFinale(); keepBoard(); }
 /* A level in progress is written down after every change, so a detour to the daily or a rush, or closing the tab,
    comes back to the same tiles, sealed jars and undo steps. A snapshot carries the level's content and is dropped
    if the level it was made for has changed since (a new version of the game). */
@@ -2488,7 +2527,7 @@ function showHome(focus = true) {
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
   homeOpen = true; homeRenderUntil = performance.now() + 1600;
   ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
-  stage.classList.add('at-home'); clearTimeout(idleTimer); if (focus) ui.play.focus({ preventScroll: true });
+  stage.classList.add('at-home'); clearTimeout(idleTimer); hideHand(); if (focus) ui.play.focus({ preventScroll: true });
 }
 function leaveHome() {
   homeOpen = false; clearInterval(dailyTimer); ui.home.classList.add('off');
@@ -2671,7 +2710,7 @@ function tap(h) {
   else toast('Pick a tile from a stack first.');
 }
 // act on finger-down: the answer starts in the frame the finger lands
-canvas.addEventListener('pointerdown', e => { if (e.button === 0 || e.pointerType !== 'mouse') tap(pick(e)); });
+canvas.addEventListener('pointerdown', e => { if (e.button === 0 || e.pointerType !== 'mouse') { boardTouched = true; if (handOn) hideHand(); tap(pick(e)); } });
 canvas.addEventListener('pointermove', e => {
   if (e.pointerType !== 'mouse') return;
   aim(e); canvas.style.cursor = ray.intersectObjects(hitMeshes, false).length ? 'pointer' : 'default';
@@ -2755,7 +2794,7 @@ async function start(hot) {
   buildLevel(n, resumable(n));   // a level left half-played comes back as it was
   fitCamera(false);
   if (hot && hot.level) ui.home.classList.add('off'); else showHome(false);   // a republish mid-game keeps the player in the game
-  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); }).observe(stage);
+  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); if (handOn) placeHand(); }).observe(stage);
   renderer.setAnimationLoop(loop);
   // hooks for automated play-tests and for measuring the build against the Taste File rubric
   const toPage = screenPoint;
@@ -2766,6 +2805,7 @@ async function start(hot) {
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
+    get hand() { return handOn; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
