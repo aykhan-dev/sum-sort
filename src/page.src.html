@@ -110,6 +110,17 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(140% 100% at 50% 45%,rgba(255,255,255,0) 55%,rgba(190,120,160,.16) 100%);
 }
+/* the last jar: the room's edges dim a little, so the eye goes to the one jar left */
+.vignette::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .6s ease;
+  background:radial-gradient(110% 80% at 50% 42%,rgba(255,255,255,0) 40%,rgba(110,50,100,.34) 100%)}
+.stage.finale .vignette::after{opacity:1}
+/* the winning seal: one soft flash of light */
+.flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 40%,#FFFFFF 0%,rgba(255,255,255,.6) 40%,rgba(255,255,255,0) 75%);opacity:0}
+.flash.go{animation:flash .5s ease-out}
+@keyframes flash{0%{opacity:0}15%{opacity:.75}100%{opacity:0}}
+/* a new level: its number pops in the level bar */
+.level-tag .num.pop{animation:numpop .5s cubic-bezier(.3,1.7,.5,1)}
+@keyframes numpop{0%{scale:.55}60%{scale:1.15}100%{scale:1}}
 .hud{justify-self:start}
 .pill{
   display:inline-flex;align-items:center;gap:10px;
@@ -393,6 +404,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   .jbar i.now,.jbar i.fill{animation:none}
   .shop-card,.reward{animation:none}
   .callout{animation:callout-still 1.15s linear both}
+  .flash.go,.level-tag .num.pop{animation:none}
+  .vignette::after{transition:none}
   .raised,.cta{transition:none}
 }
 </style>
@@ -401,6 +414,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   <main class="stage" id="stage">
     <canvas id="scene" aria-label="Sum Sort level: glass jars with number badges and stacks of numbered gummy tiles on a candy counter"></canvas>
     <div class="vignette" aria-hidden="true"></div>
+    <div class="flash" id="flash" aria-hidden="true"></div>
     <div class="callouts" id="callouts" aria-hidden="true"></div>
     <div class="top" id="topUi">
       <header class="bar">
@@ -623,7 +637,7 @@ const ui = {
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
-  homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'),
+  homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
   homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
@@ -902,10 +916,10 @@ function drawBadge(view) {
   const cx = 128, cy = 124;
   g.save(); g.shadowColor = 'rgba(110,40,90,0.28)'; g.shadowBlur = 14; g.shadowOffsetY = 6;
   g.beginPath(); g.arc(cx, cy, 92, 0, Math.PI * 2);
-  g.fillStyle = s.sealed ? GOLD : s.locked ? '#FBEFF3' : '#FFFFFF'; g.fill(); g.restore();
+  g.fillStyle = s.sealed ? GOLD : s.locked ? '#FBEFF3' : s.finale ? '#FFF4D6' : '#FFFFFF'; g.fill(); g.restore();
   g.lineCap = 'round';
   if (!s.sealed) {
-    g.lineWidth = 13; g.strokeStyle = '#F3E3EC';
+    g.lineWidth = s.finale ? 17 : 13; g.strokeStyle = s.finale ? GOLD : '#F3E3EC';
     if (s.spare) g.setLineDash([14, 14]);
     g.beginPath(); g.arc(cx, cy, 108, 0, Math.PI * 2); g.stroke(); g.setLineDash([]);
     if (s.target != null && s.sum > 0) {
@@ -1078,6 +1092,7 @@ let moveCount = 0, spareUsed = false, rescued = false, allow = { ...ALLOW };
 let dead = false, softDead = false, plan = null, spareRescues = false, splitArmed = false, tipText = DEFAULT_TIP, buildId = 0;
 let flights = 0;      // tiles in the air: they never block input
 let daily = null;     // the date key of the daily puzzle on the board, or null for the level
+let finaleJar = null; // the last numbered jar left open, once the others are sealed
 let chain = 0, bestChain = 0, callouts = 0;
 let sealLog = [], boostersUsed = 0, winStars = 0;   // for the shared result: the chain at each seal, in order, and boosters spent   // jars sealed in a row with no wasted move (see comboStep), words shown
 let pending = null;   // one remembered tap, replayed as soon as the board can take it
@@ -1106,6 +1121,7 @@ function buildLevel(n) {
   toastMsg = ''; clearTimeout(toastTimer);
   sel = null; history = []; busy = 0; flights = 0; pending = null; deferred = null;
   won = false; moveCount = 0; spareUsed = false; rescued = false; allow = { ...ALLOW };
+  finaleJar = null; stage.classList.remove('finale');
   dead = false; softDead = false; plan = null; spareRescues = false; setSplitArmed(false);
   chain = 0; bestChain = 0; callouts = 0; sealLog = []; boostersUsed = 0;
   jars = def.jars.map((t, i) => {
@@ -1135,6 +1151,7 @@ function buildLevel(n) {
   ui.levelTag.classList.toggle('is-daily', !!daily);
   ui.levelNum.className = 'num gummy ' + (daily ? 'c-grape' : 'c-rasp');
   ui.levelNum.textContent = daily ? String(Number(daily.slice(8))) : String(n);
+  ui.levelNum.classList.remove('pop'); void ui.levelNum.offsetWidth; ui.levelNum.classList.add('pop');
   ui.levelTag.querySelector('.eyebrow').textContent = daily ? `Daily #${dailyNumber(daily)}` : 'Level';
   ui.chapterName.textContent = daily ? WEEKDAYS[weekdayOf(daily)] : ch.name;
   ui.win.hidden = true;
@@ -1211,7 +1228,7 @@ function syncBadge(j, extra = {}) {
   Object.assign(j.view.state, { target: j.t, sum: landedSum(j), spare: j.spare, sealed: j.sealed && !!j.view.lidDown, locked: isLocked(j) }, extra);
   drawBadge(j.view);
   if (before !== j.view.state.sum && !REDUCED) {
-    const b = j.view.badge, base = b.userData.base;
+    const b = j.view.badge, base = b.userData.base; b.userData.hold = performance.now() + 240 * SPEED;
     tween(220, k => { const s = base * (1 + 0.2 * Math.sin(Math.PI * k)); b.scale.set(s, s, 1); }).then(() => b.scale.set(base, base, 1));
   }
 }
@@ -1284,7 +1301,19 @@ function analyse(move) {
   if (dead && !wasDead) { sfx.stuck(); buzz(30); }
   else if (softDead && !wasSoft) sfx.nudge();
 }
-function afterChange(move) { refreshLocks(); analyse(move); updateHud(); armIdle(); }
+function afterChange(move) { refreshLocks(); analyse(move); updateHud(); armIdle(); updateFinale(); }
+/* One numbered jar left: its badge track turns gold and breathes, and the room dims at the edges. */
+function updateFinale() {
+  const numbered = jars.filter(j => j.t != null), open = numbered.filter(j => !j.sealed);
+  const next = !won && numbered.length > 1 && open.length === 1 ? open[0] : null;
+  if (next === finaleJar) return;
+  if (finaleJar) {
+    const v = finaleJar.view, b = v.badge; v.state.finale = false; drawBadge(v); b.scale.set(b.userData.base, b.userData.base, 1);
+    if (!finaleJar.sealed) ringTo(v.goldRing, 0, 300);
+  }
+  finaleJar = next; stage.classList.toggle('finale', !!next);
+  if (next) { next.view.state.finale = true; drawBadge(next.view); ringTo(next.view.goldRing, 0.55, 500); }
+}
 /* Input is only ever held by a booster animation, and never for more than half a second.
    A tap that arrives meanwhile is remembered; a booster pressed while tiles are flying waits for them to land. */
 function settle() {
@@ -1311,20 +1340,20 @@ function squash(mesh) {
     mesh.scale.set(1 + 0.15 * d, 1 - 0.25 * d, 1 + 0.15 * d);
   }).then(() => mesh.scale.set(1, 1, 1));
 }
-async function flyTo(mesh, group, slotY, aboveY = 3.35) {
+async function flyTo(mesh, group, slotY, aboveY = 3.35, slow = 1) {
   playGroup.attach(mesh);
   const p0 = mesh.position.clone(), gp = group.position.clone();
   const above = new THREE.Vector3(gp.x, aboveY, gp.z);
   const ctrl = p0.clone().lerp(above, 0.5); ctrl.y = Math.max(p0.y, aboveY) + 1.0;
   mesh.rotation.set(0, 0, 0);
-  await tween(310, k => {
+  await tween(310 * slow, k => {
     const a = (1 - k) * (1 - k), b = 2 * (1 - k) * k, c = k * k;
     mesh.position.set(a * p0.x + b * ctrl.x + c * above.x, a * p0.y + b * ctrl.y + c * above.y, a * p0.z + b * ctrl.z + c * above.z);
     mesh.rotation.y = Math.sin(k * Math.PI) * 0.7;
   }, ease.inOutCubic);
   mesh.rotation.set(0, 0, 0);
   const target = group.position.y + slotY;
-  await tween(170, k => { mesh.position.y = aboveY + (target - aboveY) * k; }, ease.inQuad);
+  await tween(170 * slow, k => { mesh.position.y = aboveY + (target - aboveY) * k; }, ease.inQuad);
   group.attach(mesh); mesh.position.set(0, slotY, 0); mesh.rotation.set(0, 0, 0);
   squash(mesh);
 }
@@ -1336,7 +1365,7 @@ function lift(tile, src, up) {
 }
 function ringTo(ring, to, ms = 180) { const o = ring.material.opacity; return tween(ms, k => { ring.material.opacity = o + (to - o) * k; }); }
 function pulseBadge(view, times = 3) {
-  const b = view.badge, base = b.userData.base;
+  const b = view.badge, base = b.userData.base; b.userData.hold = performance.now() + 1020 * SPEED;
   return tween(1000, k => { const s = base * (1 + 0.28 * Math.abs(Math.sin(k * Math.PI * times))); b.scale.set(s, s, 1); })
     .then(() => b.scale.set(base, base, 1));
 }
@@ -1393,24 +1422,27 @@ function moveTo(di) {
   const finishing = jars.every(j => j.t == null || j.sealed);
   if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
   updateHud();
-  flyTo(tile.mesh, dst.view.group, jarSlotY(slot)).then(async () => {
+  // the winning tile flies in slow motion while the camera leans toward its jar
+  if (finishing && !REDUCED) kickCamera(dst.view.group.position, 7, 1500);
+  flyTo(tile.mesh, dst.view.group, jarSlotY(slot), 3.35, finishing && !REDUCED ? 1.9 : 1).then(async () => {
     if (id !== buildId) return;
     tile.flying = false; flights--;
     sfx.drop(slot); buzz(8); syncBadge(dst);
-    if (seals) { const lid = sealAnim(dst, combo); if (finishing) { await lid; if (id === buildId) winLevel(); return; } }
+    if (seals) { const lid = sealAnim(dst, combo, finishing); if (finishing) { await lid; if (id === buildId) winLevel(); return; } }
     if (!won) afterChange({ src, dst: di });
     settle();
   });
 }
-async function sealAnim(j, combo = 0) {
+async function sealAnim(j, combo = 0, final = false) {
   const v = j.view, token = v.lidToken = (v.lidToken || 0) + 1;
   v.lid.visible = true; v.lid.position.y = 4.1; v.lid.rotation.z = 0.3;
   sfx.lid();
   await tween(440, k => { if (v.lidToken !== token) return; v.lid.position.y = 4.1 + (LID_Y - 4.1) * k; v.lid.rotation.z = 0.3 * (1 - k); }, ease.outBounce);
   if (v.lidToken !== token) return;   // an undo took the lid back off
   v.lidDown = true;
-  burst(new THREE.Vector3(v.group.position.x, 2.55, v.group.position.z));
-  syncBadge(j); sfx.seal(sealedCount() - 1); buzz(18);
+  burst(new THREE.Vector3(v.group.position.x, 2.55, v.group.position.z), final ? 56 : 28, PAL_GOLD, final ? 1.45 : 1);
+  if (final && !REDUCED) { ui.flash.classList.remove('go'); void ui.flash.offsetWidth; ui.flash.classList.add('go'); }
+  syncBadge(j); sfx.seal(sealedCount() - 1); buzz(final ? [24, 30, 40] : 18);
   ringTo(v.goldRing, 0.9, 420); hop(v.group, 0.22, 400);
   if (combo >= 2) callout(j, combo);
   await wait(160);
@@ -1427,12 +1459,13 @@ async function unsealAnim(j) {
 /* Combo words: a candy word pops up over the jar that just sealed, in the wordmark's lettering, and the camera
    leans in a little. The words climb with the chain; from the fifth jar on they turn gold and throw extra sparks.
    The word is page text, not part of the 3D scene, so it stays sharp at any size and never blocks a tap. */
-const kick = { dir: new THREE.Vector3(), amount: 0 };
-function kickCamera(at, n) {
+const kick = { dir: new THREE.Vector3(), amount: 0, id: 0 };
+function kickCamera(at, n, ms = 340) {
   if (REDUCED) return;
   kick.dir.set(at.x, 1.2, at.z).sub(camera.position);
   const peak = kick.dir.length() * Math.min(0.045, 0.012 + 0.007 * n); kick.dir.normalize();
-  tween(340, k => { kick.amount = peak * Math.sin(Math.PI * k) * (1 - 0.4 * k); }).then(() => { kick.amount = 0; });
+  const id = ++kick.id;   // a newer lean takes over from an older one
+  tween(ms, k => { if (id === kick.id) kick.amount = peak * Math.sin(Math.PI * k) * (1 - 0.4 * k); }).then(() => { if (id === kick.id) kick.amount = 0; });
 }
 function callout(j, n) {
   const word = comboWord(n); if (!word) return;
@@ -1569,6 +1602,7 @@ function armIdle() {
 async function winLevel() {
   won = true; dead = false; softDead = false; clearTimeout(idleTimer); refreshLocks(false); updateHud();
   const starsBefore = totalStars();
+  updateFinale();
   const id = buildId, ch = chapterOf(levelNo), tiles = def.par, L = lastLayout;
   const stars = winStars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
   const perfect = stars === 3 && !def.exact && !def.teach;      // tutorial levels cannot be played badly, so they stay on the plain rung
@@ -1954,6 +1988,9 @@ function loop() {
   }
   if (sel && !REDUCED) sel.tile.mesh.rotation.z = 0.05 * Math.sin(t * 9);
   if (!REDUCED) jars.forEach((j, i) => { j.view.badge.position.y = BADGE_Y + 0.035 * Math.sin(t * 2 + i); });
+  if (finaleJar && !REDUCED && now > (finaleJar.view.badge.userData.hold || 0)) {   // breathes, unless a pulse is playing on it
+    const b = finaleJar.view.badge, s = b.userData.base * (1 + 0.07 * Math.sin(t * 4.5)); b.scale.set(s, s, 1);
+  }
   updateBursts(dt); updateConfetti(confetti, dt);
   if (!homeOpen || now < homeRenderUntil) {   // behind the home wash the settled board is a still picture
     if (kick.amount) camera.position.addScaledVector(kick.dir, kick.amount);
@@ -1987,7 +2024,7 @@ async function start(hot) {
     get dead() { return dead; }, get softDead() { return softDead; }, get plan() { return plan; }, get level() { return levelNo; }, get moves() { return moveCount; },
     get lowQuality() { return lowQuality; }, get allow() { return allow; }, get pending() { return !!pending; },
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
-    get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
+    get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
     setTileColor(v, hex) { tileMaterial(v).color.set(hex); },

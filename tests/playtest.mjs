@@ -117,6 +117,15 @@ const lock = await page.evaluate(() => new Promise(res => { const t = performanc
   const was = __sumSort.pending; const iv = setInterval(() => { if (__sumSort.busy === 0) { clearInterval(iv); setTimeout(() => res({ ms: Math.round(performance.now() - t), remembered: was, sel: __sumSort.sel, moves: __sumSort.moves }), 60); } }, 10); }));
 log('undo', lock); pass('tap during undo is remembered and replayed', lock.remembered && lock.sel && lock.sel.kind === 'stack');
 console.log('(undo lock time is inflated by the software renderer; design value 480 ms)');
+// 6b. the last jar: singled out once every other jar is sealed, let go when the level is won
+await go(5); await settled();
+{ const n = await page.evaluate(() => __sumSort.plan.length);
+  for (let k = 0; k < n - 1; k++) { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  const on = await page.evaluate(() => ({ finale: __sumSort.finale, open: __sumSort.jars.findIndex(j => !j.sealed), dim: document.getElementById('stage').classList.contains('finale') }));
+  const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m);
+  await page.waitForFunction(() => __sumSort.won && !document.getElementById('win').hidden, null, { timeout: 60000 });
+  const off = await page.evaluate(() => ({ finale: __sumSort.finale, dim: document.getElementById('stage').classList.contains('finale') }));
+  pass('the last open jar is singled out, and let go on the win', on.finale >= 0 && on.finale === on.open && on.dim && off.finale === -1 && !off.dim, JSON.stringify({ on, off })); }
 // 7. celebration ladder: plain clear, perfect, chapter done
 const playOut = async () => { for (let k = 0; k < 40; k++) { const st = await page.evaluate(() => ({ won: __sumSort.won, m: __sumSort.plan && __sumSort.plan[0] })); if (st.won || !st.m) break;
   await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, st.m); await settled(); } await page.waitForTimeout(5000);
@@ -172,10 +181,12 @@ await go(3); await settled(); await playOut();
 await tapEl('#winHomeBtn'); await page.waitForTimeout(500); let h8 = await H(); await page.screenshot({ path: SHOTS + '/home-4.png' });
 pass('home from the win card shows the next level and the stars', h8.open && h8.num === '4' && h8.level === 4 && Number(h8.tally) > 0 && (await page.evaluate(() => document.getElementById('win').hidden)), JSON.stringify(h8));
 { await tapEl('#starTally');
-  const shop = await page.evaluate(() => ({ open: !document.getElementById('shop').hidden, themes: document.querySelectorAll('#themes .theme').length,
-    inUse: [...document.querySelectorAll('#themes .theme[aria-pressed="true"]')].map(b => b.dataset.id), locked: document.querySelectorAll('#themes .theme:disabled').length }));
+  const shop = await page.evaluate(() => { const all = [...document.querySelectorAll('#themes .theme')], total = __sumSort.totalStars();
+    const at = b => Number((b.querySelector('.ts').textContent.match(/\d+/) || [0])[0]);
+    return { open: !document.getElementById('shop').hidden, themes: all.length, total, inUse: all.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.id),
+      locked: all.filter(b => b.disabled).length, lockedRight: all.filter(b => b.disabled).every(b => at(b) > total) }; });
   await page.keyboard.press('Escape');
-  pass('the star tally opens the candy shop: every counter, the first in use, the rest locked until their box', shop.open && shop.themes === 8 && shop.inUse.join() === 'strawberry' && shop.locked === 7 && await page.evaluate(() => document.getElementById('shop').hidden), JSON.stringify(shop)); }
+  pass('the star tally opens the candy shop: every counter, the first in use, the rest locked until their box', shop.open && shop.themes === 8 && shop.inUse.join() === 'strawberry' && shop.locked >= 6 && shop.lockedRight && await page.evaluate(() => document.getElementById('shop').hidden), JSON.stringify(shop)); }
 const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound', '#starTally'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
 pass('home controls are at least 48 px', Object.values(homeSizes).every(v => v.split('x').every(n => +n >= 48)), JSON.stringify(homeSizes));
 await tapEl('#homeSound'); pass('home sound button toggles both sound buttons', (await page.evaluate(() => ['soundBtn', 'homeSound'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join())) === 'false,false'); await tapEl('#homeSound');
