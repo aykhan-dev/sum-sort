@@ -115,6 +115,8 @@ const playOut = async () => { for (let k = 0; k < 40; k++) { const st = await pa
   return page.evaluate(() => ({ cls: document.getElementById('winCard').className, title: document.getElementById('winTitle').textContent, stars: document.getElementById('winStars').getAttribute('aria-label'), tag: document.getElementById('winChapter').hidden ? null : document.getElementById('winChapter').textContent, next: document.getElementById('nextLabel').textContent, text: document.getElementById('winText').textContent, shown: !document.getElementById('win').hidden })); };
 await go(3); await settled(); const w3 = await playOut(); log('win L3 (tutorial)', w3);
 await go(16); await settled(); const w16 = await playOut(); log('win L16 (3 stars)', w16); await page.screenshot({ path: SHOTS + '/win-perfect.png' });
+{ const c = await page.evaluate(() => ({ best: __sumSort.bestChain, words: __sumSort.callouts, jars: __sumSort.jars.length }));
+  pass('a clean run chains every jar into a combo, with a word from the second seal on', c.best === c.jars && c.words === c.jars - 1, JSON.stringify(c)); }
 await go(10); await settled(); const w10 = await playOut(); log('win L10 (chapter end)', w10); await page.screenshot({ path: SHOTS + '/win-chapter.png' });
 pass('ladder: tutorial clear < perfect < chapter', !/perfect/.test(w3.cls) && /perfect/.test(w16.cls) && /chapter-done/.test(w10.cls) && w10.next === 'Next chapter');
 await page.click('#nextBtn', { force: true }); await page.waitForTimeout(1200);

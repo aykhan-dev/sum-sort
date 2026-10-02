@@ -34,8 +34,8 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 
 | # | Item | Why it catches attention | Impact | Effort | Status |
 | --- | --- | --- | --- | --- | --- |
-| E1 | Fast unit tests, `meta.mjs` for pure meta logic, CI on push | Every feature below lands with tests in seconds, not minutes | enabler | 2 | todo |
-| F1 | **Combo callouts**: quick seals chain into "Sweet! → Yummy! → Sugar rush!" words, rising pitch, camera punch | Rewards flow; the single biggest "feel" upgrade per line of code | 5 | 2 | todo |
+| E1 | Fast unit tests, `meta.mjs` for pure meta logic, CI on push | Every feature below lands with tests in seconds, not minutes | enabler | 2 | done |
+| F1 | **Combo callouts**: quick seals chain into "Sweet! → Yummy! → Sugar rush!" words, rising pitch, camera punch | Rewards flow; the single biggest "feel" upgrade per line of code | 5 | 2 | done |
 | F2 | **Daily Puzzle + streak**: one seeded board per day, same for everyone, Monday easy to Sunday hard; flame streak on home | The return loop. Gives a reason to open the game every day | 5 | 3 | todo |
 | F3 | **Share result**: Wordle-style text card (stars, moves vs par, streak, jar emoji row) via the share sheet or clipboard | Free spread; players recruit players | 5 | 1 | todo |
 | F4 | **Journey on home**: chapter progress bar, "next: Split in 3 levels", daily card | Goal-gradient effect: near goals pull players forward | 4 | 2 | todo |
@@ -58,3 +58,6 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 
 | When (UTC) | Item | Result |
 | --- | --- | --- |
+| 21:20 | E1 | Unit tests (7) run in about 1 s; `npm run check`; CI workflow; build inlines several pure modules. |
+| 22:05 | F1 | Combo chain = seals in a row with only stack-to-jar moves (exactly what a par game is). From the 2nd seal a wordmark-style word pops over the jar (Sweet → Tasty → Yummy → Delicious → Sugar rush), with a sparkle that climbs in pitch and a 1–4% camera lean. Gold words and extra sparks from the 5th. Words are page text: sharp, sized to fit a 390 px phone, never take a tap. Reduced motion: fade only, no lean. First try was a 3D sprite: too small and pale on a phone, replaced. |
+

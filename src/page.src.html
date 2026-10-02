@@ -120,6 +120,25 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .pill .sep{width:1px;height:14px;background:var(--line-deep)}
 .fallback{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center;font-weight:700;color:var(--ink)}
 
+/* combo words: the wordmark's lettering, popping up over a jar that just sealed (never takes a tap) */
+.callouts{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.callout{
+  position:absolute;translate:-50% -50%;white-space:nowrap;rotate:-4deg;
+  font:700 clamp(38px,11.5vw,62px)/1 var(--display);letter-spacing:.5px;color:var(--raspberry);
+  -webkit-text-stroke:2px #FFFFFF;paint-order:stroke fill;
+  text-shadow:0 .06em 0 var(--raspberry-deep),0 .1em 0 #FFFFFF,0 .2em .3em rgba(199,48,79,.35);
+  animation:callout 1.15s cubic-bezier(.2,.8,.3,1) both;
+}
+.callout.top{color:var(--gold);font-size:clamp(42px,13vw,70px);text-shadow:0 .06em 0 var(--gold-deep),0 .1em 0 #FFFFFF,0 .2em .35em rgba(217,150,43,.45)}
+@keyframes callout{
+  0%{opacity:0;scale:.3;transform:translateY(18px)}
+  18%{opacity:1;scale:1.12;transform:translateY(0)}
+  30%{scale:1}
+  70%{opacity:1}
+  100%{opacity:0;scale:1.04;transform:translateY(-34px)}
+}
+@keyframes callout-still{0%,100%{opacity:0}15%,70%{opacity:1}}
+
 /* win card */
 .win{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(255,236,228,.45);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .win-card{
@@ -276,6 +295,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   .win-card,.stars svg.on,.win-card.perfect .stars::before,.play{animation:none}
   .home,.home.off,.top,.bottom{transition:none}
   .boost.rescue{animation:none}
+  .callout{animation:callout-still 1.15s linear both}
   .raised,.cta{transition:none}
 }
 </style>
@@ -284,6 +304,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   <main class="stage" id="stage">
     <canvas id="scene" aria-label="Sum Sort level: glass jars with number badges and stacks of numbered gummy tiles on a candy counter"></canvas>
     <div class="vignette" aria-hidden="true"></div>
+    <div class="callouts" id="callouts" aria-hidden="true"></div>
     <div class="top" id="topUi">
       <header class="bar">
         <div class="bar-left">
@@ -454,7 +475,7 @@ const ui = {
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
-  homeSound: $('homeSound'), play: $('playBtn')
+  homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts')
 };
 
 /* ---------------- saved progress (this browser only) ---------------- */
@@ -529,6 +550,8 @@ const sfx = {
   split: () => { tone(700, 0.09, { type: 'triangle', gain: 0.05 }); tone(940, 0.11, { type: 'triangle', gain: 0.05, delay: 0.08 }); },
   stuck: () => { tone(330, 0.2, { gain: 0.05, to: 290 }); tone(247, 0.3, { gain: 0.05, to: 220, delay: 0.16 }); },
   nudge: () => tone(392, 0.22, { gain: 0.045, to: 440 }),
+  // a sparkle after the seal chord, a step higher for every jar in the chain
+  combo: n => { const r = Math.pow(2, Math.min(n - 2, 5) * 2 / 12); [1, 1.26, 1.5, 2].forEach((m, i) => tone(1046.5 * r * m, 0.2, { type: 'triangle', gain: 0.032, delay: 0.16 + i * 0.055 })); },
   perfect: () => [2, 4, 5, 4, 5].forEach((s, i) => tone(NOTES[s] * (i > 2 ? 4 : 2), 0.42, { gain: 0.045, delay: i * 0.085 })),
   chapter: () => [0, 2, 4, 5, 4, 5, 5].forEach((s, i) => { tone(NOTES[s] * 2, 0.5, { type: 'triangle', gain: 0.05, delay: i * 0.12 }); tone(NOTES[s], 0.5, { gain: 0.03, delay: i * 0.12 }); })
 };
@@ -889,6 +912,7 @@ let levelNo = 1, def = null, jars = [], stacks = [], sel = null, history = [], b
 let moveCount = 0, spareUsed = false, rescued = false, allow = { ...ALLOW };
 let dead = false, softDead = false, plan = null, spareRescues = false, splitArmed = false, tipText = DEFAULT_TIP, buildId = 0;
 let flights = 0;      // tiles in the air: they never block input
+let chain = 0, bestChain = 0, callouts = 0;   // jars sealed in a row with no wasted move (see comboStep), words shown
 let pending = null;   // one remembered tap, replayed as soon as the board can take it
 let deferred = null;  // one booster press waiting for flying tiles to land
 let hitMeshes = [];
@@ -916,6 +940,7 @@ function buildLevel(n) {
   sel = null; history = []; busy = 0; flights = 0; pending = null; deferred = null;
   won = false; moveCount = 0; spareUsed = false; rescued = false; allow = { ...ALLOW };
   dead = false; softDead = false; plan = null; spareRescues = false; setSplitArmed(false);
+  chain = 0; bestChain = 0; callouts = 0;
   jars = def.jars.map((t, i) => {
     const lock = def.locks ? def.locks[i] : 0, view = makeJarView({ target: t, locked: lock > 0 });
     const tiles = (def.fill ? def.fill[i] : []).map((v, k) => {
@@ -1189,6 +1214,8 @@ function moveTo(di) {
   if (seals) dst.sealed = true;
   history.push({ type: 'move', src: { kind: src.kind, i: src.i }, dst: di, seals });
   moveCount++;
+  chain = comboStep(chain, { clean: src.kind === 'stack' && dst.t != null, seals }); bestChain = Math.max(bestChain, chain);
+  const combo = seals ? chain : 0;
   const finishing = jars.every(j => j.t == null || j.sealed);
   if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
   updateHud();
@@ -1196,12 +1223,12 @@ function moveTo(di) {
     if (id !== buildId) return;
     tile.flying = false; flights--;
     sfx.drop(slot); buzz(8); syncBadge(dst);
-    if (seals) { const lid = sealAnim(dst); if (finishing) { await lid; if (id === buildId) winLevel(); return; } }
+    if (seals) { const lid = sealAnim(dst, combo); if (finishing) { await lid; if (id === buildId) winLevel(); return; } }
     if (!won) afterChange({ src, dst: di });
     settle();
   });
 }
-async function sealAnim(j) {
+async function sealAnim(j, combo = 0) {
   const v = j.view, token = v.lidToken = (v.lidToken || 0) + 1;
   v.lid.visible = true; v.lid.position.y = 4.1; v.lid.rotation.z = 0.3;
   sfx.lid();
@@ -1211,6 +1238,7 @@ async function sealAnim(j) {
   burst(new THREE.Vector3(v.group.position.x, 2.55, v.group.position.z));
   syncBadge(j); sfx.seal(sealedCount() - 1); buzz(18);
   ringTo(v.goldRing, 0.9, 420); hop(v.group, 0.22, 400);
+  if (combo >= 2) callout(j, combo);
   await wait(160);
 }
 async function unsealAnim(j) {
@@ -1222,11 +1250,39 @@ async function unsealAnim(j) {
   v.lid.visible = false; v.lid.rotation.z = 0;
 }
 
+/* Combo words: a candy word pops up over the jar that just sealed, in the wordmark's lettering, and the camera
+   leans in a little. The words climb with the chain; from the fifth jar on they turn gold and throw extra sparks.
+   The word is page text, not part of the 3D scene, so it stays sharp at any size and never blocks a tap. */
+const kick = { dir: new THREE.Vector3(), amount: 0 };
+function kickCamera(at, n) {
+  if (REDUCED) return;
+  kick.dir.set(at.x, 1.2, at.z).sub(camera.position);
+  const peak = kick.dir.length() * Math.min(0.045, 0.012 + 0.007 * n); kick.dir.normalize();
+  tween(340, k => { kick.amount = peak * Math.sin(Math.PI * k) * (1 - 0.4 * k); }).then(() => { kick.amount = 0; });
+}
+function callout(j, n) {
+  const word = comboWord(n); if (!word) return;
+  const top = n >= 5, at = j.view.group.position, el = document.createElement('div');
+  el.className = 'callout' + (top ? ' top' : ''); el.textContent = word; ui.callouts.appendChild(el); callouts++;
+  // over the jar's badge, but kept clear of the level bar, the coach line and the screen edges
+  const p = screenPoint(new THREE.Vector3(at.x, BADGE_Y + 0.6, at.z)), box = ui.callouts.getBoundingClientRect(), POP = 1.14;
+  const room = box.width - 24;   // a word wider than the screen at the top of its pop is set smaller
+  if (el.offsetWidth * POP > room) el.style.fontSize = parseFloat(getComputedStyle(el).fontSize) * room / (el.offsetWidth * POP) + 'px';
+  const half = el.offsetWidth * POP / 2 + 12, lo = ui.top.getBoundingClientRect().bottom - box.top + el.offsetHeight / 2 + 6;
+  el.style.left = Math.max(half, Math.min(box.width - half, p.x - box.left)) + 'px';
+  el.style.top = Math.max(lo, Math.min(box.height * 0.62, p.y - box.top)) + 'px';
+  sfx.combo(n); buzz([8, 30, 8 + 4 * n]);
+  if (n >= 3) kickCamera(at, n);
+  if (top) burst(new THREE.Vector3(at.x, 3.2, at.z), 30, PAL_GOLD, 1.35);
+  el.addEventListener('animationend', () => el.remove());
+  setTimeout(() => el.remove(), 2000);   // in case the animation never runs (a hidden tab)
+}
+
 /* ---------------- boosters ---------------- */
 async function undo() {
   if (busy || won || !history.length || allow.undo <= 0 || !unlocked('undo')) return;
   const id = buildId;
-  deselect(); setSplitArmed(false); busy++; allow.undo--;
+  deselect(); setSplitArmed(false); busy++; allow.undo--; chain = 0;
   const h = history.pop();
   if (h.type === 'split') {
     const list = srcList(h.loc), view = srcView(h.loc);
@@ -1249,7 +1305,7 @@ async function undo() {
 async function addSpare() {
   if (busy || won || spareUsed || allow.spare <= 0 || !unlocked('spare')) return;
   const id = buildId;
-  deselect(); setSplitArmed(false); busy++; spareUsed = true; rescued = true; allow.spare--; updateHud();
+  deselect(); setSplitArmed(false); busy++; spareUsed = true; rescued = true; allow.spare--; chain = 0; updateHud();
   const j = { t: null, lock: 0, exact: false, tiles: [], sealed: false, spare: true, view: makeJarView({ spare: true }) };
   jars.push(j); j.view.group.scale.setScalar(0.001); playGroup.add(j.view.group);
   refreshHits();
@@ -1279,7 +1335,7 @@ async function doSplit(loc) {
   if (tile.v < 2) return fail('A 1 is as small as it gets.');
   if (loc.kind === 'jar' && list.length >= JAR_CAP) return fail('No room in that jar for two tiles.');
   if (sel) { ringTo(srcView(sel).selRing, 0); sel = null; }
-  busy++; allow.split--; rescued = true; updateHud();
+  busy++; allow.split--; rescued = true; chain = 0; updateHud();
   const small = Math.floor(tile.v / 2), big = tile.v - small;
   list.pop(); const k = list.length;
   await tween(140, t => tile.mesh.scale.setScalar(1 - 0.6 * t), ease.inQuad);
@@ -1409,6 +1465,8 @@ function goHome() {
 
 /* ---------------- camera ---------------- */
 const _p = new THREE.Vector3(), _up = new THREE.Vector3(), _right = new THREE.Vector3();
+/* where a point on the board shows on the page, in CSS pixels */
+function screenPoint(v) { const p = v.clone().project(camera), r = canvas.getBoundingClientRect(); return { x: r.left + (p.x + 1) / 2 * r.width, y: r.top + (1 - p.y) / 2 * r.height }; }
 function zonePoints(zones) {
   const pts = [];
   zones.forEach(({ min, max }) => { for (let i = 0; i < 8; i++) pts.push(new THREE.Vector3(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z)); });
@@ -1547,7 +1605,11 @@ function loop() {
   if (sel && !REDUCED) sel.tile.mesh.rotation.z = 0.05 * Math.sin(t * 9);
   if (!REDUCED) jars.forEach((j, i) => { j.view.badge.position.y = BADGE_Y + 0.035 * Math.sin(t * 2 + i); });
   updateBursts(dt); updateConfetti(confetti, dt);
-  if (!homeOpen || now < homeRenderUntil) renderer.render(scene, camera);   // behind the home wash the settled board is a still picture
+  if (!homeOpen || now < homeRenderUntil) {   // behind the home wash the settled board is a still picture
+    if (kick.amount) camera.position.addScaledVector(kick.dir, kick.amount);
+    renderer.render(scene, camera);
+    if (kick.amount) { camera.position.addScaledVector(kick.dir, -kick.amount); camera.updateMatrixWorld(); }
+  }
   // frames 20-80 decide whether this device renders at reduced resolution
   if (!lowQuality && !window.__sumSortKeepQuality && ++frames > 20 && frames <= 80) {
     slowMs += raw * 1000;
@@ -1569,11 +1631,12 @@ async function start(hot) {
   new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); }).observe(stage);
   renderer.setAnimationLoop(loop);
   // hooks for automated play-tests and for measuring the build against the Taste File rubric
-  const toPage = v => { const p = v.project(camera), r = canvas.getBoundingClientRect(); return { x: r.left + (p.x + 1) / 2 * r.width, y: r.top + (1 - p.y) / 2 * r.height }; };
+  const toPage = screenPoint;
   window.__sumSort = {
     get jars() { return jars; }, get stacks() { return stacks; }, get busy() { return busy; }, get flights() { return flights; }, get won() { return won; },
     get dead() { return dead; }, get softDead() { return softDead; }, get plan() { return plan; }, get level() { return levelNo; }, get moves() { return moveCount; },
     get lowQuality() { return lowQuality; }, get allow() { return allow; }, get pending() { return !!pending; },
+    get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
     setTileColor(v, hex) { tileMaterial(v).color.set(hex); },
