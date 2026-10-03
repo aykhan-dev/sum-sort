@@ -84,6 +84,8 @@ export function streakAfter(streak, key) {
 /* Days in a row worth a celebration of their own, like finishing a chapter. */
 export const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
 export const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
+/* Bonus stars on a daily won on a streak: +1 from three days in a row, +2 from a week, +3 from two weeks */
+export const streakBonus = n => n >= 14 ? 3 : n >= 7 ? 2 : n >= 3 ? 1 : 0;
 /* the streak as it stands today: still alive if the last daily was today or yesterday, or the day before with a freeze */
 export const streakNow = (streak, today) => {
   if (!streak) return 0;

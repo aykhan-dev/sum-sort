@@ -300,8 +300,12 @@ await page.evaluate(() => __sumSort.play()); await go(56); await settled();
 // 14. a streak landing on 3 days gets its own celebration
 await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.save.streak = { count: 2, best: 2, last: '2026-10-07' }; __sumSort.showHome(); });
 await tapEl('#dailyBtn'); await settled();
-{ const w = await playOut();
+{ const pre = await page.evaluate(() => ({ tip: document.getElementById('tip').textContent, total: __sumSort.totalStars() }));
+  const w = await playOut();
   const tag = await page.evaluate(() => ({ hidden: document.getElementById('winChapter').hidden, text: document.getElementById('winChapter').textContent, streak: __sumSort.save.streak.count }));
+  const bonus = await page.evaluate(() => ({ text: document.getElementById('winBonus').hidden ? null : document.getElementById('winBonus').textContent, r: __sumSort.save.daily['2026-10-08'], total: __sumSort.totalStars() }));
+  pass('a daily won on a 3-day streak pays a bonus star, named before the first move', /Finish it for a 3-day streak and \+1 bonus star\.$/.test(pre.tip) && bonus.text === 'Streak bonus: +1 star'
+    && bonus.r.bonus === 1 && bonus.total === pre.total + bonus.r.stars + 1, JSON.stringify({ pre, bonus }));
   pass('a 3-day streak gets the chapter rung: its own title, tag and second wave', w.title === '3-day streak!' && /chapter-done/.test(w.cls) && !tag.hidden && tag.text === '3 dailies in a row' && tag.streak === 3 && /^Next mark: 7 days/.test(w.text), JSON.stringify({ w, tag }));
   await page.screenshot({ path: SHOTS + '/win-streak.png' }); await tapEl('#winHomeBtn'); }
 // 15. the board can be played with the keyboard alone, and every spot is read out

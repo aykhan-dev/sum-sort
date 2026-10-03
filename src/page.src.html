@@ -224,6 +224,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 }
 .cta:active{transform:translateY(4px);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 1px 0 var(--chip-lo)}
 .ghost{width:54px;min-height:52px;border-radius:18px;display:grid;place-items:center;color:var(--ink)}
+.win-card .bonus{margin:4px 0 0;padding:5px 13px;border-radius:999px;background:#FFF4D6;border:1px solid #F2D48A;font:800 13px var(--body);color:var(--ink)}
+.win-card .bonus::before{content:"★ ";color:#D9962B}
 .chip.retry{display:inline-flex;align-items:center;gap:6px;margin-top:2px}
 .chip.retry svg{width:17px;height:17px}
 .chip.retry[hidden]{display:none}
@@ -599,6 +601,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
           <span class="stat"><small id="winMovesLabel">Moves</small><b id="winMoves">3</b></span>
           <span class="stat"><small id="winParLabel">Par</small><b id="winPar">3</b></span>
         </div>
+        <p class="bonus" id="winBonus" hidden></p>
         <p class="note" id="winText">No wasted moves.</p>
         <button id="winRetryBtn" class="chip retry" type="button" hidden>
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Replay for 3 stars
@@ -809,7 +812,7 @@ const ui = {
   win: $('win'), winText: $('winText'), winEyebrow: $('winEyebrow'), winTitle: $('winTitle'), winStars: $('winStars'),
   winMoves: $('winMoves'), winPar: $('winPar'), tally: $('starTally'), winCard: $('winCard'), winChapter: $('winChapter'),
   winStats: $('winStats'), nextLabel: $('nextLabel'), tray: $('tray'), hud: $('hud'),
-  next: $('nextBtn'), winHome: $('winHomeBtn'), winWeek: $('winWeek'), winWeekRow: $('winWeekRow'), winWeekNote: $('winWeekNote'), winRetry: $('winRetryBtn'), winShare: $('winShareBtn'), shareTip: $('shareTip'),
+  next: $('nextBtn'), winHome: $('winHomeBtn'), winWeek: $('winWeek'), winBonus: $('winBonus'), winWeekRow: $('winWeekRow'), winWeekNote: $('winWeekNote'), winRetry: $('winRetryBtn'), winShare: $('winShareBtn'), shareTip: $('shareTip'),
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
@@ -1387,6 +1390,7 @@ function buildLevel(n, resume = null) {
   const ch = chapterOf(n);
   tipText = rush ? (rush.round ? `Board ${rush.round + 1}. Every board you clear adds ${RUSH.perBoard} seconds.` : `Seal jars fast: every board you clear adds ${RUSH.perBoard} seconds. Combos score more.`)
     : daily ? `Daily puzzle: the same board for everyone today. ${dailyRecipe(daily).level} on a ${WEEKDAYS[weekdayOf(daily)]}.`
+      + streakTip(daily)
     : def.rule || (n === ch.from ? ch.rule : INTRO[n] || (def.exact ? MATCH_TIP : DEFAULT_TIP));
   // the level tag: a level number, or the day of the month for the daily
   ui.levelTag.classList.toggle('is-daily', !!daily); ui.levelTag.classList.toggle('is-rush', !!rush);
@@ -1913,23 +1917,24 @@ function recordWin() {
   const run = !daily && ch.to === Infinity && levelNo !== TEST_LEVEL ? stretchOf(levelNo, ch) : null, runDone = !!run && levelNo === run.to && !again;
   // the level is done the moment it is won: leaving now and coming back later starts the next one.
   // A daily counts for its own day and the streak, and leaves the levels where they were.
-  let streakGrew = false;
+  let streakGrew = false, bonus = 0;
   if (daily) {
     const prev = save.daily[daily];
     save.daily[daily] = prev && prev.stars >= stars ? prev : { stars, moves: moveCount, par: def.par, seals: sealLog.slice(), boosters: boostersUsed };
     const before = save.streak ? save.streak.count : 0;
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
+    bonus = prev ? 0 : streakBonus(save.streak.count); if (bonus) save.daily[daily].bonus = bonus;   // a streak pays: +1 star from three days, more from a week
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; save.board = null; }
   const opened = boxesOpened(starsBefore, totalStars());
   // a streak landing on 3, 7, 14, 30 days gets the chapter rung: a second wave of candy and the long flourish
   const milestone = daily && streakGrew ? streakMilestone(save.streak.count) : 0, big = chapterDone || !!milestone || runDone;
   persist();
-  return winInfo = { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big, again, bestBefore };
+  return winInfo = { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big, again, bestBefore, bonus };
 }
 async function winLevel() {
   won = true; dead = false; softDead = false; clearTimeout(idleTimer); refreshLocks(false); updateHud();
   updateFinale();
-  const { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big, again, bestBefore } = recordWin();
+  const { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big, again, bestBefore, bonus } = recordWin();
   const id = buildId, ch = chapterOf(levelNo), tiles = def.par, L = lastLayout;
   if (opened.length) sfx.box();
   // rung 3: level cleared
@@ -1985,6 +1990,7 @@ async function winLevel() {
   }
   ui.winJourney.hidden = !!daily || levelNo === TEST_LEVEL;
   ui.winWeek.hidden = !daily; if (daily) renderWeek(daily);
+  ui.winBonus.hidden = !bonus; if (bonus) ui.winBonus.textContent = `Streak bonus: +${plural(bonus, 'star')}`;
   if (!ui.winJourney.hidden) { drawJourney(ui.winBar, levelNo, { cleared: true }); ui.winNext.innerHTML = chapterDone ? '' : nextText(levelNo); }
   ui.nextLabel.textContent = daily ? 'Share result' : chapterDone && next ? 'Next chapter' : 'Next level';
   ui.next.querySelector('svg').outerHTML = daily ? SHARE_ICON : NEXT_ICON;
@@ -1999,6 +2005,12 @@ async function winLevel() {
 
 /* The daily's week on its win card: a stamp for each daily played (gold for three stars), today ringed, and what
    tomorrow brings. Days get harder toward Sunday, so the row is also the week's climb. */
+/* before the first move on the daily: what finishing it pays for the streak */
+function streakTip(key) {
+  if (save.daily[key]) return '';
+  const n = streakAfter(save.streak, key).count, b = streakBonus(n);
+  return b ? ` Finish it for a ${n}-day streak and +${plural(b, 'bonus star')}.` : '';
+}
 function renderWeek(key) {
   const days = weekOf(key), today = todayKey(), done = days.filter(k => save.daily[k]).length, wd = weekdayOf(key);
   ui.winWeekRow.innerHTML = days.map((k, i) => {
@@ -2100,7 +2112,7 @@ function endRush() {
   ui.winTitle.textContent = beaten ? 'You beat it!' : tied ? "It's a tie!" : isBest && rush.score > 0 ? 'New best!' : "Time's up!";
   ui.winTitle.classList.toggle('long', ui.winTitle.textContent.length > 10);
   ui.winStars.innerHTML = BOLT_BIG; ui.winStars.setAttribute('aria-label', 'Sugar Rush');
-  ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true; ui.winRetry.hidden = true; ui.winWeek.hidden = true;
+  ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true; ui.winRetry.hidden = true; ui.winWeek.hidden = true; ui.winBonus.hidden = true;
   ui.winMovesLabel.textContent = 'Score'; ui.winParLabel.textContent = 'Best';
   ui.winMoves.textContent = rush.score; ui.winPar.textContent = save.rush.best;
   ui.winText.textContent = rush.beat != null ? (beaten ? `${rush.score - rush.beat} over the challenge. Share it back.` : tied ? `Level with ${rush.beat}. One more seal wins it.` : `${rush.beat - rush.score} short of ${rush.beat}. Same boards, one more try?`)
@@ -2219,7 +2231,7 @@ function nextText(after) {
 
 /* ---------------- candy boxes ----------------
    Stars from levels and dailies pile up and open boxes; each box holds a counter theme for the whole room. */
-const totalStars = () => [...Object.values(save.stars), ...Object.values(save.daily).map(r => r && r.stars), save.treat && save.treat.stars].reduce((a, b) => a + (Number(b) || 0), 0);
+const totalStars = () => [...Object.values(save.stars), ...Object.values(save.daily).map(r => r && (Number(r.stars) || 0) + (Number(r.bonus) || 0)), save.treat && save.treat.stars].reduce((a, b) => a + (Number(b) || 0), 0);
 const swatchVars = t => `--s1:${t.sky[0]};--s2:${t.sky[1]};--s3:${t.sky[2]};--c:${t.counter}`;
 const swatchStyle = (el, t) => { el.style.cssText = swatchVars(t); };
 function useTheme(id) {

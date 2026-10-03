@@ -308,3 +308,8 @@ test('daily treat: one a day, days in a row climb the week to day 7, a missed da
   assert.ok(!treatReady(t, '2026-10-12')); assert.equal(treatDay(t, '2026-10-12'), 2);     // a clock set back
   assert.equal(treatAfter({ day: 6, last: '2026-12-31', stars: 12, weeks: 0 }, '2027-01-01').day, 7);
 });
+
+import { streakBonus } from '../../src/meta.mjs';
+test('streak bonus: nothing for the first two days, then a star more at three days, a week and two weeks', () => {
+  assert.deepEqual([0, 1, 2, 3, 6, 7, 13, 14, 100].map(streakBonus), [0, 0, 0, 1, 1, 2, 2, 3, 3]);
+});
