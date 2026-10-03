@@ -53,11 +53,14 @@ export function dailyFromPool(pool, key) {
 }
 export function generateDaily(key, opts = { tries: 60, runs: 400, tol: 0.06 }) {
   const r = dailyRecipe(key), seed = dailySeed(key);
-  let def = null;
-  for (let salt = 0; salt < 8 && !(def && def.fail <= DAILY_CAP - 0.05); salt++) {
+  let pick = null, easiest = null;   // the board nearest the target within the cap; failing that, the easiest one made
+  for (let salt = 0; salt < 16 && !(pick && Math.abs(pick.fail - r.want) <= 0.05); salt++) {
     const d = generateWith(r, mulberry32(seed + salt * 0x9E3779B1), opts);
-    if (d && (!def || Math.abs(d.fail - r.want) < Math.abs(def.fail - r.want))) def = d;
+    if (!d) continue;
+    if (!easiest || d.fail < easiest.fail) easiest = d;
+    if (d.fail <= DAILY_CAP && (!pick || Math.abs(d.fail - r.want) < Math.abs(pick.fail - r.want))) pick = d;
   }
+  const def = pick || easiest;
   return def && { ...def, daily: key };
 }
 /* days from one date key to another (1 = the next day); Infinity without a first date */
@@ -68,8 +71,8 @@ export const dayGap = (from, to) => from ? Math.round((keyUTC(to) - keyUTC(from)
 export const FREEZE_MAX = 2;
 export function streakAfter(streak, key) {
   const s = { count: 0, best: 0, last: null, freezes: 0, ...(streak || {}) };
-  if (s.last === key) return s;
   const gap = dayGap(s.last, key);
+  if (gap <= 0) return s;   // today's again, or an older day's board finished later (another timezone, a second tab)
   let freezes = s.freezes || 0, saved = false, count = 1;
   if (gap === 1) count = s.count + 1;
   else if (gap === 2 && freezes > 0) { count = s.count + 1; freezes--; saved = true; }
@@ -84,8 +87,8 @@ export const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
 export const streakNow = (streak, today) => {
   if (!streak) return 0;
   const gap = dayGap(streak.last, today);
-  // today or yesterday, or a missed day with a freeze in hand; a last daily dated after today (a clock set back) is not
-  return gap === 0 || gap === 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;
+  // today or yesterday (or later: a clock set back, which streakAfter leaves alone too), or a missed day with a freeze in hand
+  return gap <= 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;
 };
 export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
 

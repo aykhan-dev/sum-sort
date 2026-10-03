@@ -9,7 +9,9 @@ const server = http.createServer((req, res) => { const f = path.join(ROOT, decod
   res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
 await new Promise(r => server.listen(0, '127.0.0.1', r)); const URL_ = `http://127.0.0.1:${server.address().port}/index.html`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 760 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+// a phone by default; VIEWPORT=360x640 (or any WxH) runs the same play on another screen
+const [VW, VH] = (process.env.VIEWPORT || '390x760').split('x').map(Number), VIEW = { width: VW, height: VH };
+const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
 const page = await ctx.newPage(); page.setDefaultTimeout(180000);
 await page.addInitScript(() => { window.__sumSortKeepQuality = true; });   // the test decides the render quality itself
 // sharing goes to a clipboard the test can read, never to a real share sheet
@@ -26,7 +28,10 @@ let fails = 0;
 const pass = (name, ok, extra = '') => { if (!ok) fails++; console.log((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); };
 // 0. home: the game opens on it, shows the current level, and Play is the only way in
 const H = () => page.evaluate(() => ({ open: __sumSort.home, off: document.getElementById('home').classList.contains('off'), num: document.getElementById('homeNum').textContent, chapter: document.getElementById('homeChapter').textContent, tally: document.getElementById('starTally').hidden ? null : document.getElementById('starTally').textContent, level: __sumSort.level, moves: __sumSort.moves }));
-const tapEl = async sel => { const p = await page.evaluate(sel => { const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === el || el.contains(hit)) }; }, sel);
+// a tap goes where the button is once it stops moving (cards pop in): two frames with the same box
+const still = sel => page.waitForFunction(sel => { const el = document.querySelector(sel); if (!el) return true; const r = JSON.stringify(el.getBoundingClientRect());
+  return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => res(JSON.stringify(el.getBoundingClientRect()) === r)))); }, sel, { timeout: 30000 });
+const tapEl = async sel => { await still(sel); const p = await page.evaluate(sel => { const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === el || el.contains(hit)) }; }, sel);
   if (!p.ok) console.log('COVERED: ' + sel); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(450); };
 let h0 = await H(); console.log('home at start'.padEnd(30), JSON.stringify(h0));
 pass('game opens on home with level 1 and no star tally', h0.open && !h0.off && h0.num === '1' && h0.chapter === 'Match' && h0.tally === null);
@@ -239,7 +244,7 @@ await page.evaluate(() => __sumSort.play()); await go(3); await settled(); await
 log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
 // 11. installed and offline: a manifest to install from, and after one visit the game opens with no network
 { const head = await page.evaluate(() => ({ manifest: !!document.querySelector('link[rel="manifest"]'), og: document.querySelector('meta[property="og:image"]')?.content }));
-  const off = await browser.newContext({ viewport: { width: 390, height: 760 }, hasTouch: true, isMobile: true });
+  const off = await browser.newContext({ viewport: VIEW, hasTouch: true, isMobile: true });
   const p2 = await off.newPage(); p2.setDefaultTimeout(180000);
   await p2.addInitScript(() => { window.__sumSortKeepQuality = true; });
   await p2.goto(URL_ + '?sw=1'); await p2.evaluate(() => navigator.serviceWorker.ready);
@@ -254,6 +259,8 @@ await page.evaluate(() => { window.__sumSortRushSeed = 4242; __sumSort.goLevel(3
   await tapEl('#rushBtn'); await settled();
   const r0 = await page.evaluate(() => ({ r: __sumSort.rush, hud: document.getElementById('hud').innerText.replace(/\n/g, ' '), tray: document.getElementById('tray').hidden, last: __sumSort.save.last }));
   const restartHidden = await page.evaluate(() => document.getElementById('restartBtn').hidden);
+  await page.focus('#scene'); await page.keyboard.press('u'); await page.keyboard.press('h');
+  pass('no boosters in a rush, not even by key', await page.evaluate(() => __sumSort.allow.hint === 3 && __sumSort.allow.undo === 5 && !__sumSort.sel));
   // play the board to its last move, then let the clock nearly run out: the winning move must still count
   for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.plan && __sumSort.plan.length > 1 && __sumSort.plan[0]); if (!m) break;
     await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
@@ -339,6 +346,17 @@ await page.evaluate(() => __sumSort.play()); await go(25); await settled(); awai
 { const share = async () => { const a = await page.evaluate(() => [__sumSort.frameNo, __sumSort.renders]); await page.waitForTimeout(3000); const b = await page.evaluate(() => [__sumSort.frameNo, __sumSort.renders]); return (b[1] - a[1]) / Math.max(1, b[0] - a[0]); };
   const still = await share(); await page.evaluate(() => __sumSort.tap({ kind: 'stack', i: 0 })); const lifted = await share(); await page.evaluate(() => __sumSort.tap(null));
   pass('a still board saves battery by drawing every other frame; a lifted tile is drawn every frame', still < 0.85 && lifted === 1, JSON.stringify({ still: +still.toFixed(2), lifted })); }
+// 19. a win is kept even when the player leaves while the winning tile is still in the air
+await page.evaluate(() => __sumSort.play()); await go(20); await settled();
+{ const n = await page.evaluate(() => __sumSort.plan.length);
+  for (let k = 0; k < n - 1; k++) { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.waitForFunction(() => __sumSort.plan && __sumSort.plan.length === 1 && !__sumSort.busy && !__sumSort.flights);
+  // the winning move and Home in the same breath: the tile is still in the air when the level is left
+  const before = await page.evaluate(() => { const m = __sumSort.plan[0]; __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst });
+    const st = { won: __sumSort.won, flights: __sumSort.flights, moves: __sumSort.moves }; document.getElementById('homeBtn').click(); return st; });
+  await page.waitForTimeout(800);
+  const kept = await page.evaluate(() => ({ stars: __sumSort.save.stars[20], last: __sumSort.save.last, level: __sumSort.level, home: __sumSort.home }));
+  pass('leaving during the winning flight still records the win', before.won && before.flights === 1 && kept.stars >= 1 && kept.last === 21 && kept.level === 21 && kept.home, JSON.stringify({ before, kept })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

@@ -252,8 +252,18 @@ test('streak freeze: earned on milestones from a week, spent by itself on one mi
   assert.equal(streakAfter({ count: 5, best: 5, last: '2026-10-01', freezes: 1 }, '2026-10-04').count, 1, 'a freeze covers one missed day, not two');
 });
 
-test('streak: a last daily dated after today (the clock went back) is not a live streak, as streakAfter would reset it', () => {
+test('streak: a last daily dated after today (the clock went back) keeps the streak, on the card and in the rules', () => {
   const s = { count: 5, best: 5, last: '2026-10-06', freezes: 1 };
-  assert.equal(streakNow(s, '2026-10-05'), 0);
-  assert.equal(streakAfter(s, '2026-10-05').count, 1);
+  assert.equal(streakNow(s, '2026-10-05'), 5);
+  assert.equal(streakAfter(s, '2026-10-05').count, 5);
+});
+
+test('streak: an older daily finished after a newer one leaves the streak alone', () => {
+  const s = { count: 20, best: 20, last: '2026-10-04', freezes: 0 };
+  assert.deepEqual(streakAfter(s, '2026-10-03'), s);
+});
+
+test('dailies past the pool stay under the cap', () => {
+  let k = '2031-01-05';   // a Monday, then the hardest days of a few weeks
+  for (let i = 0; i < 4; i++) { const d = generateDaily(addDays(k, 6 + 7 * i)); assert.ok(d.fail <= DAILY_CAP, `${addDays(k, 6 + 7 * i)}: ${d.fail}`); }
 });

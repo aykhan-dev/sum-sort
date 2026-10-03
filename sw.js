@@ -2,7 +2,7 @@
 /* Sum Sort service worker: the game opens and plays offline once it has been loaded.
    The page itself goes network first, so a new build shows on the next visit; everything else (three.js, icons,
    fonts) comes from the cache first. The build stamps VERSION, and an old cache is dropped when a new one is ready. */
-const CACHE = 'sum-sort-5cbcb52671ea';
+const CACHE = 'sum-sort-bb15ccd0c05f';
 const CORE = ['./', 'index.html', 'manifest.webmanifest', 'vendor/three/three.module.min.js',
   'vendor/three/addons/geometries/RoundedBoxGeometry.js', 'vendor/three/addons/environments/RoomEnvironment.js',
   'icons/icon-192.png', 'icons/icon-512.png'];
