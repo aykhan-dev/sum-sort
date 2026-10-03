@@ -9,9 +9,14 @@ const server = http.createServer((req, res) => { const f = path.join(ROOT, decod
   res.writeHead(200, { 'content-type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res); });
 await new Promise(r => server.listen(0, '127.0.0.1', r)); const URL_ = `http://127.0.0.1:${server.address().port}/index.html`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const ctx = await browser.newContext({ viewport: { width: 390, height: 760 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+// a phone by default; VIEWPORT=360x640 (or any WxH) runs the same play on another screen
+const [VW, VH] = (process.env.VIEWPORT || '390x760').split('x').map(Number), VIEW = { width: VW, height: VH };
+const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
 const page = await ctx.newPage(); page.setDefaultTimeout(180000);
 await page.addInitScript(() => { window.__sumSortKeepQuality = true; });   // the test decides the render quality itself
+// sharing goes to a clipboard the test can read, never to a real share sheet
+await page.addInitScript(() => { window.__copied = []; Object.defineProperty(navigator, 'share', { value: undefined });
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: t => { window.__copied.push(t); return Promise.resolve(); } } }); });
 await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());   // system fonts are enough here, and the run stays offline
 const errors = [];
 page.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_FAILED/.test(m.text())) errors.push(m.text()); });
@@ -23,16 +28,26 @@ let fails = 0;
 const pass = (name, ok, extra = '') => { if (!ok) fails++; console.log((ok ? 'PASS ' : 'FAIL ') + name + (extra ? '  ' + extra : '')); };
 // 0. home: the game opens on it, shows the current level, and Play is the only way in
 const H = () => page.evaluate(() => ({ open: __sumSort.home, off: document.getElementById('home').classList.contains('off'), num: document.getElementById('homeNum').textContent, chapter: document.getElementById('homeChapter').textContent, tally: document.getElementById('starTally').hidden ? null : document.getElementById('starTally').textContent, level: __sumSort.level, moves: __sumSort.moves }));
-const tapEl = async sel => { const p = await page.evaluate(sel => { const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === el || el.contains(hit)) }; }, sel);
+// a tap goes where the button is once it stops moving (cards pop in): two frames with the same box
+const still = sel => page.waitForFunction(sel => { const el = document.querySelector(sel); if (!el) return true; const r = JSON.stringify(el.getBoundingClientRect());
+  return new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => res(JSON.stringify(el.getBoundingClientRect()) === r)))); }, sel, { timeout: 30000 });
+const tapEl = async sel => { await still(sel); const p = await page.evaluate(sel => { const el = document.querySelector(sel), r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y); return { x, y, ok: !!hit && (hit === el || el.contains(hit)) }; }, sel);
   if (!p.ok) console.log('COVERED: ' + sel); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(450); };
 let h0 = await H(); console.log('home at start'.padEnd(30), JSON.stringify(h0));
 pass('game opens on home with level 1 and no star tally', h0.open && !h0.off && h0.num === '1' && h0.chapter === 'Match' && h0.tally === null);
-{ const p = await page.evaluate(() => __sumSort.screenOf('stack', 0, 0.5)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
-  pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel))); }
+{ const d = await page.evaluate(() => ({ dis: document.getElementById('dailyBtn').getAttribute('aria-disabled'), label: document.getElementById('dailyBtn').getAttribute('aria-label') }));
+  await page.evaluate(() => document.getElementById('dailyBtn').click()); await page.waitForTimeout(300);
+  pass('a new player sees the daily locked, with how far to go', d.dis === 'true' && /opens at level 19, 18 levels to go/.test(d.label) && await page.evaluate(() => __sumSort.home && !__sumSort.daily), d.label); }
+// (a jar: it sits under the wordmark, where home has nothing to press; a stack sits under the Play button)
+{ const p = await page.evaluate(() => __sumSort.screenOf('jar', 0, 1.2)); await page.touchscreen.tap(p.x, p.y); await page.waitForTimeout(250);
+  pass('board cannot be touched through home', !(await page.evaluate(() => __sumSort.sel)) && await page.evaluate(() => __sumSort.home)); }
+{ const j = await page.evaluate(() => ({ count: homeCount.textContent, next: homeNext.textContent, segs: homeBar.children.length, now: homeBar.querySelectorAll('.now').length }));
+  pass('home shows the chapter journey and what opens next', j.count === '1 of 10' && j.segs === 10 && j.now === 1 && j.next === 'Up next: two-tile jars and the Undo booster at level 11', JSON.stringify(j)); }
 pass('no level list, no replay of old levels', (await page.evaluate(() => ['levelBtn', 'levels', 'replayBtn'].every(id => !document.getElementById(id)))));
 await page.screenshot({ path: SHOTS + '/home-1.png' });
 await tapEl('#playBtn'); h0 = await H();
 pass('Play opens the current level', !h0.open && h0.off && h0.level === 1);
+const handL1 = await page.waitForFunction(() => __sumSort.hand, null, { timeout: 10000 }).then(() => true, () => false);
 const settled = () => page.waitForFunction(() => __sumSort.busy === 0 && __sumSort.flights === 0);
 const S = () => page.evaluate(() => ({
   jars: __sumSort.jars.map(j => (j.sealed ? '#' : '') + j.t + ':' + j.tiles.map(x => x.v).join('+')).join(' '),
@@ -49,6 +64,8 @@ const touch = async (kind, i, y) => { const p = await page.evaluate(([k, i, y]) 
 await go(1); let s = await S(); log('L1', s);
 pass('chapter 1 hides boosters and Moves/Par', s.trayHidden && s.hudHidden);
 await touch('stack', 0); await page.waitForTimeout(250);
+{ const after = await page.evaluate(() => __sumSort.hand); await page.waitForTimeout(1200); const later = await page.evaluate(() => __sumSort.hand);
+  pass('the first level shows the first move with a hand, gone at the first touch and not back', handL1 && !after && !later, JSON.stringify({ handL1, after, later })); }
 const wrong = await page.evaluate(() => { const v = __sumSort.stacks[0].tiles.at(-1).v; return __sumSort.jars.findIndex(j => j.t !== v); });
 await touch('jar', wrong); await page.waitForTimeout(250); s = await S();
 pass('exact-fit jar rejects the wrong tile', s.moves === 0 && /wants the/.test(s.tip), s.tip);
@@ -84,14 +101,16 @@ s = await S(); pass('tutorial: stack tile rejected, jar-to-jar move wins the lev
 log('L12 win card', await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, statsHidden: document.getElementById('winStats').hidden, text: document.getElementById('winText').textContent })));
 // 5. soft dead end and hard dead end on level 11
 await go(11); await settled(); s = await S(); log('L11', s);
-// play random non-plan stack moves until the board is soft-dead or dead
+// play random non-plan stack moves until the board is soft-dead or dead. The random source is seeded, so every run
+// plays the same moves and reaches the same dead ends.
+await page.evaluate(() => { let a = 20261002; window.__rnd = () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; });
 let seenSoft = false, seenDead = false;
-for (let tryNo = 0; tryNo < 12 && !(seenSoft && seenDead); tryNo++) {
+for (let tryNo = 0; tryNo < 24 && !(seenSoft && seenDead); tryNo++) {
   await go(11 + (tryNo % 6 === 1 ? 2 : tryNo % 6)); await settled();
   for (let k = 0; k < 14; k++) {
     const mv = await page.evaluate(() => { const S = __sumSort.stacks, J = __sumSort.jars, out = [];
       S.forEach((s, si) => { const t = s.tiles.at(-1); if (!t) return; J.forEach((j, di) => { const sum = j.tiles.reduce((a, x) => a + x.v, 0); if (!j.sealed && j.tiles.length < 4 && sum + t.v <= j.t && sum + t.v !== j.t) out.push([si, di]); }); });
-      return out.length ? out[Math.floor(Math.random() * out.length)] : null; });
+      return out.length ? out[Math.floor(window.__rnd() * out.length)] : null; });
     if (!mv) break;
     await page.evaluate(([a, b]) => { __sumSort.tap({ kind: 'stack', i: a }); __sumSort.tap({ kind: 'jar', i: b }); }, mv); await settled(); await page.waitForTimeout(80);
     s = await S();
@@ -109,12 +128,30 @@ const lock = await page.evaluate(() => new Promise(res => { const t = performanc
   const was = __sumSort.pending; const iv = setInterval(() => { if (__sumSort.busy === 0) { clearInterval(iv); setTimeout(() => res({ ms: Math.round(performance.now() - t), remembered: was, sel: __sumSort.sel, moves: __sumSort.moves }), 60); } }, 10); }));
 log('undo', lock); pass('tap during undo is remembered and replayed', lock.remembered && lock.sel && lock.sel.kind === 'stack');
 console.log('(undo lock time is inflated by the software renderer; design value 480 ms)');
+// 6b. the last jar: singled out once every other jar is sealed, let go when the level is won
+await go(5); await settled();
+{ const n = await page.evaluate(() => __sumSort.plan.length);
+  for (let k = 0; k < n - 1; k++) { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  const on = await page.evaluate(() => ({ finale: __sumSort.finale, open: __sumSort.jars.findIndex(j => !j.sealed), dim: document.getElementById('stage').classList.contains('finale') }));
+  const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m);
+  await page.waitForFunction(() => __sumSort.won && !document.getElementById('win').hidden, null, { timeout: 60000 });
+  const off = await page.evaluate(() => ({ finale: __sumSort.finale, dim: document.getElementById('stage').classList.contains('finale') }));
+  pass('the last open jar is singled out, and let go on the win', on.finale >= 0 && on.finale === on.open && on.dim && off.finale === -1 && !off.dim, JSON.stringify({ on, off })); }
 // 7. celebration ladder: plain clear, perfect, chapter done
 const playOut = async () => { for (let k = 0; k < 40; k++) { const st = await page.evaluate(() => ({ won: __sumSort.won, m: __sumSort.plan && __sumSort.plan[0] })); if (st.won || !st.m) break;
   await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, st.m); await settled(); } await page.waitForTimeout(5000);
   return page.evaluate(() => ({ cls: document.getElementById('winCard').className, title: document.getElementById('winTitle').textContent, stars: document.getElementById('winStars').getAttribute('aria-label'), tag: document.getElementById('winChapter').hidden ? null : document.getElementById('winChapter').textContent, next: document.getElementById('nextLabel').textContent, text: document.getElementById('winText').textContent, shown: !document.getElementById('win').hidden })); };
 await go(3); await settled(); const w3 = await playOut(); log('win L3 (tutorial)', w3);
 await go(16); await settled(); const w16 = await playOut(); log('win L16 (3 stars)', w16); await page.screenshot({ path: SHOTS + '/win-perfect.png' });
+{ const c = await page.evaluate(() => ({ best: __sumSort.bestChain, words: __sumSort.callouts, jars: __sumSort.jars.length }));
+  pass('a clean run chains every jar into a combo, with a word from the second seal on', c.best === c.jars && c.words === c.jars - 1, JSON.stringify(c));
+  const wj = await page.evaluate(() => ({ hidden: winJourney.hidden, on: winBar.querySelectorAll('.on').length, segs: winBar.children.length, next: winNext.textContent }));
+  pass('the win card fills in the cleared level on the chapter bar', !wj.hidden && wj.segs === 8 && wj.on === 6 && wj.next === 'Up next: bigger sums and the daily puzzle at level 19', JSON.stringify(wj));
+  await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const img = await page.evaluate(() => __sumSort.cardImage().length);
+  pass('the result is also drawn as a picture for share sheets', img > 20000, String(img));
+  const t = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('the win card shares a spoiler-free result', /^Sum Sort Level 16 ⭐⭐⭐\n8 moves, par 8 · no boosters\n🟩🟨🟨🟨/.test(t), JSON.stringify(t)); }
 await go(10); await settled(); const w10 = await playOut(); log('win L10 (chapter end)', w10); await page.screenshot({ path: SHOTS + '/win-chapter.png' });
 pass('ladder: tutorial clear < perfect < chapter', !/perfect/.test(w3.cls) && /perfect/.test(w16.cls) && /chapter-done/.test(w10.cls) && w10.next === 'Next chapter');
 await page.click('#nextBtn', { force: true }); await page.waitForTimeout(1200);
@@ -156,15 +193,263 @@ await page.screenshot({ path: SHOTS + '/surface-21.png' });
 await go(3); await settled(); await playOut();
 await tapEl('#winHomeBtn'); await page.waitForTimeout(500); let h8 = await H(); await page.screenshot({ path: SHOTS + '/home-4.png' });
 pass('home from the win card shows the next level and the stars', h8.open && h8.num === '4' && h8.level === 4 && Number(h8.tally) > 0 && (await page.evaluate(() => document.getElementById('win').hidden)), JSON.stringify(h8));
-const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
+{ await tapEl('#starTally');
+  const shop = await page.evaluate(() => { const all = [...document.querySelectorAll('#themes .theme')], total = __sumSort.totalStars();
+    const at = b => Number((b.querySelector('.ts').textContent.match(/\d+/) || [0])[0]);
+    return { open: !document.getElementById('shop').hidden, themes: all.length, total, inUse: all.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.id),
+      locked: all.filter(b => b.disabled).length, lockedRight: all.filter(b => b.disabled).every(b => at(b) > total) }; });
+  const rec = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#record span')].map(e => [e.querySelector('small').textContent, e.querySelector('b').textContent])));
+  const cleared = await page.evaluate(() => Object.keys(__sumSort.save.stars).length);
+  pass('the shop shows the player\'s record', Object.keys(rec).length === 6 && Number(rec.Levels) === cleared && /^×\d+$/.test(rec['Best combo']), JSON.stringify(rec));
+  await page.keyboard.press('Escape');
+  pass('the star tally opens the candy shop: every counter, the first in use, the rest locked until their box', shop.open && shop.themes === 8 && shop.inUse.join() === 'strawberry' && shop.locked >= 6 && shop.lockedRight && await page.evaluate(() => document.getElementById('shop').hidden), JSON.stringify(shop)); }
+const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound', '#homeMusic', '#starTally'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
 pass('home controls are at least 48 px', Object.values(homeSizes).every(v => v.split('x').every(n => +n >= 48)), JSON.stringify(homeSizes));
+await tapEl('#homeMusic'); { const m = await page.evaluate(() => ({ pressed: document.getElementById('homeMusic').getAttribute('aria-pressed'), saved: __sumSort.save.music, playing: __sumSort.music })); await tapEl('#homeMusic');
+  const back = await page.evaluate(() => ({ pressed: document.getElementById('homeMusic').getAttribute('aria-pressed'), saved: __sumSort.save.music }));
+  pass('the music button turns the music off and on, and remembers it', m.pressed === 'false' && m.saved === false && !m.playing && back.pressed === 'true' && back.saved === true, JSON.stringify({ m, back })); }
 await tapEl('#homeSound'); pass('home sound button toggles both sound buttons', (await page.evaluate(() => ['soundBtn', 'homeSound'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join())) === 'false,false'); await tapEl('#homeSound');
 await tapEl('#playBtn'); h8 = await H(); pass('Play starts the next level', !h8.open && h8.level === 4 && h8.moves === 0);
 // 8. generated level beyond the stored range, and reload
 await go(101); await settled(); const w101 = await playOut(); log('win L101 (generated)', { shown: w101.shown, title: w101.title });
 await page.reload(); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
 { const h = await H(); pass('after a win and a reload, home waits on the next level', h.open && h.num === '102' && h.level === 102, JSON.stringify(h)); await page.screenshot({ path: SHOTS + '/home-102.png' }); }
+// 9. daily puzzle: one board a day, its own result and streak, levels untouched
+await page.evaluate(() => { window.__sumSortToday = '2026-10-05'; __sumSort.showHome(); });
+{ const card = await page.evaluate(() => document.getElementById('dailyBtn').getAttribute('aria-label'));
+  await tapEl('#dailyBtn'); await settled();
+  const d = await page.evaluate(() => ({ daily: __sumSort.daily, level: __sumSort.level, tag: document.getElementById('levelTag').innerText.replace(/\n/g, ' '), jars: __sumSort.jars.length }));
+  pass('the daily card opens today\'s board', /^Play daily puzzle 5, Monday, Easy/.test(card) && d.daily === '2026-10-05' && /Daily #5 Monday/i.test(d.tag), JSON.stringify(d));
+  const w = await playOut(); log('win daily', w); await page.screenshot({ path: SHOTS + '/win-daily.png' });
+  const wk = await page.evaluate(() => ({ hidden: winWeek.hidden, days: [...winWeekRow.children].map(e => e.className.trim()), note: winWeekNote.textContent, journey: winJourney.hidden }));
+  pass('the daily win card shows the week: today stamped, and what tomorrow brings', !wk.hidden && wk.journey && wk.days.length === 8 && /^wd on( gold)? this$/.test(wk.days[0]) && wk.days.slice(1, 7).every(c => c === 'wd') && wk.days[7] === 'wd prize' && wk.note === '1 of 7 this week. Tomorrow: Tuesday, easy.', JSON.stringify(wk));
+  const after = await page.evaluate(() => ({ result: __sumSort.save.daily['2026-10-05'], streak: __sumSort.save.streak, last: __sumSort.save.last }));
+  pass('a daily win records the day and starts a streak, and leaves the levels alone', w.shown && /^Daily #5/.test(await page.evaluate(() => document.getElementById('winEyebrow').textContent)) && after.result && after.result.stars >= 1 && after.streak.count === 1 && after.last === 102, JSON.stringify(after));
+  await tapEl('#nextBtn');
+  const shared = await page.evaluate(() => ({ t: window.__copied.at(-1) || '', label: document.getElementById('nextLabel').textContent }));
+  pass('sharing is the daily\'s main button', w.next === 'Share result' && /^Sum Sort Daily #5 ⭐/.test(shared.t) && shared.label === 'Copied!', JSON.stringify(shared));
+  await tapEl('#winHomeBtn'); const h9 = await H();
+  const done = await page.evaluate(() => ({ dis: document.getElementById('dailyBtn').getAttribute('aria-disabled'), label: document.getElementById('dailyBtn').getAttribute('aria-label') }));
+  pass('back home: the level waits where it was, the daily shows done until tomorrow', h9.open && h9.level === 102 && /done with.*Share result$/.test(done.label), JSON.stringify({ h9, done }));
+  await tapEl('#dailyBtn'); pass('the done card shares the same result', await page.evaluate(() => window.__copied.at(-1) === window.__copied.at(-2)));
+  await page.screenshot({ path: SHOTS + '/home-daily-done.png' });
+  await page.evaluate(() => { window.__sumSortToday = '2026-10-06'; __sumSort.showHome(); });
+  pass('the next day brings a new daily and the streak is at stake', /^Play daily puzzle 6, Tuesday.*Keep your 1-day streak/.test(await page.evaluate(() => document.getElementById('dailyBtn').getAttribute('aria-label')))); }
+// 10. a win that crosses a box's star count opens it; its counter is one tap away
+await page.evaluate(() => { const s = __sumSort.save, daily = __sumSort.totalStars() - Object.values(s.stars).reduce((a, b) => a + b, 0); s.stars = { 1: 14 - daily }; });
+await page.evaluate(() => __sumSort.play()); await go(3); await settled(); await playOut();
+{ const r = await page.evaluate(() => ({ shown: !document.getElementById('winReward').hidden, name: document.getElementById('rewardName').textContent, total: __sumSort.totalStars() }));
+  await page.click('#rewardUse', { force: true }); await page.waitForTimeout(400);
+  const t = await page.evaluate(() => ({ theme: __sumSort.save.theme, stage: getComputedStyle(document.documentElement).getPropertyValue('--stage').trim() }));
+  pass('crossing 15 stars opens the first box, and Use it repaints the room', r.shown && r.name === 'Mint Parlour' && r.total === 17 && t.theme === 'mint' && t.stage === '#D0EDE2', JSON.stringify({ r, t }));
+  await page.screenshot({ path: SHOTS + '/win-box.png' }); }
 log('overflow', await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
+// 11. installed and offline: a manifest to install from, and after one visit the game opens with no network
+{ const head = await page.evaluate(() => ({ manifest: !!document.querySelector('link[rel="manifest"]'), og: document.querySelector('meta[property="og:image"]')?.content }));
+  const off = await browser.newContext({ viewport: VIEW, hasTouch: true, isMobile: true });
+  const p2 = await off.newPage(); p2.setDefaultTimeout(180000);
+  await p2.addInitScript(() => { window.__sumSortKeepQuality = true; });
+  await p2.goto(URL_ + '?sw=1'); await p2.evaluate(() => navigator.serviceWorker.ready);
+  await p2.reload(); await p2.waitForFunction(() => !!navigator.serviceWorker.controller);
+  await off.setOffline(true); await p2.reload();
+  const ok = await p2.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0, null, { timeout: 120000 }).then(() => true, () => false);
+  pass('the built page can be installed, previews well, and plays offline after one visit', head.manifest && /\/og\.png$/.test(head.og || '') && ok, JSON.stringify({ ...head, offline: ok }));
+  await off.close(); }
+// 12. Sugar Rush: from level 25 a minute of quick boards; clearing one wins time back, the clock ends it, the best is kept
+await page.evaluate(() => { window.__sumSortRushSeed = 4242; __sumSort.goLevel(30); __sumSort.showHome(); });
+{ const card = await page.evaluate(() => ({ two: document.getElementById('modes').classList.contains('two'), shown: !document.getElementById('rushBtn').hidden }));
+  await tapEl('#rushBtn'); await settled();
+  const r0 = await page.evaluate(() => ({ r: __sumSort.rush, hud: document.getElementById('hud').innerText.replace(/\n/g, ' '), tray: document.getElementById('tray').hidden, last: __sumSort.save.last }));
+  const restartHidden = await page.evaluate(() => document.getElementById('restartBtn').hidden);
+  await page.focus('#scene'); await page.keyboard.press('u'); await page.keyboard.press('h');
+  pass('no boosters in a rush, not even by key', await page.evaluate(() => __sumSort.allow.hint === 3 && __sumSort.allow.undo === 5 && !__sumSort.sel));
+  // play the board to its last move, then let the clock nearly run out: the winning move must still count
+  for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.plan && __sumSort.plan.length > 1 && __sumSort.plan[0]); if (!m) break;
+    await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.evaluate(() => { __sumSort.setRushLeft(0.4); const m = __sumSort.plan[0]; __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); });
+  await page.waitForFunction(() => __sumSort.rush.round === 1, null, { timeout: 30000 });
+  const r1 = await page.evaluate(() => __sumSort.rush);
+  pass('in a rush: no restart button, and a board won in the last second still counts and wins time', restartHidden && !r1.over && r1.boards === 1 && r1.left > 0, JSON.stringify({ restartHidden, r1 }));
+  await page.evaluate(() => __sumSort.setRushLeft(0.2));
+  await page.waitForFunction(() => !document.getElementById('win').hidden, null, { timeout: 30000 }); await page.waitForTimeout(600);
+  const end = await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, score: Number(document.getElementById('winMoves').textContent), best: __sumSort.save.rush, next: document.getElementById('nextLabel').textContent }));
+  await page.screenshot({ path: SHOTS + '/rush-end.png' });
+  await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const shared = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('a rush result draws as a picture too', (await page.evaluate(() => __sumSort.cardImage().length)) > 20000);
+  pass('Sugar Rush opens beside the daily, runs on a clock without boosters, and leaves the levels alone', card.two && card.shown && r0.r.left > 55 && /^Time (1:00|0:5\d) Score 0$/.test(r0.hud) && r0.tray && r0.last === 30, JSON.stringify({ card, r0 }));
+  pass('a cleared rush board scores and wins time; the clock ends the run, keeps the best and shares it', r1.boards === 1 && r1.score >= 3 * 10 + 25 && end.title === 'New best!' && end.score === r1.score && end.best.best === r1.score && end.next === 'Play again' && /^Sum Sort Sugar Rush ⚡ \d+/.test(shared), JSON.stringify({ r1, end, shared }));
+  await tapEl('#winHomeBtn'); const hr = await H();
+  pass('home after a rush: the level waits, the best score shows', hr.open && hr.level === 30 && /^Best \d+$/.test(await page.evaluate(() => document.getElementById('rushSub').textContent)), JSON.stringify(hr)); }
+// 13. a level in progress survives a detour to the daily, and closing the tab
+await page.evaluate(() => { window.__sumSortToday = '2026-10-07'; }); await go(26); await page.evaluate(() => __sumSort.play()); await settled();
+{ for (let k = 0; k < 3; k++) { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  const board = st => ({ jars: st.jars, stacks: st.stacks, moves: st.moves }), before = board(await S());
+  await page.evaluate(() => __sumSort.showHome()); await tapEl('#dailyBtn'); await settled();
+  const inDaily = await page.evaluate(() => __sumSort.daily);
+  await tapProp('home'); await tapEl('#playBtn'); await settled();
+  const back = board(await S());
+  await page.reload(); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0); await page.evaluate(() => __sumSort.dropQuality());
+  const h13 = await H(); await tapEl('#playBtn'); await settled();
+  const reloaded = board(await S());
+  pass('a half-played level comes back as it was after the daily, and after closing the tab', inDaily === '2026-10-07' && before.moves === 3 && JSON.stringify(back) === JSON.stringify(before) && h13.level === 26 && JSON.stringify(reloaded) === JSON.stringify(before), JSON.stringify({ before, back, reloaded })); }
+// 13b. endless levels come in runs of ten, and closing one is celebrated like a chapter
+await page.evaluate(() => __sumSort.play()); await go(56); await settled();
+{ const w = await playOut();
+  pass('level 56 closes the first endless run of ten with the chapter rung', w.title === 'Run complete!' && /chapter-done/.test(w.cls) && w.tag === 'Levels 47–56 cleared' && w.text === 'Next run: levels 57–66.', JSON.stringify(w)); }
+// 14. a streak landing on 3 days gets its own celebration
+await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.save.streak = { count: 2, best: 2, last: '2026-10-07' }; __sumSort.showHome(); });
+await tapEl('#dailyBtn'); await settled();
+{ const pre = await page.evaluate(() => ({ tip: document.getElementById('tip').textContent, total: __sumSort.totalStars() }));
+  const w = await playOut();
+  const tag = await page.evaluate(() => ({ hidden: document.getElementById('winChapter').hidden, text: document.getElementById('winChapter').textContent, streak: __sumSort.save.streak.count }));
+  const bonus = await page.evaluate(() => ({ text: document.getElementById('winBonus').hidden ? null : document.getElementById('winBonus').textContent, r: __sumSort.save.daily['2026-10-08'], total: __sumSort.totalStars() }));
+  pass('a daily won on a 3-day streak pays a bonus star, named before the first move', /Finish it for a 3-day streak and \+1 bonus star\.$/.test(pre.tip) && bonus.text === 'Streak bonus: +1 star'
+    && bonus.r.bonus === 1 && bonus.total === pre.total + bonus.r.stars + 1, JSON.stringify({ pre, bonus }));
+  pass('a 3-day streak gets the chapter rung: its own title, tag and second wave', w.title === '3-day streak!' && /chapter-done/.test(w.cls) && !tag.hidden && tag.text === '3 dailies in a row' && tag.streak === 3 && /^Next mark: 7 days/.test(w.text), JSON.stringify({ w, tag }));
+  await page.screenshot({ path: SHOTS + '/win-streak.png' }); await tapEl('#winHomeBtn'); }
+// 15. the board can be played with the keyboard alone, and every spot is read out
+await page.evaluate(() => __sumSort.play()); await go(14); await settled(); await page.focus('#scene');
+{ await page.keyboard.press('ArrowRight');
+  const first = await page.evaluate(() => ({ f: __sumSort.kbFocus, sr: document.getElementById('srStatus').textContent }));
+  const m = await page.evaluate(() => __sumSort.plan[0]);
+  for (let k = 0; k < 12; k++) { const f = await page.evaluate(() => __sumSort.kbFocus); if (f && f.kind === m.src.kind && f.i === m.src.i) break; await page.keyboard.press('ArrowRight'); }
+  await page.keyboard.press('Enter'); const lifted = await page.evaluate(() => __sumSort.sel);
+  await page.keyboard.press('ArrowUp');
+  for (let k = 0; k < 12; k++) { const f = await page.evaluate(() => __sumSort.kbFocus); if (f && f.kind === 'jar' && f.i === m.dst) break; await page.keyboard.press('ArrowRight'); }
+  await page.keyboard.press('Enter'); await settled();
+  const after = await page.evaluate(() => ({ moves: __sumSort.moves, sr: document.getElementById('srStatus').textContent }));
+  pass('arrows and Enter play a move, and each spot is read out', !!first.f && /^Stack \d: top tile \d/.test(first.sr) && lifted && lifted.kind === m.src.kind && after.moves === 1 && /^Jar/.test(after.sr), JSON.stringify({ first, after })); }
+// 16. a challenge link: the same boards, a score to beat, and a link back
+await page.goto(URL_ + '?rush=4242&beat=50'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0); await page.evaluate(() => __sumSort.dropQuality());
+{ const card = await page.evaluate(() => ({ c: __sumSort.challenge, search: location.search }));
+  // the card pops in: tap its button where it ends up, not where it is mid-pop
+  await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
+  await tapEl('#challengePlay'); await settled();
+  const r0 = await page.evaluate(() => ({ r: __sumSort.rush, hud: document.getElementById('hud').innerText.replace(/\n/g, ' ') }));
+  for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.rush.round === 0 && __sumSort.plan && __sumSort.plan[0]); if (!m) break;
+    await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.waitForFunction(() => __sumSort.rush.round === 1, null, { timeout: 30000 });
+  await page.evaluate(() => __sumSort.setRushLeft(0.2));
+  await page.waitForFunction(() => !document.getElementById('win').hidden, null, { timeout: 30000 }); await page.waitForTimeout(600);
+  const end = await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, score: __sumSort.rush.score }));
+  await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const shared = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('a challenge link plays its seed against its score, cleans the address, and shares a link back', card.c && card.c.seed === 4242 && card.c.beat === 50 && card.search === '' && /beat 50$/.test(r0.hud) && end.title === 'You beat it!' && new RegExp(`\\?rush=4242&beat=${end.score}$`).test(shared), JSON.stringify({ card, r0, end, shared })); }
+// 17. a streak freeze earned at a week covers one missed day by itself
+await tapEl('#winHomeBtn');   // out of the challenge the way a player leaves it
+await page.evaluate(() => { window.__sumSortToday = '2026-10-11'; __sumSort.save.streak = { count: 7, best: 7, last: '2026-10-09', freezes: 1 }; __sumSort.goLevel(30); __sumSort.showHome(); });
+{ const sub = await page.evaluate(() => document.getElementById('dailySub').textContent);
+  await page.waitForFunction(() => !document.getElementById('home').classList.contains('off'));
+  await tapEl('#dailyBtn'); await settled(); const w = await playOut();
+  const st = await page.evaluate(() => __sumSort.save.streak);
+  pass('a freeze holds a streak over a missed day, and says so', /freeze holds it$/i.test(sub) && st.count === 8 && st.freezes === 0 && st.saved && /^A freeze covered the day you missed/.test(w.text), JSON.stringify({ sub, st, text: w.text }));
+  await tapEl('#winHomeBtn'); }
+// 18. a still board is drawn every other frame; anything moving gets every frame
+// (measured between the board's entrance and the idle coaching that pulses after 8 s, which counts as movement)
+await page.waitForFunction(() => __sumSort.frameNo > 95, null, { timeout: 180000 });
+await page.evaluate(() => __sumSort.play()); await go(25); await settled(); await page.waitForFunction(() => !__sumSort.liveScene, null, { timeout: 60000 });
+{ const share = async () => { const a = await page.evaluate(() => [__sumSort.frameNo, __sumSort.renders]); await page.waitForTimeout(3000); const b = await page.evaluate(() => [__sumSort.frameNo, __sumSort.renders]); return (b[1] - a[1]) / Math.max(1, b[0] - a[0]); };
+  const still = await share(); await page.evaluate(() => __sumSort.tap({ kind: 'stack', i: 0 })); const lifted = await share(); await page.evaluate(() => __sumSort.tap(null));
+  pass('a still board saves battery by drawing every other frame; a lifted tile is drawn every frame', still < 0.85 && lifted === 1, JSON.stringify({ still: +still.toFixed(2), lifted })); }
+// 19. a win is kept even when the player leaves while the winning tile is still in the air
+await page.evaluate(() => __sumSort.play()); await go(20); await settled();
+{ const n = await page.evaluate(() => __sumSort.plan.length);
+  for (let k = 0; k < n - 1; k++) { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.waitForFunction(() => __sumSort.plan && __sumSort.plan.length === 1 && !__sumSort.busy && !__sumSort.flights);
+  // the winning move and Home in the same breath: the tile is still in the air when the level is left
+  const before = await page.evaluate(() => { const m = __sumSort.plan[0]; __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst });
+    const st = { won: __sumSort.won, flights: __sumSort.flights, moves: __sumSort.moves }; document.getElementById('homeBtn').click(); return st; });
+  await page.waitForTimeout(800);
+  const kept = await page.evaluate(() => ({ stars: __sumSort.save.stars[20], last: __sumSort.save.last, level: __sumSort.level, home: __sumSort.home }));
+  pass('leaving during the winning flight still records the win', before.won && before.flights === 1 && kept.stars >= 1 && kept.last === 21 && kept.level === 21 && kept.home, JSON.stringify({ before, kept })); }
+// 20. a level cleared under three stars offers a replay from its win card; the replay is a side trip
+{ const winCard = () => page.evaluate(() => ({ retry: !document.getElementById('winRetryBtn').hidden, text: document.getElementById('winText').textContent,
+    stars: __sumSort.save.stars[__sumSort.level], last: __sumSort.save.last, level: __sumSort.level }));
+  await page.evaluate(() => __sumSort.play()); await go(22); await settled();
+  await page.evaluate(() => document.getElementById('refillBtn').click());   // a rescued clear earns two stars at most
+  await playOut(); const w = await winCard();
+  pass('a clear under three stars offers a replay', w.retry && w.stars === 2 && w.last === 23, JSON.stringify(w));
+  await tapEl('#winRetryBtn'); await page.waitForTimeout(900);
+  const r = await page.evaluate(() => ({ level: __sumSort.level, replaying: __sumSort.replaying, moves: __sumSort.moves, win: !document.getElementById('win').hidden, last: __sumSort.save.last }));
+  pass('the replay starts the same level afresh and leaves the progress where it was', r.level === 22 && r.replaying && r.moves === 0 && !r.win && r.last === 23, JSON.stringify(r));
+  await playOut(); const b = await winCard();
+  pass('a better replay keeps the new stars and says so', !b.retry && b.stars === 3 && /^Up from 2 stars/.test(b.text) && b.last === 23, JSON.stringify(b));
+  await page.click('#winHomeBtn', { force: true }); await page.waitForTimeout(800);
+  // Home in the middle of a replay goes back to the next new level, and the replay is not kept
+  await page.evaluate(() => __sumSort.play()); await go(24); await settled();
+  await page.evaluate(() => document.getElementById('refillBtn').click()); await playOut();
+  await tapEl('#winRetryBtn'); await page.waitForTimeout(900);
+  { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.click('#homeBtn', { force: true }); await page.waitForTimeout(800);
+  const h = await page.evaluate(() => ({ level: __sumSort.level, home: __sumSort.home, board: __sumSort.save.board, last: __sumSort.save.last, replaying: __sumSort.replaying }));
+  pass('Home in the middle of a replay goes on to the next new level', h.level === 25 && h.home && !h.board && h.last === 25 && !h.replaying, JSON.stringify(h)); }
+// 21. a shared daily is a link to today's board: a brand-new player gets a card with the rule, then the board with the first-move hand
+await page.addInitScript(() => { window.__sumSortToday = '2026-10-07';
+  if (location.search.includes('daily=') && !sessionStorage.getItem('__new')) { localStorage.removeItem('sumsort.proto.v1'); sessionStorage.setItem('__new', '1'); } });   // a new player, once
+await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0); await page.evaluate(() => __sumSort.dropQuality());
+{ const card = await page.evaluate(() => ({ c: __sumSort.challenge, search: location.search, title: document.getElementById('challengeTitle').textContent,
+    text: document.getElementById('challengeText').textContent, level: __sumSort.level }));
+  pass('a shared daily opens a card for today\'s board, even for a new player', !!card.c && card.c.daily === '2026-10-07' && card.search === '' && card.title === 'Daily #7'
+    && /^A friend solved today's board in 9 moves\. .*Fill each jar/.test(card.text) && card.level === 1, JSON.stringify(card));
+  await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
+  await tapEl('#challengePlay'); await settled();
+  await page.waitForFunction(() => __sumSort.hand, null, { timeout: 30000 });
+  const d = await page.evaluate(() => ({ daily: __sumSort.daily, level: __sumSort.level, hand: __sumSort.hand }));
+  await page.evaluate(() => document.getElementById('scene').dispatchEvent(new PointerEvent('pointerdown', { clientX: 12, clientY: 300, pointerType: 'touch', isPrimary: true, bubbles: true })));   // a touch on the board
+  const w = await playOut();
+  const after = await page.evaluate(() => ({ result: !!__sumSort.save.daily['2026-10-07'], last: __sumSort.save.last, streak: __sumSort.save.streak && __sumSort.save.streak.count, share: __sumSort.resultText() }));
+  pass('the shared daily plays from level 1 with the hand, and its own result links back to the daily', d.daily === '2026-10-07' && d.level === 1 && d.hand && w.shown
+    && after.result && after.last === 1 && after.streak === 1 && /\?daily=2026-10-07&moves=\d+$/.test(after.share), JSON.stringify({ d, after }));
+  await page.click('#winHomeBtn', { force: true }); await page.waitForTimeout(800); await page.evaluate(() => __sumSort.play());
+  await page.waitForFunction(() => __sumSort.hand, null, { timeout: 20000 }).catch(() => {});
+  const l1 = await page.evaluate(() => ({ level: __sumSort.level, daily: __sumSort.daily, hand: __sumSort.hand }));
+  pass('after a shared daily, level 1 still shows the first-move hand', l1.level === 1 && !l1.daily && l1.hand, JSON.stringify(l1));
+  // a friend's link after today's is done: their moves against yours, and yours to send back
+  await page.goto(URL_ + '?daily=2026-10-07&moves=99'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
+  await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
+  const back = await page.evaluate(() => ({ text: document.getElementById('challengeText').textContent, label: document.getElementById('challengePlayLabel').textContent }));
+  await tapEl('#challengePlay'); await page.waitForTimeout(400);
+  const sent = await page.evaluate(() => ({ t: window.__copied.at(-1) || '', open: !document.getElementById('challenge').hidden, daily: __sumSort.daily }));
+  pass('a friend\'s daily after yours compares the moves and sends yours back', /^A friend solved today's board in 99 moves; you took \d+\. You win this one! Send yours back\.$/.test(back.text)
+    && back.label === 'Share yours' && /^Sum Sort Daily #7 .*\?daily=2026-10-07&moves=\d+$/s.test(sent.t) && !sent.open && !sent.daily, JSON.stringify({ back, sent })); }
+// 22. the daily treat: from level 3 a candy on home opens once a day for stars; days in a row climb the week
+{ const T = () => page.evaluate(() => ({ hidden: treatBtn.hidden, ready: treatBtn.classList.contains('ready'), sheet: !treat.hidden, sub: treatSub.textContent,
+    open: treatOpen.textContent, t: __sumSort.save.treat, total: __sumSort.totalStars(), focus: document.activeElement && document.activeElement.id }));
+  const early = await T();
+  await page.evaluate(() => { __sumSort.goLevel(5); __sumSort.showHome(); }); await page.waitForTimeout(600);
+  const home = await T();
+  const bar = await page.evaluate(() => { installBtn.hidden = false; const r = { sound: Math.round(homeSound.getBoundingClientRect().right), w: innerWidth, sw: document.documentElement.scrollWidth }; installBtn.hidden = true; return r; });
+  pass('home\'s top bar fits with the tally, the treat, Install, music and sound', bar.sound <= bar.w && bar.sw === bar.w, JSON.stringify(bar));
+  await tapEl('#treatBtn'); await page.waitForTimeout(400); const sheet = await T();
+  await tapEl('#treatOpen'); await page.waitForTimeout(400); const got = await T();
+  pass('the daily treat opens from level 3, once a day, for stars', early.hidden && !home.hidden && home.ready && sheet.sheet && sheet.sub === 'Day 1 of 7' && sheet.open === 'Open: 1 star'
+    && got.t.day === 1 && got.total === home.total + 1 && !got.ready && got.open === 'See you tomorrow', JSON.stringify({ early, home, sheet, got }));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300); const shut = await T();
+  await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.showHome(); }); await page.waitForTimeout(300); const next = await T();
+  await page.evaluate(() => { __sumSort.openTreat(); treatOpen.click(); }); await page.waitForTimeout(300); const day2 = await T();
+  await page.evaluate(() => { treatClose.click(); window.__sumSortToday = '2026-10-10'; __sumSort.showHome(); __sumSort.openTreat(); }); await page.waitForTimeout(300); const gap = await T();
+  await page.evaluate(() => treatClose.click());   // leave home clear for the next section
+  pass('days in a row climb the treats; a missed day starts the week over', !shut.sheet && shut.focus === 'treatBtn' && next.ready && day2.t.day === 2 && day2.t.stars === 2 && gap.sub === 'Day 1 of 7',
+    JSON.stringify({ shut, next: next.ready, day2: day2.t, gap: gap.sub })); }
+// 23. in the day's last hours, a streak with no freeze to cover a miss says when it ends
+{ const D = () => page.evaluate(() => ({ sub: document.getElementById('dailySub').textContent, risk: document.getElementById('dailySub').classList.contains('risk') }));
+  await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; window.__sumSortNow = '2026-10-08T21:47:00'; __sumSort.save.streak = { count: 4, best: 4, last: '2026-10-07', freezes: 0 };
+    __sumSort.goLevel(30); __sumSort.showHome(); }); await page.waitForTimeout(400);
+  const late = await D();
+  await page.evaluate(() => { __sumSort.save.streak.freezes = 1; __sumSort.showHome(); }); await page.waitForTimeout(300); const covered = await D();
+  await page.evaluate(() => { __sumSort.save.streak.freezes = 0; window.__sumSortNow = '2026-10-08T12:00:00'; __sumSort.showHome(); }); await page.waitForTimeout(300); const noon = await D();
+  pass('a streak at risk says when it ends, only late and only with no freeze', late.risk && late.sub === 'Ends in 2h 13m' && !covered.risk && !noon.risk && noon.sub === 'Keep it going',
+    JSON.stringify({ late, covered, noon })); }
+// 24. every daily of a week, Monday to Sunday, pays a bonus once, on the win that completes it
+await page.evaluate(() => { const s = __sumSort.save, r = { stars: 3, moves: 9, par: 9, seals: [0], boosters: 0 };
+  for (const k of ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17']) s.daily[k] = { ...r };
+  s.streak = { count: 6, best: 6, last: '2026-10-17', freezes: 0 }; window.__sumSortToday = '2026-10-18'; __sumSort.showHome(); });
+await tapEl('#dailyBtn'); await settled();
+{ const t0 = await page.evaluate(() => __sumSort.totalStars()); await playOut();
+  const fw = await page.evaluate(() => ({ r: __sumSort.save.daily['2026-10-18'], note: document.getElementById('winWeekNote').textContent, prize: document.getElementById('winWeekRow').lastElementChild.className, total: __sumSort.totalStars() }));
+  pass('a full week of dailies pays its bonus once, on the win that completes it', fw.r.week === 5 && fw.note === 'Every daily this week: +5 stars!' && fw.prize === 'wd prize won'
+    && fw.total === t0 + fw.r.stars + fw.r.bonus + 5, JSON.stringify({ t0, fw })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

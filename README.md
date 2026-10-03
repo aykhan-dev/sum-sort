@@ -21,18 +21,29 @@ On GitHub Pages: repository Settings → Pages → Deploy from a branch → `mai
 | `index.html` | The built game. Generated, do not edit by hand. |
 | `src/page.src.html` | Page source: styles, markup, rendering and game code. |
 | `src/logic.mjs` | Pure game logic: solver, fail-rate model, level generator, chapters. |
+| `src/meta.mjs` | Pure meta-game logic around the levels (combos, daily puzzle, streaks, sharing). |
 | `src/levels.json` | Levels 1–100, generated once and checked by the solver. Later levels are generated on the device. |
-| `scripts/build.mjs` | Inlines logic and levels into the page and writes `index.html`. |
+| `src/dailies.json` | Daily puzzles for a year from 1 Oct 2026, one per day, checked by the solver. Later days are generated on the device. |
+| `scripts/build.mjs` | Inlines the pure modules and levels into the page and writes `index.html`. |
 | `scripts/generate-levels.mjs` | Regenerates `src/levels.json` and prints the difficulty curve. |
+| `scripts/generate-dailies.mjs` | Regenerates `src/dailies.json` and prints the fail rate per weekday. |
+| `tests/unit/` | Unit tests for the pure modules (node's built-in runner, about a second). |
 | `tests/playtest.mjs` | Plays the built page in headless Chromium with real touches. |
+| `docs/ROADMAP.md` | What gets built next, and why. |
+| `src/sw.src.js` | Service worker source. The build stamps its version and writes `sw.js`. |
+| `manifest.webmanifest`, `icons/`, `og.png` | Install manifest, app icons and the link-preview image. `scripts/make-art.mjs` draws them from the game. |
 | `vendor/three/` | three.js r170 (MIT), so the page needs no CDN for code. |
 
 ## Build and test
 
 ```
 npm run build
+npm run test:unit    # pure logic, about a second
+npm run check        # build, fail if index.html was stale, unit tests
 npm i && npx playwright install chromium && npm test
 ```
+
+CI (`.github/workflows/ci.yml`) runs `npm run check` and the headless play-test on every push.
 
 ## Chapters
 
@@ -47,6 +58,30 @@ npm i && npx playwright install chromium && npm test
 
 Boosters arrive one at a time: Undo (level 11), Hint (13), +1 Jar (15), Split (21).
 
+## Daily puzzle
+
+From level 19 the home screen offers one extra board a day, the same for everyone on that calendar date. It uses only the rules of the first three chapters. Monday is easy and the week climbs to Sunday (model fail rate 20% to 60%). Finishing dailies on consecutive days builds a streak, and a streak pays: each daily won on it adds bonus stars (+1 from three days in a row, +2 from a week, +3 from two weeks). Every daily of a week, Monday to Sunday, earns 5 more. In the day's last six hours, a streak with no freeze to cover a miss shows on the daily card when it ends. A daily never moves the level progress. The daily's win card stamps the day on the week's row and says what tomorrow brings.
+
+## Sugar Rush
+
+From level 25 a second card sits beside the daily: a minute of quick, small boards with no boosters. A seal scores 10 points times the combo chain, a cleared board adds 25 points and 8 seconds (up to 90 on the clock), and a dead end can be skipped for 5 seconds. Boards grow as the run goes on; every run is new. The best score is kept and can be shared.
+
+## Stars and candy boxes
+
+Stars from levels, dailies, daily treats and streak bonuses open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop. From level 3, a wrapped candy on the home screen is a daily treat: open it once a day for stars (1, 1, 2, 2, 3, 3, then 6 on the seventh day in a row); a missed day starts the week over. A level cleared under three stars can be replayed from its win card; a replay never moves the progress back.
+
+## Sharing
+
+Every result can be shared: the daily, a level, a Sugar Rush score. The text is spoiler-free (stars, moves against par, one coloured square per seal, the streak, the link). On phones whose share sheet takes images, a picture of the result goes with it. A Sugar Rush share carries a challenge link: whoever opens it plays the same boards with the score to beat. A daily share links to the daily: whoever opens it gets a card for today's board and can play it at once, even on their first visit.
+
+## Sound
+
+Every sound is made in the browser, no audio files: the effects, and a soft music loop that plays faster in a rush. Home has a music button beside the sound button; the sound button silences both.
+
+## Install and offline
+
+Served over https (GitHub Pages), the page registers a service worker: after one visit the game opens and plays with no network, and browsers that support it offer to install it. A new build reaches players on their next visit. Shared links show `og.png` as their preview; its address is set by `SITE` in `scripts/build.mjs`.
+
 ## Status
 
-Prototype. Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser, not yet on real phones.
+Prototype, now with a daily puzzle (streaks, bonuses, a daily treat, shareable links), Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of 76 checks), not yet on real phones.
