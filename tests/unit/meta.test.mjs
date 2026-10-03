@@ -313,3 +313,15 @@ import { streakBonus } from '../../src/meta.mjs';
 test('streak bonus: nothing for the first two days, then a star more at three days, a week and two weeks', () => {
   assert.deepEqual([0, 1, 2, 3, 6, 7, 13, 14, 100].map(streakBonus), [0, 0, 0, 1, 1, 2, 2, 3, 3]);
 });
+
+import { streakAtRisk, hoursMinutes, RISK_HOURS } from '../../src/meta.mjs';
+test('streak at risk: two days or more, no freeze to cover a miss, in the day\'s last hours', () => {
+  const h = 3600000;
+  assert.equal(streakAtRisk(5, 0, 2 * h), true);
+  assert.equal(streakAtRisk(5, 0, RISK_HOURS * h), false);
+  assert.equal(streakAtRisk(5, 1, 2 * h), false);   // a freeze would cover tonight
+  assert.equal(streakAtRisk(1, 0, 2 * h), false);
+  assert.equal(streakAtRisk(0, 0, 2 * h), false);
+  assert.equal(hoursMinutes(3 * h + 12 * 60000 + 59000), '3h 12m');
+  assert.equal(hoursMinutes(45 * 60000), '45m');
+});

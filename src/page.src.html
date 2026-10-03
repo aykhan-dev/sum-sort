@@ -468,6 +468,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .daily .dtxt{display:grid;min-width:0}
 .daily .eyebrow{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);line-height:1.25}
 .daily .dname{font:600 17px var(--display);line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.daily .dsub.risk{color:var(--raspberry-ink);font-weight:800}
 .daily .dsub{font-size:12.5px;font-weight:700;color:var(--ink-soft);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .daily .dside{display:flex;align-items:center;gap:6px;font:700 17px var(--display);font-variant-numeric:tabular-nums}
 .flame{display:inline-flex;align-items:center;gap:2px;color:#D8572A}
@@ -754,6 +755,7 @@ function getLevel(n) {
 }
 /* the player's calendar day; play-tests may pin it */
 const todayKey = () => window.__sumSortToday || dayKey();
+const msLeftToday = () => msToNextDay(window.__sumSortNow ? new Date(window.__sumSortNow) : new Date());   // (tests set the clock)
 const dailyCache = new Map();
 function getDaily(key) {
   if (!dailyCache.has(key)) dailyCache.set(key, dailyFromPool(DAILIES, key) || generateDaily(key));
@@ -2378,6 +2380,7 @@ function renderDaily() {
   ui.dailyMon.textContent = dailyLabel(key).split(' ')[2]; ui.dailyDay.textContent = String(Number(key.slice(8)));
   ui.daily.classList.toggle('locked', locked);
   ui.daily.setAttribute('aria-disabled', String(locked));
+  ui.dailySub.classList.remove('risk');
   const flame = n => `<span class="flame${n >= 7 ? ' hot' : ''}">${FLAME}${n}</span>`;   // a week or more: the flame grows
   if (locked) {
     const left = DAILY_OPENS - levelNo;
@@ -2385,7 +2388,7 @@ function renderDaily() {
     ui.dailySub.textContent = `${plural(left, 'level')} to go`; ui.dailySide.innerHTML = '';
     ui.daily.setAttribute('aria-label', `Daily puzzle, opens at level ${DAILY_OPENS}, ${plural(left, 'level')} to go`);
   } else if (result) {
-    const h = Math.floor(msToNextDay() / 3600000), m = Math.floor(msToNextDay() / 60000) % 60;
+    const h = Math.floor(msLeftToday() / 3600000), m = Math.floor(msLeftToday() / 60000) % 60;
     if (shareFileFor !== dailyShareText(key)) prepareShareFile(dailyCard(key), dailyShareText(key));
     ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)} · done`; ui.dailyName.textContent = `${'★'.repeat(result.stars)}${'☆'.repeat(3 - result.stars)} ${plural(result.moves, 'move')}`;
     ui.dailySub.textContent = `Next in ${h ? h + 'h ' : ''}${m}m`;
@@ -2396,10 +2399,14 @@ function renderDaily() {
     ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)}`; ui.dailyName.textContent = `${levelNo >= RUSH_OPENS ? day.slice(0, 3) : day} · ${r.level}`;
     const narrow = levelNo >= RUSH_OPENS;   // the card shares its row with Sugar Rush
     const held = streak && save.streak && dayGap(save.streak.last, key) === 2;   // yesterday was missed; a freeze is holding the streak
-    ui.dailySub.textContent = streak ? (held ? (narrow ? 'Freeze holds it' : 'A freeze holds it') : narrow ? 'Keep it going' : 'Keep your streak') : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
+    // the day's last hours, with nothing to cover a miss: say when the streak ends (a real deadline, midnight)
+    const risk = !held && streakAtRisk(streak, save.streak && save.streak.freezes, msLeftToday()), left = hoursMinutes(msLeftToday());
+    ui.dailySub.textContent = risk ? `${narrow ? 'Ends' : 'Streak ends'} in ${left}`
+      : streak ? (held ? (narrow ? 'Freeze holds it' : 'A freeze holds it') : narrow ? 'Keep it going' : 'Keep your streak') : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
+    ui.dailySub.classList.toggle('risk', risk);
     ui.dailySide.innerHTML = (streak ? flame(streak) : '') + `<span class="go gummy c-grape">${PLAY_ICON}</span>`;
     const freezes = save.streak && save.streak.freezes ? ` ${plural(save.streak.freezes, 'streak freeze')} in hand.` : '';
-    ui.daily.setAttribute('aria-label', `Play daily puzzle ${dailyNumber(key)}, ${WEEKDAYS[weekdayOf(key)]}, ${r.level}.` + (streak ? ` Keep your ${streak}-day streak.` : '') + freezes);
+    ui.daily.setAttribute('aria-label', `Play daily puzzle ${dailyNumber(key)}, ${WEEKDAYS[weekdayOf(key)]}, ${r.level}.` + (streak ? ` Keep your ${streak}-day streak.` : '') + (risk ? ` It ends in ${left}.` : '') + freezes);
   }
 }
 function playDaily() {

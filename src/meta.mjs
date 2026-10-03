@@ -94,6 +94,10 @@ export const streakNow = (streak, today) => {
   return gap <= 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;
 };
 export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
+/* A streak of two days or more is at risk in the day's last six hours, unless a freeze would cover the miss */
+export const RISK_HOURS = 6;
+export const streakAtRisk = (count, freezes, msLeft) => count >= 2 && !freezes && msLeft < RISK_HOURS * 3600000;
+export const hoursMinutes = ms => { const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60; return `${h ? h + 'h ' : ''}${m}m`; };
 
 /* ---------------- sharing ----------------
    A result anyone can paste anywhere, with nothing given away about the board: stars, moves against par, one square

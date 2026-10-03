@@ -424,6 +424,15 @@ await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(
   await page.evaluate(() => { treatClose.click(); window.__sumSortToday = '2026-10-10'; __sumSort.showHome(); __sumSort.openTreat(); }); await page.waitForTimeout(300); const gap = await T();
   pass('days in a row climb the treats; a missed day starts the week over', !shut.sheet && shut.focus === 'treatBtn' && next.ready && day2.t.day === 2 && day2.t.stars === 2 && gap.sub === 'Day 1 of 7',
     JSON.stringify({ shut, next: next.ready, day2: day2.t, gap: gap.sub })); }
+// 23. in the day's last hours, a streak with no freeze to cover a miss says when it ends
+{ const D = () => page.evaluate(() => ({ sub: document.getElementById('dailySub').textContent, risk: document.getElementById('dailySub').classList.contains('risk') }));
+  await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; window.__sumSortNow = '2026-10-08T21:47:00'; __sumSort.save.streak = { count: 4, best: 4, last: '2026-10-07', freezes: 0 };
+    __sumSort.goLevel(30); __sumSort.showHome(); }); await page.waitForTimeout(400);
+  const late = await D();
+  await page.evaluate(() => { __sumSort.save.streak.freezes = 1; __sumSort.showHome(); }); await page.waitForTimeout(300); const covered = await D();
+  await page.evaluate(() => { __sumSort.save.streak.freezes = 0; window.__sumSortNow = '2026-10-08T12:00:00'; __sumSort.showHome(); }); await page.waitForTimeout(300); const noon = await D();
+  pass('a streak at risk says when it ends, only late and only with no freeze', late.risk && late.sub === 'Ends in 2h 13m' && !covered.risk && !noon.risk && noon.sub === 'Keep it going',
+    JSON.stringify({ late, covered, noon })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
