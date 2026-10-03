@@ -394,6 +394,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .home-btns{display:flex;gap:8px}
 .install{display:inline-flex;align-items:center;gap:6px;padding:0 16px 0 12px;font-size:14px}
 .install svg.i{width:18px;height:18px}
+@media (max-width:420px){.install{width:48px;padding:0;justify-content:center}.install .itx{display:none}}   /* beside the tally and the treat on a phone */
 .home-mid{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;min-height:0;width:100%}
 .wordmark{
   margin:0;display:grid;justify-items:center;rotate:-4deg;
@@ -658,8 +659,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="12" rx="5.2" ry="4.4"/><path d="M6.9 10.4 2.8 7.6v8.8l4.1-2.8M17.1 10.4l4.1-2.8v8.8l-4.1-2.8"/><path d="M10.3 7.9l3.2 8.2"/></svg>
       </button>
       </span>
-      <button class="chip install" id="installBtn" type="button" hidden>
-        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></svg>Install
+      <button class="chip install" id="installBtn" type="button" aria-label="Install" hidden>
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></svg><span class="itx">Install</span>
       </button>
       <span class="home-btns">
       <button id="homeMusic" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Music">
@@ -2031,7 +2032,8 @@ function buildLevel(n, resume = null) {
   analyse(); updateHud(); armIdle();
   updateFinale();
   boardSig = daily || rush ? '' : levelSig(def);
-  if (n !== handLevel) { boardTouched = false; handLevel = n; }   // a touch on this level counts until another level is built
+  const hk = rush ? 'rush' : daily ? 'daily' : n;   // a daily opened from a link at level 1 is not level 1
+  if (hk !== handLevel) { boardTouched = false; handLevel = hk; }   // a touch on this level counts until another level is built
   hideHand(); if (showsHand()) handTimer = setTimeout(showHand, 900);
   kbFocus = null;
 }
@@ -2534,9 +2536,9 @@ function recordWin() {
   if (daily) {
     const prev = save.daily[daily];
     save.daily[daily] = prev && prev.stars >= stars ? prev : { stars, moves: moveCount, par: def.par, seals: sealLog.slice(), boosters: boostersUsed };
-    const before = save.streak ? save.streak.count : 0;
+    const before = save.streak ? save.streak.count : 0, grows = dayGap(save.streak && save.streak.last, daily) > 0;
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
-    bonus = prev ? 0 : streakBonus(save.streak.count); if (bonus) save.daily[daily].bonus = bonus;   // a streak pays: +1 star from three days, more from a week
+    bonus = prev || !grows ? 0 : streakBonus(save.streak.count); if (bonus) save.daily[daily].bonus = bonus;   // a streak pays: +1 star from three days, more from a week
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; save.board = null; }
   const opened = boxesOpened(starsBefore, totalStars());
   // a streak landing on 3, 7, 14, 30 days gets the chapter rung: a second wave of candy and the long flourish
@@ -2620,7 +2622,7 @@ async function winLevel() {
    tomorrow brings. Days get harder toward Sunday, so the row is also the week's climb. */
 /* before the first move on the daily: what finishing it pays for the streak */
 function streakTip(key) {
-  if (save.daily[key]) return '';
+  if (save.daily[key] || dayGap(save.streak && save.streak.last, key) <= 0) return '';
   const n = streakAfter(save.streak, key).count, b = streakBonus(n);
   return b ? ` Finish it for a ${n}-day streak and +${plural(b, 'bonus star')}.` : '';
 }
@@ -2888,7 +2890,10 @@ function closeChallenge(play) {
   if (ui.challenge.hidden) return;
   ui.challenge.hidden = true; ui.home.inert = false;
   const c = pendingChallenge; pendingChallenge = null;
-  if (play && c && c.daily && save.daily[c.daily]) shareOut(dailyShareText(c.daily), how => { ui.dailySub.textContent = how === 'Copied' ? 'Copied!' : how; setTimeout(renderDaily, 2600); });
+  if (play && c && c.daily && save.daily[c.daily]) {
+    shareOut(dailyShareText(c.daily), how => { ui.dailySub.textContent = how === 'Copied' ? 'Copied!' : how; setTimeout(renderDaily, 2600); });
+    ui.daily.focus({ preventScroll: true });
+  }
   else if (play && c && c.daily) startDaily(c.daily);
   else if (play && c) startRush(c); else ui.play.focus({ preventScroll: true });
 }
@@ -3047,7 +3052,8 @@ function openInvite(link) {
   ui.challengeText.textContent = mine ? (theirs
       ? `A friend solved today's board in ${plural(theirs, 'move')}; you took ${mine.moves}. ${mine.moves < theirs ? 'You win this one!' : mine.moves === theirs ? "It's a tie!" : 'They win this one.'}`
       : `You have played today's board: ${plural(mine.moves, 'move')}, par ${mine.par}.`) + ' Send yours back.'
-    : (link.key !== key ? "That daily has gone, but today's is ready. "
+    : (link.key > key ? "Your friend's board opens here tomorrow; today's is ready. "
+      : link.key < key ? "That daily has gone, but today's is ready. "
       : theirs ? `A friend solved today's board in ${plural(theirs, 'move')}. ` : "A friend sent you today's board. ")
       + `The same board for everyone, ${r.level.toLowerCase()} on a ${WEEKDAYS[weekdayOf(key)]}. Fill each jar with tiles that add up to its number.`;
   ui.challengePlayLabel.textContent = mine ? 'Share yours' : 'Play it';
@@ -3333,6 +3339,7 @@ async function start(hot) {
   } catch (e) { /* fall back to system rounded fonts */ }
   const first = Number(hot && hot.level) || Number(save.last) || 1;
   const n = Math.max(1, Math.floor(first));
+  if (hot && hot.replay) replayOf = n;   // a replay stays a side trip
   buildLevel(n, resumable(n));   // a level left half-played comes back as it was
   fitCamera(false);
   if (hot && hot.level) ui.home.classList.add('off'); else showHome(false);   // a republish mid-game keeps the player in the game
@@ -3366,7 +3373,7 @@ async function start(hot) {
 }
 /* a republish while someone is playing keeps them on their level */
 const hotApi = window.claude && window.claude.hot;
-try { if (hotApi && hotApi.snapshot) hotApi.snapshot(() => ({ level: levelNo })); } catch (e) { /* optional */ }
+try { if (hotApi && hotApi.snapshot) hotApi.snapshot(() => ({ level: levelNo, replay: replaying() })); } catch (e) { /* optional */ }
 if (hotApi && hotApi.ready) hotApi.ready(start); else start((hotApi && hotApi.data) || {});
 </script>
 

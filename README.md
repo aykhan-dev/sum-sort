@@ -68,7 +68,7 @@ From level 25 a second card sits beside the daily: a minute of quick, small boar
 
 ## Stars and candy boxes
 
-Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop. From level 3, a wrapped candy on the home screen is a daily treat: open it once a day for stars (1, 1, 2, 2, 3, 3, then 6 on the seventh day in a row); a missed day starts the week over. A level cleared under three stars can be replayed from its win card; a replay never moves the progress back.
+Stars from levels, dailies, daily treats and streak bonuses open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop. From level 3, a wrapped candy on the home screen is a daily treat: open it once a day for stars (1, 1, 2, 2, 3, 3, then 6 on the seventh day in a row); a missed day starts the week over. A level cleared under three stars can be replayed from its win card; a replay never moves the progress back.
 
 ## Sharing
 
@@ -84,4 +84,4 @@ Served over https (GitHub Pages), the page registers a service worker: after one
 
 ## Status
 
-Prototype, now with a daily puzzle, Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of about 60 checks), not yet on real phones.
+Prototype, now with a daily puzzle (streaks, bonuses, a daily treat, shareable links), Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of about 75 checks), not yet on real phones.

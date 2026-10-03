@@ -396,10 +396,15 @@ await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(
   await tapEl('#challengePlay'); await settled();
   await page.waitForFunction(() => __sumSort.hand, null, { timeout: 30000 });
   const d = await page.evaluate(() => ({ daily: __sumSort.daily, level: __sumSort.level, hand: __sumSort.hand }));
+  await page.evaluate(() => document.getElementById('scene').dispatchEvent(new PointerEvent('pointerdown', { clientX: 12, clientY: 300, pointerType: 'touch', isPrimary: true, bubbles: true })));   // a touch on the board
   const w = await playOut();
   const after = await page.evaluate(() => ({ result: !!__sumSort.save.daily['2026-10-07'], last: __sumSort.save.last, streak: __sumSort.save.streak && __sumSort.save.streak.count, share: __sumSort.resultText() }));
   pass('the shared daily plays from level 1 with the hand, and its own result links back to the daily', d.daily === '2026-10-07' && d.level === 1 && d.hand && w.shown
     && after.result && after.last === 1 && after.streak === 1 && /\?daily=2026-10-07&moves=\d+$/.test(after.share), JSON.stringify({ d, after }));
+  await page.click('#winHomeBtn', { force: true }); await page.waitForTimeout(800); await page.evaluate(() => __sumSort.play());
+  await page.waitForFunction(() => __sumSort.hand, null, { timeout: 20000 }).catch(() => {});
+  const l1 = await page.evaluate(() => ({ level: __sumSort.level, daily: __sumSort.daily, hand: __sumSort.hand }));
+  pass('after a shared daily, level 1 still shows the first-move hand', l1.level === 1 && !l1.daily && l1.hand, JSON.stringify(l1));
   // a friend's link after today's is done: their moves against yours, and yours to send back
   await page.goto(URL_ + '?daily=2026-10-07&moves=99'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
   await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
@@ -414,6 +419,8 @@ await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(
   const early = await T();
   await page.evaluate(() => { __sumSort.goLevel(5); __sumSort.showHome(); }); await page.waitForTimeout(600);
   const home = await T();
+  const bar = await page.evaluate(() => { installBtn.hidden = false; const r = { sound: Math.round(homeSound.getBoundingClientRect().right), w: innerWidth, sw: document.documentElement.scrollWidth }; installBtn.hidden = true; return r; });
+  pass('home\'s top bar fits with the tally, the treat, Install, music and sound', bar.sound <= bar.w && bar.sw === bar.w, JSON.stringify(bar));
   await tapEl('#treatBtn'); await page.waitForTimeout(400); const sheet = await T();
   await tapEl('#treatOpen'); await page.waitForTimeout(400); const got = await T();
   pass('the daily treat opens from level 3, once a day, for stars', early.hidden && !home.hidden && home.ready && sheet.sheet && sheet.sub === 'Day 1 of 7' && sheet.open === 'Open: 1 star'
