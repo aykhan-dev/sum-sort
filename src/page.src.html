@@ -1406,7 +1406,8 @@ function buildLevel(n, resume = null) {
   boardSig = daily || rush ? '' : levelSig(def);
   const hk = rush ? 'rush' : daily ? 'daily' : n;   // a daily opened from a link at level 1 is not level 1
   if (hk !== handLevel) { boardTouched = false; handLevel = hk; }   // a touch on this level counts until another level is built
-  hideHand(); if (showsHand()) handTimer = setTimeout(showHand, 900);
+  hideHand();
+  if (showsHand()) { prepareGuide(); handTimer = setTimeout(showHand, 900); }
   kbFocus = null;
 }
 /* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made.
@@ -1416,60 +1417,132 @@ const showsHand = () => !rush && moveCount === 0 && !boardTouched && !sel && (le
 const firstBoard = () => levelNo === 1 && !rush;   // (a daily played before level 1 is cleared came from a link: still a first board)
 function showHand(again = false) {
   if (homeOpen || won || !(again ? firstBoard() && !sel : showsHand()) || !plan || !plan[0]) return;
-  if (!guide) guide = makeGuide();
-  guide.move = plan[0]; dressGhost(topOf(plan[0].src));
+  if (!guide) { prepareGuide(() => showHand(again)); return; }   // still being sculpted: shown the moment it is ready
+  guide.move = plan[0]; guide.t = 0; dressGhost(topOf(plan[0].src));
   handOn = true; handT0 = performance.now(); poseGuide(0);
 }
 function hideHand() {
   clearTimeout(handTimer); handOn = false;
-  if (guide) guide.hand.visible = guide.ghost.visible = guide.ripple.visible = false;
+  if (guide) guide.hand.visible = guide.ghost.visible = guide.taps.visible = false;
 }
 
 /* ---------------- the guide hand ----------------
-   A white cartoon glove with a raspberry cuff and the ink outline of the controls, lit like the candy and casting its
-   shadow on the counter. It reaches in from the player's side, presses the tile, glides over to the jar and presses
-   its badge, while a see-through copy of the tile lifts and flies in, the way the real one will. It is posed against
-   the camera every frame, so it reads the same on any screen, and it is not in playGroup, so a tap never lands on it.
-   Built on first use. Reduced motion: it rests on the tile, still. */
+   A round candy hand: a short plump finger, a thumb standing apart, round knuckles and a big round palm, melted into
+   one smooth body and glazed like the tiles, peach with a strawberry blush where it turns from the light. It bounces
+   in, squishes as it presses the tile and wobbles back like jelly, glides over to the jar leaning into the turn, and
+   presses the jar; each press rings out in two arcs and a pinch of sugar, and a see-through copy of the tile lifts
+   and flies in, the way the real one will. It is posed against the camera every frame, so it reads the same on any
+   screen, and it is not in playGroup, so a tap never lands on it. Sculpted once, in idle moments, when a board that
+   shows it is set up. Reduced motion: it rests on the tile, still. */
 let guide = null, handT0 = 0;
-const HAND_LOOP = 3400, HAND_SIZE = 1.05, HAND_TILT = 0.6, HAND_LEAN = 0.4;   // ms per demo; size; tilt toward the viewer and lean sideways (radians)
-function makeGuide() {
-  const glove = new THREE.MeshPhysicalMaterial({ color: 0xFFFFFF, roughness: 0.4, clearcoat: 0.6, clearcoatRoughness: 0.2 });
-  const cuff = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(RASP), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 });
-  // the outline: back faces pushed out along the normals, in ink
-  const ink = new THREE.ShaderMaterial({
-    side: THREE.BackSide, uniforms: { color: { value: new THREE.Color(INK) }, width: { value: 0.028 } },
-    vertexShader: `uniform float width; void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * width, 1.0); }`,
-    fragmentShader: `uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0);
-      #include <colorspace_fragment>
-    }` });
-  // the fingertip is the origin: +y runs up the finger to the wrist, +z is the back of the hand, +x the thumb side
+const HAND_LOOP = 3400, HAND_SIZE = 1.3, HAND_TILT = 0.6, HAND_LEAN = 0.4;   // ms per demo; size; tilt toward the viewer and lean sideways (radians)
+const PRESS_A = 640, PRESS_B = 2020;   // when the fingertip lands on the tile, then on the jar (ms into the demo)
+const TAP_GAP = 1.9;   // the opening in the tap arcs, toward the hand (radians)
+/* Surface nets: a mesh for the surface where sdf(x, y, z) = 0, sampled every `step`, each vertex settled onto the
+   surface and lit by the field's own gradient, so it shades as smooth as the shape it was sculpted from. A generator:
+   it yields after each slice of work, so it can be run a few milliseconds at a time (see prepareGuide). */
+const CUBE_EDGES = [0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7];   // corner pairs; a corner's bits are its x, y, z
+function* melt(sdf, lo, hi, step) {
+  const n = [0, 1, 2].map(a => Math.ceil((hi[a] - lo[a]) / step) + 1), [nx, ny, nz] = n, at = (x, y, z) => x + nx * (y + ny * z);
+  const f = new Float32Array(nx * ny * nz), cell = new Int32Array(nx * ny * nz).fill(-1), pos = [], idx = [], v = new Float32Array(8);
+  for (let z = 0, i = 0; z < nz; z++, yield) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++, i++) f[i] = sdf(lo[0] + x * step, lo[1] + y * step, lo[2] + z * step);
+  // one vertex in every cell the surface passes through, at the mean of its edge crossings
+  for (let z = 0; z < nz - 1; z++, yield) for (let y = 0; y < ny - 1; y++) for (let x = 0; x < nx - 1; x++) {
+    let inside = 0;
+    for (let c = 0; c < 8; c++) { v[c] = f[at(x + (c & 1), y + (c >> 1 & 1), z + (c >> 2))]; if (v[c] < 0) inside++; }
+    if (inside === 0 || inside === 8) continue;
+    let sx = 0, sy = 0, sz = 0, k = 0;
+    for (let e = 0; e < 24; e += 2) {
+      const a = CUBE_EDGES[e], b = CUBE_EDGES[e + 1];
+      if ((v[a] < 0) === (v[b] < 0)) continue;
+      const t = v[a] / (v[a] - v[b]);
+      sx += (a & 1) + ((b & 1) - (a & 1)) * t; sy += (a >> 1 & 1) + ((b >> 1 & 1) - (a >> 1 & 1)) * t; sz += (a >> 2) + ((b >> 2) - (a >> 2)) * t; k++;
+    }
+    cell[at(x, y, z)] = pos.length / 3;
+    pos.push(lo[0] + (x + sx / k) * step, lo[1] + (y + sy / k) * step, lo[2] + (z + sz / k) * step);
+  }
+  // one quad across every grid edge the surface cuts, joining the four cells around it, facing out
+  const p = [0, 0, 0], q = [0, 0, 0];
+  for (let z = 0; z < nz; z++, yield) for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+    const v0 = f[at(x, y, z)]; p[0] = x; p[1] = y; p[2] = z;
+    for (let a = 0; a < 3; a++) {
+      const u = (a + 1) % 3, w = (a + 2) % 3;
+      if (p[a] + 1 >= n[a] || p[u] < 1 || p[w] < 1 || p[u] > n[u] - 2 || p[w] > n[w] - 2) continue;
+      q[0] = x; q[1] = y; q[2] = z; q[a]++;
+      if ((v0 < 0) === (f[at(q[0], q[1], q[2])] < 0)) continue;
+      const c = [[0, 0], [-1, 0], [-1, -1], [0, -1]].map(([du, dw]) => { const r = [x, y, z]; r[u] += du; r[w] += dw; return cell[at(r[0], r[1], r[2])]; });
+      if (v0 < 0) idx.push(c[0], c[1], c[2], c[0], c[2], c[3]); else idx.push(c[0], c[2], c[1], c[0], c[3], c[2]);
+    }
+  }
+  const e = step * 0.5, nor = new Float32Array(pos.length), g = [0, 0, 0];
+  const grad = (x, y, z) => { g[0] = sdf(x + e, y, z) - sdf(x - e, y, z); g[1] = sdf(x, y + e, z) - sdf(x, y - e, z); g[2] = sdf(x, y, z + e) - sdf(x, y, z - e); return Math.sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]) || 1; };
+  for (let i = 0; i < pos.length; i += 3) {
+    if (i % 1500 === 0) yield;
+    let x = pos[i], y = pos[i + 1], z = pos[i + 2], l = grad(x, y, z);
+    const d = sdf(x, y, z) * 2 * e / (l * l); x -= g[0] * d; y -= g[1] * d; z -= g[2] * d;   // one Newton step onto the surface
+    l = grad(x, y, z);
+    pos[i] = x; pos[i + 1] = y; pos[i + 2] = z; nor[i] = g[0] / l; nor[i + 1] = g[1] / l; nor[i + 2] = g[2] / l;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setIndex(idx);
+  return geo;
+}
+/* the hand as a distance field: the fingertip is the origin, +y runs up the finger into the palm, +z is the back of
+   the hand, +x the thumb side. A short plump finger, a thumb standing apart, three round knuckles in a row and a big
+   round palm, all melted together; the knuckles barely touch, so they stay apart. */
+const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
+function bone(x, y, z, ax, ay, az, bx, by, bz, ra, rb) {   // a capsule from a to b whose radius runs from ra to rb
+  const px = x - ax, py = y - ay, pz = z - az, dx = bx - ax, dy = by - ay, dz = bz - az;
+  const h = clamp01((px * dx + py * dy + pz * dz) / (dx * dx + dy * dy + dz * dz)), qx = px - dx * h, qy = py - dy * h, qz = pz - dz * h;
+  return Math.sqrt(qx * qx + qy * qy + qz * qz) - (ra + (rb - ra) * h);
+}
+function ellipsoid(x, y, z, rx, ry, rz) {   // an ellipsoid (a close estimate of its distance)
+  const ax = x / rx, ay = y / ry, az = z / rz, bx = ax / rx, by = ay / ry, bz = az / rz, k0 = Math.sqrt(ax * ax + ay * ay + az * az);
+  return k0 * (k0 - 1) / (Math.sqrt(bx * bx + by * by + bz * bz) || 1e-6);
+}
+const KNUCKLES = [[-0.2, 0.3, 0.1], [-0.36, 0.33, 0.097], [-0.51, 0.41, 0.09]];   // where each curled finger rounds off, and how plump
+function handField(x, y, z) {
+  let knuckles = 9;
+  for (const [cx, cy, r] of KNUCKLES) knuckles = smin(knuckles, bone(x, y, z, cx, cy + 0.2, -0.03, cx, cy, -0.05, r, r), 0.015);
+  let d = smin(ellipsoid(x + 0.3, y - 0.72, z + 0.02, 0.33, 0.39, 0.19), knuckles, 0.06);   // the palm, and the curled fingers on it
+  d = smin(d, bone(x, y, z, 0, 0.13, 0.01, -0.02, 0.62, 0, 0.125, 0.135), 0.05);   // the pointing finger
+  return smin(d, bone(x, y, z, 0.27, 0.68, 0.02, -0.1, 0.98, -0.02, 0.11, 0.13), 0.05);   // the thumb
+}
+function* sculptGuide() {
   const hand = new THREE.Group();
-  const part = (geo, mat, at) => {
-    const m = new THREE.Mesh(geo, mat); m.position.copy(at); m.castShadow = true; m.add(new THREE.Mesh(geo, ink)); hand.add(m); return m;
-  };
-  const bone = (a, b, r) => {
-    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), len = d.length();
-    part(new THREE.CapsuleGeometry(r, len, 8, 20), glove, A.add(B).multiplyScalar(0.5)).quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
-  };
-  // parts meet at an angle or sit well inside one another: a near-flush overlap would draw a broken outline
-  bone([0, 0.1, 0], [0, 0.8, -0.03], 0.1);   // the pointing finger
-  part(new RoundedBoxGeometry(0.62, 0.6, 0.3, 4, 0.12), glove, new THREE.Vector3(-0.21, 1, -0.02));   // the back of the hand
-  [[-0.17, 0.098], [-0.32, 0.092], [-0.46, 0.082]].forEach(([x, r]) => {   // three fingers curled into the palm
-    bone([x, 0.8, -0.04], [x, 0.58, -0.2], r); bone([x, 0.58, -0.2], [x, 0.74, -0.33], r * 0.95);
-  });
-  bone([0.15, 1.16, -0.1], [0.25, 0.9, -0.15], 0.105); bone([0.25, 0.9, -0.15], [0.08, 0.68, -0.27], 0.095);   // the thumb, tucked in
-  const band = part(turned([v2(0, -0.12), v2(0.3, -0.12), v2(0.35, -0.07), v2(0.36, 0), v2(0.35, 0.07), v2(0.3, 0.12), v2(0, 0.12)], 24, 40),
-    cuff, new THREE.Vector3(-0.21, 1.42, -0.02));
-  band.scale.z = 0.62;
-  // the tile's see-through copy, dressed for each demo, and the ring a press leaves
+  // a peach glaze with the tiles' clear coat, and a strawberry sheen at the edges that keeps it apart from a pale counter
+  const glaze = new THREE.MeshPhysicalMaterial({ color: new THREE.Color('#F8C49A'), roughness: 0.34, clearcoat: 1, clearcoatRoughness: 0.06,
+    sheen: 1, sheenColor: new THREE.Color('#FF8FA3'), sheenRoughness: 0.45 });
+  const body = new THREE.Mesh(yield* melt(handField, [-0.68, -0.04, -0.26], [0.44, 1.2, 0.26], 0.02), glaze); body.castShadow = true; hand.add(body);
+  // the tile's see-through copy, dressed for each demo
   const ghost = new THREE.Group(), gBody = new THREE.Mesh(tileGeo), gTop = new THREE.Mesh(topDecalGeo), gFront = new THREE.Mesh(frontDecalGeo);
   gTop.rotation.x = -Math.PI / 2; gTop.position.y = TILE_H / 2 + 0.002; gFront.position.z = TILE_W / 2 + 0.002; ghost.add(gBody, gTop, gFront);
-  const ripple = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 64),
-    new THREE.MeshBasicMaterial({ color: new THREE.Color(RASP), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
-  ripple.renderOrder = 6;
-  hand.visible = ghost.visible = ripple.visible = false; scene.add(hand, ghost, ripple);
-  return { hand, ghost, parts: [gBody, gTop, gFront], ripple, move: null, face: null };
+  // two arcs that ring out from the fingertip at a press, open on the hand's side; drawn over the board
+  const taps = new THREE.Group();
+  for (let i = 0; i < 2; i++) {
+    const arc = new THREE.Mesh(new THREE.RingGeometry(0.84, 1, 48, 1, TAP_GAP / 2, Math.PI * 2 - TAP_GAP),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(RASP), transparent: true, opacity: 0, depthTest: false, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+    arc.renderOrder = 7; taps.add(arc);
+  }
+  hand.visible = ghost.visible = taps.visible = false; scene.add(hand, ghost, taps);
+  return { hand, ghost, parts: [gBody, gTop, gFront], taps, move: null, face: null, t: 0 };
+}
+/* Sculpting takes a while on a slow phone, so it runs in idle moments, at most 8 ms at a time, while home is up or the
+   board makes its entrance; once a board is waiting for the hand, a slice runs every frame. `then` runs once it is ready. */
+let sculpting = null;
+function prepareGuide(then) {
+  if (guide) { if (then) then(); return; }
+  if (!sculpting) {
+    const steps = sculptGuide(), waiting = [];
+    const run = () => {
+      const end = performance.now() + 8; let r;
+      do r = steps.next(); while (!r.done && performance.now() < end);
+      if (!r.done) { if (waiting.length) requestAnimationFrame(run); else idle(run); return; }
+      guide = r.value; sculpting = null; waiting.forEach(fn => fn());
+    };
+    sculpting = { waiting }; idle(run);
+  }
+  if (then) sculpting.waiting.push(then);
 }
 function dressGhost(tile) {
   const face = tile.hidden ? '?' : tile.v; if (guide.face === face) return; guide.face = face;
@@ -1482,17 +1555,24 @@ const gRight = new THREE.Vector3(), gUp = new THREE.Vector3(), gBack = new THREE
   gX = new THREE.Vector3(), gTmp = new THREE.Vector3(), gFA = new THREE.Vector3(), gFB = new THREE.Vector3(), gBasis = new THREE.Matrix4(), Y_UP = new THREE.Vector3(0, 1, 0);
 const spotA = new THREE.Vector3(), spotB = new THREE.Vector3(), hoverA = new THREE.Vector3(), liftA = new THREE.Vector3(), hoverB = new THREE.Vector3(),
   ghostFrom = new THREE.Vector3(), ghostAbove = new THREE.Vector3(), ghostCtrl = new THREE.Vector3();
-/* where the fingertip presses: near the front of the top tile on a dish, or under the number on a jar's badge
-   (a jar's own tiles sit behind glass) */
-const badgeSpot = (v, out) => out.set(v.x, BADGE_Y, v.z).addScaledVector(gUp, -0.3).addScaledVector(gBack, 0.15);
+/* where the fingertip presses: near the front of the top tile on a dish, or the glass of a jar just under its rim,
+   so the badge above stays in sight (a jar's own tiles sit behind the glass) */
+function jarSpot(v, out) {
+  gToCam.set(camera.position.x - v.x, 0, camera.position.z - v.z).normalize();
+  return out.set(v.x, 1.95, v.z).addScaledVector(gToCam, 0.84);
+}
 /* the line from fingertip to wrist: down the screen, leaning to one side and tilted toward the viewer, never into the counter */
 function handAxis(lean, out) {
   out.copy(gUp).multiplyScalar(-Math.cos(lean)).addScaledVector(gRight, Math.sin(lean)).multiplyScalar(Math.cos(HAND_TILT)).addScaledVector(gBack, Math.sin(HAND_TILT));
   if (out.y < 0.08) out.y = 0.08;
   return out.normalize();
 }
-/* low on the screen the hand lies further over, clear of the coach line; near the right edge it comes from the left */
-const leanAt = p => { gTmp.copy(p).project(camera); const l = HAND_LEAN + 0.5 * clamp01((-gTmp.y - 0.2) / 0.5); return gTmp.x > 0.55 ? -l : l; };
+/* the hand comes from below and to the left, the finger pointing up and over; low on the screen it lies further over,
+   clear of the coach line, and near the left edge it comes from the right instead */
+const leanAt = p => { gTmp.copy(p).project(camera); const l = HAND_LEAN + 0.5 * clamp01((-gTmp.y - 0.2) / 0.5); return gTmp.x < -0.55 ? l : -l; };
+/* a press: squashed down the finger, then a jelly wobble back (ms since the fingertip landed) */
+const squish = ms => ms < 0 ? 0 : ms < 110 ? 0.14 * Math.sin(Math.PI / 2 * ms / 110) : 0.14 * Math.exp(-7 * (ms - 110) / 1000) * Math.cos(16 * (ms - 110) / 1000);
+const smoother = k => k * k * k * (k * (k * 6 - 15) + 10);
 function poseGuide(ms) {
   const g = guide, m = g.move, t = ms % HAND_LOOP, span = (a, b) => clamp01((t - a) / (b - a));
   gRight.setFromMatrixColumn(camera.matrixWorld, 0); gUp.setFromMatrixColumn(camera.matrixWorld, 1); gBack.setFromMatrixColumn(camera.matrixWorld, 2);
@@ -1500,54 +1580,66 @@ function poseGuide(ms) {
   if (m.src.kind === 'stack') {
     gToCam.set(camera.position.x - from.x, 0, camera.position.z - from.z).normalize();
     spotA.set(from.x, dishSlotY(k) + TILE_H / 2 + 0.1, from.z).addScaledVector(gToCam, 0.3);
-  } else badgeSpot(from, spotA);
-  badgeSpot(to, spotB);
+  } else jarSpot(from, spotA);
+  jarSpot(to, spotB);
   const leanA = leanAt(spotA), leanB = leanAt(spotB);
   const fA = handAxis(leanA, gFA), fB = handAxis(leanB, gFB);
   hoverA.copy(spotA).addScaledVector(fA, 0.5); liftA.copy(spotA).addScaledVector(fA, 0.35).addScaledVector(Y_UP, 0.3); hoverB.copy(spotB).addScaledVector(fB, 0.45);
-  // the hand: in, press the tile, over to the jar, press its badge, out, and a rest before the next round
+  // the hand: bounces in, presses the tile, glides over to the jar, presses it, floats off, and rests
   const tip = g.hand.position; let scale = 1;
   if (REDUCED) { tip.copy(spotA); gF.copy(fA); }
-  else if (t < 320) { const e = ease.outCubic(span(0, 320)); tip.copy(hoverA).addScaledVector(fA, 0.4 * (1 - e)); gF.copy(fA); scale = ease.outBack(e); }
-  else if (t < 620) { tip.lerpVectors(hoverA, spotA, ease.inOutCubic(span(320, 620))); gF.copy(fA); }
-  else if (t < 780) { tip.copy(spotA).addScaledVector(fA, -0.08 * Math.sin(Math.PI * span(620, 780))); gF.copy(fA); }
-  else if (t < 1040) { tip.lerpVectors(spotA, liftA, ease.outCubic(span(780, 1040))); gF.copy(fA); }
-  else if (t < 1800) {
-    const e = ease.inOutCubic(span(1040, 1800));
-    tip.lerpVectors(liftA, hoverB, e).addScaledVector(Y_UP, 0.6 * Math.sin(Math.PI * e)); handAxis(leanA + (leanB - leanA) * e, gF);
+  else if (t < 360) { const e = ease.outCubic(span(0, 360)); tip.copy(hoverA).addScaledVector(fA, 0.35 * (1 - e)).addScaledVector(Y_UP, 0.25 * (1 - e)); gF.copy(fA); scale = ease.outBack(e); }
+  else if (t < PRESS_A) { tip.lerpVectors(hoverA, spotA, ease.inOutCubic(span(360, PRESS_A))); gF.copy(fA); }
+  else if (t < PRESS_A + 160) { tip.copy(spotA).addScaledVector(fA, -0.05 * Math.sin(Math.PI * span(PRESS_A, PRESS_A + 160))); gF.copy(fA); }
+  else if (t < PRESS_A + 420) { tip.lerpVectors(spotA, liftA, ease.outCubic(span(PRESS_A + 160, PRESS_A + 420))); gF.copy(fA); }
+  else if (t < PRESS_B - 200) {
+    // a soft arc, leaning into the way it goes
+    const e = smoother(span(PRESS_A + 420, PRESS_B - 200)), way = Math.sign(gTmp.copy(spotB).sub(spotA).dot(gRight)) || 1;
+    tip.lerpVectors(liftA, hoverB, e).addScaledVector(Y_UP, 0.55 * Math.sin(Math.PI * e));
+    handAxis(leanA + (leanB - leanA) * e - 0.3 * way * Math.sin(Math.PI * e), gF);
   }
-  else if (t < 2000) { tip.lerpVectors(hoverB, spotB, ease.inOutCubic(span(1800, 2000))); gF.copy(fB); }
-  else if (t < 2160) { tip.copy(spotB).addScaledVector(fB, -0.08 * Math.sin(Math.PI * span(2000, 2160))); gF.copy(fB); }
-  else if (t < 2400) { tip.lerpVectors(spotB, hoverB, ease.outCubic(span(2160, 2400))); gF.copy(fB); }
-  else { const e = span(2400, 2700); tip.copy(hoverB).addScaledVector(fB, 0.3 * ease.inQuad(e)); gF.copy(fB); scale = 1 - ease.inQuad(e); }
+  else if (t < PRESS_B) { tip.lerpVectors(hoverB, spotB, ease.inOutCubic(span(PRESS_B - 200, PRESS_B))); gF.copy(fB); }
+  else if (t < PRESS_B + 160) { tip.copy(spotB).addScaledVector(fB, -0.05 * Math.sin(Math.PI * span(PRESS_B, PRESS_B + 160))); gF.copy(fB); }
+  else if (t < PRESS_B + 400) { tip.lerpVectors(spotB, hoverB, ease.outCubic(span(PRESS_B + 160, PRESS_B + 400))); gF.copy(fB); }
+  else { const e = span(PRESS_B + 400, PRESS_B + 700); tip.copy(hoverB).addScaledVector(fB, 0.25 * e).addScaledVector(Y_UP, 0.3 * ease.inQuad(e)); gF.copy(fB); scale = 1 - ease.inQuad(e); }
   gB.copy(gBack).addScaledVector(gF, -gF.dot(gBack)).normalize(); gX.crossVectors(gF, gB);
   g.hand.quaternion.setFromRotationMatrix(gBasis.makeBasis(gX, gF, gB));
-  g.hand.scale.setScalar(HAND_SIZE * Math.max(0.001, scale)); g.hand.visible = scale > 0.01;
-  // the copy of the tile: lifts when the tile is pressed, flies in when the badge is, fades once it has landed
-  const gh = g.ghost, slot = jars[m.dst].tiles.length;
-  gh.visible = !REDUCED && t > 820 && t < 2820;
+  // squashed along the finger (the fingertip stays put), plumper across
+  const sq = REDUCED ? 0 : squish(t - PRESS_A) + squish(t - PRESS_B), size = HAND_SIZE * Math.max(0.001, scale);
+  g.hand.scale.set(size * (1 + sq * 0.5), size * (1 - sq), size * (1 + sq * 0.5)); g.hand.visible = scale > 0.01;
+  // the copy of the tile: lifts when the tile is pressed, flies in when the jar is, fades once it has landed
+  const gh = g.ghost, slot = jars[m.dst].tiles.length, fly = PRESS_B + 20;
+  gh.visible = !REDUCED && t > PRESS_A + 180 && t < fly + 780;
   if (gh.visible) {
-    ghostFrom.set(from.x, srcSlotY(m.src, k) + 0.42 * ease.outBack(span(820, 1010)), from.z);
+    ghostFrom.set(from.x, srcSlotY(m.src, k) + 0.42 * ease.outBack(span(PRESS_A + 180, PRESS_A + 370)), from.z);
     ghostAbove.set(to.x, 3.35, to.z); ghostCtrl.copy(ghostFrom).lerp(ghostAbove, 0.5); ghostCtrl.y = Math.max(ghostFrom.y, 3.35) + 1;
     gh.rotation.set(0, 0, 0);
-    if (t < 2040) { gh.position.copy(ghostFrom); gh.rotation.z = 0.05 * Math.sin(t * 0.009); }
-    else if (t < 2350) {
-      const e = ease.inOutCubic(span(2040, 2350)), a = (1 - e) * (1 - e), b = 2 * (1 - e) * e, c = e * e;
+    if (t < fly) { gh.position.copy(ghostFrom); gh.rotation.z = 0.05 * Math.sin(t * 0.009); }
+    else if (t < fly + 310) {
+      const e = ease.inOutCubic(span(fly, fly + 310)), a = (1 - e) * (1 - e), b = 2 * (1 - e) * e, c = e * e;
       gh.position.set(0, 0, 0).addScaledVector(ghostFrom, a).addScaledVector(ghostCtrl, b).addScaledVector(ghostAbove, c); gh.rotation.y = Math.sin(e * Math.PI) * 0.7;
     }
-    else gh.position.set(to.x, 3.35 + (to.y + jarSlotY(slot) - 3.35) * ease.inQuad(span(2350, 2520)), to.z);
-    const fade = Math.min(span(820, 900), 1 - span(2520, 2820));
+    else gh.position.set(to.x, 3.35 + (to.y + jarSlotY(slot) - 3.35) * ease.inQuad(span(fly + 310, fly + 480)), to.z);
+    const fade = Math.min(span(PRESS_A + 180, PRESS_A + 260), 1 - span(fly + 480, fly + 780));
     for (const p of g.parts) p.material.opacity = p.userData.alpha * fade;
   }
-  // the ring a press leaves: flat on the tile, or around the badge, facing the viewer
-  const r = g.ripple, pressA = span(640, 1160), pressB = span(2020, 2540), onA = t >= 640 && t < 1160, onB = t >= 2020 && t < 2540;
-  r.visible = !REDUCED && (onA || onB);
-  if (r.visible) {
-    const e = onA ? pressA : pressB, onTile = onA && m.src.kind === 'stack';
-    if (onTile) { r.position.set(from.x, dishSlotY(k) + TILE_H / 2 + 0.015, from.z); r.rotation.set(-Math.PI / 2, 0, 0); r.scale.setScalar(0.3 + 0.45 * ease.outCubic(e)); }
-    else { r.position.set((onA ? from : to).x, BADGE_Y, (onA ? from : to).z).addScaledVector(gBack, 0.02); r.quaternion.copy(camera.quaternion); r.scale.setScalar(0.42 + 0.35 * ease.outCubic(e)); }
-    r.material.opacity = 0.9 * (1 - e);
+  // the tap: two arcs ring out around the fingertip, the outer one a beat behind, open toward the hand
+  const taps = g.taps, since = t >= PRESS_B ? t - PRESS_B : t - PRESS_A;
+  taps.visible = !REDUCED && t >= PRESS_A && since < 620;
+  if (taps.visible) {
+    taps.position.copy(t >= PRESS_B ? spotB : spotA);
+    taps.quaternion.copy(camera.quaternion); taps.rotateZ(Math.atan2(gF.dot(gUp), gF.dot(gRight)));
+    taps.children.forEach((arc, i) => {
+      const e = clamp01((since - i * 90) / 520);
+      arc.scale.setScalar((0.36 + i * 0.2) * (0.85 + 0.3 * ease.outCubic(e))); arc.material.opacity = e > 0 ? 0.95 * (1 - ease.inQuad(e)) : 0;
+    });
   }
+}
+/* the demo as it plays (not as a test poses it): a pinch of sugar at each press */
+function tickGuide(ms) {
+  const t = ms % HAND_LOOP, before = guide.t; guide.t = t;
+  if (REDUCED) return;
+  for (const [at, spot] of [[PRESS_A, spotA], [PRESS_B, spotB]]) if (before < at && t >= at) burst(spot, 7, PAL_GOLD, 0.3);
 }
 function refreshHits() {
   hitMeshes = [];
@@ -2813,7 +2905,7 @@ function loop() {
     const b = finaleJar.view.badge, s = b.userData.base * (1 + 0.07 * Math.sin(t * 4.5)); b.scale.set(s, s, 1);
   }
   updateBursts(dt); updateConfetti(confetti, dt);
-  if (handOn) poseGuide(now - handT0);
+  if (handOn) { poseGuide(now - handT0); tickGuide(now - handT0); }
   // A board where nothing moves but the gently bobbing badges is drawn every other frame: the same look for about
   // half the battery. Not in the first 90 frames, which measure how fast this device draws.
   frameNo++;

@@ -63,13 +63,13 @@ const touch = async (kind, i, y) => { const p = await page.evaluate(([k, i, y]) 
 // 1. chapter 1: nothing but the board; a wrong jar says which tile it wants; cannot dead-end
 await go(1); let s = await S(); log('L1', s);
 pass('chapter 1 hides boosters and Moves/Par', s.trayHidden && s.hudHidden);
-// the hand is in the 3D scene: its fingertip presses the first move's tile, then the badge of that move's jar
-{ const h = await page.evaluate(() => { const m = __sumSort.plan[0], [onTile, onJar] = [620, 2000].map(t => __sumSort.handPose(t));
-    return { m, onTile, onJar, tile: __sumSort.screenOf('stack', m.src.i, 0.45), badge: __sumSort.screenOf('jar', m.dst, 3.08), dom: !!document.getElementById('hand') }; });
+// the hand is in the 3D scene: its fingertip presses the first move's tile, then that move's jar (times are its two presses)
+{ const h = await page.evaluate(() => { const m = __sumSort.plan[0], [onTile, onJar] = [640, 2020].map(t => __sumSort.handPose(t));
+    return { m, onTile, onJar, tile: __sumSort.screenOf('stack', m.src.i, 0.45), jar: __sumSort.screenOf('jar', m.dst, 1.4), dom: !!document.getElementById('hand') }; });
   const near = (p, q, px) => p && q && Math.hypot(p.x - q.x, p.y - q.y) <= px;
-  pass('the 3D hand presses the first move\'s tile, then its jar\'s badge', !h.dom && h.m.src.kind === 'stack' && h.onTile.src.i === h.m.src.i && h.onTile.dst === h.m.dst
-    && near(h.onTile.tip, h.onTile.a, 1) && near(h.onTile.a, h.tile, 40) && near(h.onJar.tip, h.onJar.b, 1) && near(h.onJar.b, h.badge, 40),
-    JSON.stringify({ tip: h.onTile.tip, tile: h.tile, jarTip: h.onJar.tip, badge: h.badge })); }
+  pass('the 3D hand presses the first move\'s tile, then its jar', !h.dom && h.m.src.kind === 'stack' && h.onTile.src.i === h.m.src.i && h.onTile.dst === h.m.dst
+    && near(h.onTile.tip, h.onTile.a, 1) && near(h.onTile.a, h.tile, 40) && near(h.onJar.tip, h.onJar.b, 1) && near(h.onJar.b, h.jar, 40),
+    JSON.stringify({ tip: h.onTile.tip, tile: h.tile, jarTip: h.onJar.tip, jar: h.jar })); }
 await page.screenshot({ path: SHOTS + '/hand-1.png' });
 await touch('stack', 0); await page.waitForTimeout(250);
 { const after = await page.evaluate(() => __sumSort.hand); await page.waitForTimeout(1200); const later = await page.evaluate(() => __sumSort.hand);

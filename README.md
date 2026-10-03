@@ -58,7 +58,7 @@ CI (`.github/workflows/ci.yml`) runs `npm run check` and the headless play-test 
 
 Boosters arrive one at a time: Undo (level 11), Hint (13), +1 Jar (15), Split (21).
 
-A 3D hand shows a new player what to do. It reaches into the scene, presses a tile and then the badge of the jar it belongs in, while a see-through copy of the tile flies in. It shows the first move of levels 1 and 2 and of the jar-to-jar lesson (level 12), and leaves at the first touch. On level 1 it also comes back with the next move whenever the player stops for a moment.
+A 3D hand shows a new player what to do: a round, glossy candy hand that bounces into the scene, presses a tile and then the jar it belongs in, squishing at each press while two arcs ring out from the fingertip and a see-through copy of the tile flies in. It shows the first move of levels 1 and 2 and of the jar-to-jar lesson (level 12), and leaves at the first touch. On level 1 it also comes back with the next move whenever the player stops for a moment.
 
 ## Daily puzzle
 
