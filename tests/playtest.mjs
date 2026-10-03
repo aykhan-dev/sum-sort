@@ -143,6 +143,8 @@ await go(16); await settled(); const w16 = await playOut(); log('win L16 (3 star
   const wj = await page.evaluate(() => ({ hidden: winJourney.hidden, on: winBar.querySelectorAll('.on').length, segs: winBar.children.length, next: winNext.textContent }));
   pass('the win card fills in the cleared level on the chapter bar', !wj.hidden && wj.segs === 8 && wj.on === 6 && wj.next === 'Up next: bigger sums and the daily puzzle at level 19', JSON.stringify(wj));
   await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const img = await page.evaluate(() => __sumSort.cardImage().length);
+  pass('the result is also drawn as a picture for share sheets', img > 20000, String(img));
   const t = await page.evaluate(() => window.__copied.at(-1) || '');
   pass('the win card shares a spoiler-free result', /^Sum Sort Level 16 ⭐⭐⭐\n8 moves, par 8 · no boosters\n🟩🟨🟨🟨/.test(t), JSON.stringify(t)); }
 await go(10); await settled(); const w10 = await playOut(); log('win L10 (chapter end)', w10); await page.screenshot({ path: SHOTS + '/win-chapter.png' });
@@ -265,6 +267,7 @@ await page.evaluate(() => { window.__sumSortRushSeed = 4242; __sumSort.goLevel(3
   await page.screenshot({ path: SHOTS + '/rush-end.png' });
   await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
   const shared = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('a rush result draws as a picture too', (await page.evaluate(() => __sumSort.cardImage().length)) > 20000);
   pass('Sugar Rush opens beside the daily, runs on a clock without boosters, and leaves the levels alone', card.two && card.shown && r0.r.left > 55 && /^Time (1:00|0:5\d) Score 0$/.test(r0.hud) && r0.tray && r0.last === 30, JSON.stringify({ card, r0 }));
   pass('a cleared rush board scores and wins time; the clock ends the run, keeps the best and shares it', r1.boards === 1 && r1.score >= 3 * 10 + 25 && end.title === 'New best!' && end.score === r1.score && end.best.best === r1.score && end.next === 'Play again' && /^Sum Sort Sugar Rush ⚡ \d+/.test(shared), JSON.stringify({ r1, end, shared }));
   await tapEl('#winHomeBtn'); const hr = await H();

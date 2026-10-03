@@ -70,6 +70,10 @@ From level 25 a second card sits beside the daily: a minute of quick, small boar
 
 Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop.
 
+## Sharing
+
+Every result can be shared: the daily, a level, a Sugar Rush score. The text is spoiler-free (stars, moves against par, one coloured square per seal, the streak, the link). On phones whose share sheet takes images, a picture of the result goes with it. A Sugar Rush share carries a challenge link: whoever opens it plays the same boards with the score to beat.
+
 ## Sound
 
 Every sound is made in the browser, no audio files: the effects, and a soft music loop that plays faster in a rush. Home has a music button beside the sound button; the sound button silences both.
