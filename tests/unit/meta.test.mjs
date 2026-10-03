@@ -291,3 +291,20 @@ test('daily links: the date and the moves go out, and come back only when they m
   const u = new URL(dailyUrl('https://x.dev/', '2027-01-03', 14));
   assert.deepEqual(parseDailyLink(u.search), { key: '2027-01-03', moves: 14 });
 });
+
+import { TREATS, treatReady, treatDay, treatAfter } from '../../src/meta.mjs';
+test('daily treat: one a day, days in a row climb the week to day 7, a missed day starts it over', () => {
+  assert.equal(TREATS.length, 7); assert.ok(TREATS.every((s, i) => i === 0 || s >= TREATS[i - 1]));
+  let t = null;
+  assert.ok(treatReady(t, '2026-10-05')); assert.equal(treatDay(t, '2026-10-05'), 1);
+  t = treatAfter(t, '2026-10-05'); assert.deepEqual(t, { day: 1, last: '2026-10-05', stars: 1, weeks: 0 });
+  assert.ok(!treatReady(t, '2026-10-05')); assert.equal(treatAfter(t, '2026-10-05'), t);   // once a day
+  for (let d = 6; d <= 11; d++) t = treatAfter(t, `2026-10-${String(d).padStart(2, '0')}`);
+  assert.equal(t.day, 7); assert.equal(t.stars, TREATS.reduce((a, b) => a + b)); assert.equal(t.weeks, 1);
+  assert.equal(treatDay(t, '2026-10-12'), 1);                                              // a new week
+  t = treatAfter(t, '2026-10-12'); t = treatAfter(t, '2026-10-13');
+  assert.equal(t.day, 2);
+  assert.equal(treatDay(t, '2026-10-15'), 1);                                              // a missed day
+  assert.ok(!treatReady(t, '2026-10-12')); assert.equal(treatDay(t, '2026-10-12'), 2);     // a clock set back
+  assert.equal(treatAfter({ day: 6, last: '2026-12-31', stars: 12, weeks: 0 }, '2027-01-01').day, 7);
+});

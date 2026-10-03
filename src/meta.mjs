@@ -209,6 +209,24 @@ export function rushShareText({ score, boards, newBest = false, beat = null, url
 export function challengeUrl(base, seed, score) {
   return base ? `${base}?rush=${seed >>> 0}&beat=${Math.max(0, Math.floor(score))}` : '';
 }
+/* ---------------- the daily treat ----------------
+   One treat a day from home, just for coming back: stars that count toward the candy boxes. Days in a row climb a
+   week of treats to the big one on day 7, then a new week starts; a missed day starts the week over. */
+export const TREATS = [1, 1, 2, 2, 3, 3, 6];   // stars, day 1 to day 7
+export const TREAT_OPENS = 3;                  // after the first two lessons
+export const treatReady = (t, today) => !t || dayGap(t.last, today) >= 1;
+/* the day of the week of treats that today is (or was, once opened): the day after yesterday's, day 1 after a gap */
+export function treatDay(t, today) {
+  if (!t) return 1;
+  const gap = dayGap(t.last, today);
+  return gap <= 0 ? t.day : gap === 1 ? t.day % 7 + 1 : 1;
+}
+export function treatAfter(t, today) {
+  if (!treatReady(t, today)) return t;
+  const day = treatDay(t, today);
+  return { day, last: today, stars: (t && t.stars || 0) + TREATS[day - 1], weeks: (t && t.weeks || 0) + (day === 7 ? 1 : 0) };
+}
+
 /* A shared daily is a link to the daily: whoever opens it gets a card to play today's board, even before level 19.
    It carries the date it was played and the sharer's moves, for the card to name. */
 export function dailyUrl(base, key, moves) {

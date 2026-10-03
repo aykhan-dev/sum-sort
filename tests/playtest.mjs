@@ -404,6 +404,22 @@ await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(
   const sent = await page.evaluate(() => ({ t: window.__copied.at(-1) || '', open: !document.getElementById('challenge').hidden, daily: __sumSort.daily }));
   pass('a friend\'s daily after yours compares the moves and sends yours back', /^A friend solved today's board in 99 moves; you took \d+\. You win this one! Send yours back\.$/.test(back.text)
     && back.label === 'Share yours' && /^Sum Sort Daily #7 .*\?daily=2026-10-07&moves=\d+$/s.test(sent.t) && !sent.open && !sent.daily, JSON.stringify({ back, sent })); }
+// 22. the daily treat: from level 3 a candy on home opens once a day for stars; days in a row climb the week
+{ const T = () => page.evaluate(() => ({ hidden: treatBtn.hidden, ready: treatBtn.classList.contains('ready'), sheet: !treat.hidden, sub: treatSub.textContent,
+    open: treatOpen.textContent, t: __sumSort.save.treat, total: __sumSort.totalStars(), focus: document.activeElement && document.activeElement.id }));
+  const early = await T();
+  await page.evaluate(() => { __sumSort.goLevel(5); __sumSort.showHome(); }); await page.waitForTimeout(600);
+  const home = await T();
+  await tapEl('#treatBtn'); await page.waitForTimeout(400); const sheet = await T();
+  await tapEl('#treatOpen'); await page.waitForTimeout(400); const got = await T();
+  pass('the daily treat opens from level 3, once a day, for stars', early.hidden && !home.hidden && home.ready && sheet.sheet && sheet.sub === 'Day 1 of 7' && sheet.open === 'Open: 1 star'
+    && got.t.day === 1 && got.total === home.total + 1 && !got.ready && got.open === 'See you tomorrow', JSON.stringify({ early, home, sheet, got }));
+  await page.keyboard.press('Escape'); await page.waitForTimeout(300); const shut = await T();
+  await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.showHome(); }); await page.waitForTimeout(300); const next = await T();
+  await page.evaluate(() => { __sumSort.openTreat(); treatOpen.click(); }); await page.waitForTimeout(300); const day2 = await T();
+  await page.evaluate(() => { treatClose.click(); window.__sumSortToday = '2026-10-10'; __sumSort.showHome(); __sumSort.openTreat(); }); await page.waitForTimeout(300); const gap = await T();
+  pass('days in a row climb the treats; a missed day starts the week over', !shut.sheet && shut.focus === 'treatBtn' && next.ready && day2.t.day === 2 && day2.t.stars === 2 && gap.sub === 'Day 1 of 7',
+    JSON.stringify({ shut, next: next.ready, day2: day2.t, gap: gap.sub })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

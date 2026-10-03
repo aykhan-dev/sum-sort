@@ -68,7 +68,7 @@ From level 25 a second card sits beside the daily: a minute of quick, small boar
 
 ## Stars and candy boxes
 
-Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop. A level cleared under three stars can be replayed from its win card; a replay never moves the progress back.
+Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop. From level 3, a wrapped candy on the home screen is a daily treat: open it once a day for stars (1, 1, 2, 2, 3, 3, then 6 on the seventh day in a row); a missed day starts the week over. A level cleared under three stars can be replayed from its win card; a replay never moves the progress back.
 
 ## Sharing
 
