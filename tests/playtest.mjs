@@ -281,6 +281,10 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-07'; }); await go(2
   const h13 = await H(); await tapEl('#playBtn'); await settled();
   const reloaded = board(await S());
   pass('a half-played level comes back as it was after the daily, and after closing the tab', inDaily === '2026-10-07' && before.moves === 3 && JSON.stringify(back) === JSON.stringify(before) && h13.level === 26 && JSON.stringify(reloaded) === JSON.stringify(before), JSON.stringify({ before, back, reloaded })); }
+// 13b. endless levels come in runs of ten, and closing one is celebrated like a chapter
+await page.evaluate(() => __sumSort.play()); await go(56); await settled();
+{ const w = await playOut();
+  pass('level 56 closes the first endless run of ten with the chapter rung', w.title === 'Run complete!' && /chapter-done/.test(w.cls) && w.tag === 'Levels 47–56 cleared' && w.text === 'Next run: levels 57–66.', JSON.stringify(w)); }
 // 14. a streak landing on 3 days gets its own celebration
 await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.save.streak = { count: 2, best: 2, last: '2026-10-07' }; __sumSort.showHome(); });
 await tapEl('#dailyBtn'); await settled();

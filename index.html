@@ -2340,6 +2340,8 @@ async function winLevel() {
   const stars = winStars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
   const perfect = stars === 3 && !def.exact && !def.teach;      // tutorial levels cannot be played badly, so they stay on the plain rung
   const chapterDone = !daily && levelNo === ch.to;
+  // past the chapters the journey counts runs of ten: closing one gets the chapter rung too
+  const run = !daily && ch.to === Infinity && levelNo !== TEST_LEVEL ? stretchOf(levelNo, ch) : null, runDone = !!run && levelNo === run.to;
   // the level is done the moment it is won: leaving now and coming back later starts the next one.
   // A daily counts for its own day and the streak, and leaves the levels where they were.
   let streakGrew = false;
@@ -2351,7 +2353,7 @@ async function winLevel() {
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; save.board = null; }
   const opened = boxesOpened(starsBefore, totalStars());
   // a streak landing on 3, 7, 14, 30 days gets the chapter rung: a second wave of candy and the long flourish
-  const milestone = daily && streakGrew ? streakMilestone(save.streak.count) : 0, big = chapterDone || !!milestone;
+  const milestone = daily && streakGrew ? streakMilestone(save.streak.count) : 0, big = chapterDone || !!milestone || runDone;
   persist();
   if (opened.length) sfx.box();
   // rung 3: level cleared
@@ -2375,13 +2377,14 @@ async function winLevel() {
   const next = CHAPTERS[CHAPTERS.indexOf(ch) + 1];
   ui.winCard.classList.toggle('perfect', perfect); ui.winCard.classList.toggle('chapter-done', big);
   ui.winEyebrow.textContent = daily ? `Daily #${dailyNumber(daily)} · ${dailyLabel(daily)}` : `Level ${levelNo} cleared`;
-  ui.winTitle.textContent = chapterDone ? `${ch.name} done!` : milestone ? `${milestone}-day streak!` : perfect ? 'Perfect!' : stars >= 2 ? 'Sweet!' : 'Sealed!';
+  ui.winTitle.textContent = chapterDone ? `${ch.name} done!` : milestone ? `${milestone}-day streak!` : runDone ? 'Run complete!' : perfect ? 'Perfect!' : stars >= 2 ? 'Sweet!' : 'Sealed!';
   ui.winTitle.classList.toggle('long', ui.winTitle.textContent.length > 10);
   ui.winStars.innerHTML = [1, 2, 3].map(i => STAR.replace('<svg', `<svg class="${i <= stars ? 'on' : ''}"`)).join('');
   ui.winStars.setAttribute('aria-label', `${stars} of 3 stars`);
   ui.winChapter.hidden = !big;
   if (chapterDone) { ui.winChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.winChapter.textContent = `Chapter complete: ${ch.name}`; }
   else if (milestone) { ui.winChapter.className = 'chapter-tag c-orange'; ui.winChapter.textContent = `${milestone} dailies in a row`; }
+  else if (runDone) { ui.winChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.winChapter.textContent = `Levels ${run.from}–${run.to} cleared`; }
   ui.winStats.hidden = !!def.exact || !!def.teach;
   ui.winMovesLabel.textContent = 'Moves'; ui.winParLabel.textContent = 'Par';
   ui.winMoves.textContent = moveCount; ui.winPar.textContent = def.par;
@@ -2391,6 +2394,7 @@ async function winLevel() {
     : (save.streak.count > 1 ? `${save.streak.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.';
   ui.winText.textContent = daily ? streakNote
     : chapterDone && next ? `Next up: ${next.name}. ${next.rule}`
+    : runDone ? `Next run: levels ${run.to + 1}–${run.to + 10}.`
     : def.exact || def.teach ? 'All jars sealed.'
     : stars === 3 ? 'No wasted moves.'
     : rescued ? 'Solved with a booster. Go without one for 3 stars.'
