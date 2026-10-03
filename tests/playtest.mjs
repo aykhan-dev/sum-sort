@@ -63,6 +63,14 @@ const touch = async (kind, i, y) => { const p = await page.evaluate(([k, i, y]) 
 // 1. chapter 1: nothing but the board; a wrong jar says which tile it wants; cannot dead-end
 await go(1); let s = await S(); log('L1', s);
 pass('chapter 1 hides boosters and Moves/Par', s.trayHidden && s.hudHidden);
+// the hand is in the 3D scene: its fingertip presses the first move's tile, then the badge of that move's jar
+{ const h = await page.evaluate(() => { const m = __sumSort.plan[0], [onTile, onJar] = [620, 2000].map(t => __sumSort.handPose(t));
+    return { m, onTile, onJar, tile: __sumSort.screenOf('stack', m.src.i, 0.45), badge: __sumSort.screenOf('jar', m.dst, 3.08), dom: !!document.getElementById('hand') }; });
+  const near = (p, q, px) => p && q && Math.hypot(p.x - q.x, p.y - q.y) <= px;
+  pass('the 3D hand presses the first move\'s tile, then its jar\'s badge', !h.dom && h.m.src.kind === 'stack' && h.onTile.src.i === h.m.src.i && h.onTile.dst === h.m.dst
+    && near(h.onTile.tip, h.onTile.a, 1) && near(h.onTile.a, h.tile, 40) && near(h.onJar.tip, h.onJar.b, 1) && near(h.onJar.b, h.badge, 40),
+    JSON.stringify({ tip: h.onTile.tip, tile: h.tile, jarTip: h.onJar.tip, badge: h.badge })); }
+await page.screenshot({ path: SHOTS + '/hand-1.png' });
 await touch('stack', 0); await page.waitForTimeout(250);
 { const after = await page.evaluate(() => __sumSort.hand); await page.waitForTimeout(1200); const later = await page.evaluate(() => __sumSort.hand);
   pass('the first level shows the first move with a hand, gone at the first touch and not back', handL1 && !after && !later, JSON.stringify({ handL1, after, later })); }
@@ -70,6 +78,12 @@ const wrong = await page.evaluate(() => { const v = __sumSort.stacks[0].tiles.at
 await touch('jar', wrong); await page.waitForTimeout(250); s = await S();
 pass('exact-fit jar rejects the wrong tile', s.moves === 0 && /wants the/.test(s.tip), s.tip);
 await page.evaluate(() => __sumSort.tap(null));
+// on the first level the hand comes back whenever the player stops: after a move, it shows the next one
+{ const m = await page.evaluate(() => __sumSort.plan[0]);
+  await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled();
+  const back = await page.waitForFunction(() => __sumSort.hand, null, { timeout: 20000 }).then(() => true, () => false);
+  const h = await page.evaluate(() => { const p = __sumSort.handPose(0), m = __sumSort.plan[0]; return { moves: __sumSort.moves, same: !!p && p.src.kind === m.src.kind && p.src.i === m.src.i && p.dst === m.dst }; });
+  pass('on the first level the hand comes back with the next move when the player stops', back && h.moves === 1 && h.same, JSON.stringify({ back, ...h })); }
 // 2. finger-down + overlapping moves: fire three full moves 60 ms apart on level 5 and check none is lost
 await go(5); await settled();
 const plan = await page.evaluate(() => __sumSort.plan.slice(0, 3).map(m => ({ s: m.src.i, d: m.dst })));
@@ -86,6 +100,8 @@ await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{
 await page.waitForTimeout(120); const selDown = (await S()).sel;
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 pass('selection starts on finger-down', !!selDown, JSON.stringify(selDown));
+await page.evaluate(() => __sumSort.tap(null)); await page.waitForTimeout(3000);
+pass('past the first level the hand stays away once the board was touched', !(await page.evaluate(() => __sumSort.hand)));
 // 3. booster unlocks
 const trays = {};
 for (const n of [10, 11, 12, 13, 15, 21]) { await go(n); trays[n] = (await S()).tray; }

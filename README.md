@@ -58,6 +58,8 @@ CI (`.github/workflows/ci.yml`) runs `npm run check` and the headless play-test 
 
 Boosters arrive one at a time: Undo (level 11), Hint (13), +1 Jar (15), Split (21).
 
+A 3D hand shows a new player what to do. It reaches into the scene, presses a tile and then the badge of the jar it belongs in, while a see-through copy of the tile flies in. It shows the first move of levels 1 and 2 and of the jar-to-jar lesson (level 12), and leaves at the first touch. On level 1 it also comes back with the next move whenever the player stops for a moment.
+
 ## Daily puzzle
 
 From level 19 the home screen offers one extra board a day, the same for everyone on that calendar date. It uses only the rules of the first three chapters. Monday is easy and the week climbs to Sunday (model fail rate 20% to 60%). Finishing dailies on consecutive days builds a streak, and a streak pays: each daily won on it adds bonus stars (+1 from three days in a row, +2 from a week, +3 from two weeks). Every daily of a week, Monday to Sunday, earns 5 more. In the day's last six hours, a streak with no freeze to cover a miss shows on the daily card when it ends. A daily never moves the level progress. The daily's win card stamps the day on the week's row and says what tomorrow brings.
@@ -84,4 +86,4 @@ Served over https (GitHub Pages), the page registers a service worker: after one
 
 ## Status
 
-Prototype, now with a daily puzzle (streaks, bonuses, a daily treat, shareable links), Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of 76 checks), not yet on real phones.
+Prototype, now with a daily puzzle (streaks, bonuses, a daily treat, shareable links), Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play and a 3D guide hand (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of 79 checks), not yet on real phones.

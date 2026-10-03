@@ -140,22 +140,6 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .vignette::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .6s ease;
   background:radial-gradient(110% 80% at 50% 42%,rgba(255,255,255,0) 40%,rgba(110,50,100,.34) 100%)}
 .stage.finale .vignette::after{opacity:1}
-/* the first move, shown by a hand: tap this tile, then this jar. The fingertip is the hotspot (24% 6% of the box). */
-.hand{position:absolute;left:0;top:0;width:58px;height:58px;margin:-3px 0 0 -14px;pointer-events:none;opacity:0;z-index:2;
-  transform-origin:24% 6%;filter:drop-shadow(0 8px 10px rgba(59,39,71,.32))}
-.hand svg{width:100%;height:100%}
-.hand.go{animation:handmove 2.8s ease-in-out .2s infinite both}
-@keyframes handmove{
-  0%{opacity:0;transform:translate(var(--x0),var(--y0)) translateY(18px)}
-  12%{opacity:1;transform:translate(var(--x0),var(--y0))}
-  19%{transform:translate(var(--x0),var(--y0)) scale(.84)}
-  27%{transform:translate(var(--x0),var(--y0))}
-  62%{transform:translate(var(--x1),var(--y1))}
-  69%{transform:translate(var(--x1),var(--y1)) scale(.84)}
-  77%{opacity:1;transform:translate(var(--x1),var(--y1))}
-  92%,100%{opacity:0;transform:translate(var(--x1),var(--y1))}
-}
-.hand.still{opacity:1;transform:translate(var(--x0),var(--y0))}
 /* the winning seal: one soft flash of light */
 .flash{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 40%,#FFFFFF 0%,rgba(255,255,255,.6) 40%,rgba(255,255,255,0) 75%);opacity:0}
 .flash.go{animation:flash .5s ease-out}
@@ -562,10 +546,6 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
     <p class="sr-only" id="srStatus" aria-live="polite"></p>
     <div class="vignette" aria-hidden="true"></div>
     <div class="flash" id="flash" aria-hidden="true"></div>
-    <div class="hand" id="hand" aria-hidden="true"><svg viewBox="0 0 48 48">
-      <path d="M14.5 4.5c2.2 0 4 1.8 4 4v13.2l1.6-.5c1.9-.6 3.9.4 4.6 2.2l.2.5 1.2-.3c2-.5 4 .6 4.6 2.5l.2.6.9-.1c2.3-.2 4.3 1.5 4.5 3.8l.6 6.4c.4 4.6-2.6 8.7-7.1 9.6l-4.4.9c-3.4.7-6.9-.5-9.2-3.1L6.6 33.8c-1.3-1.5-1.1-3.7.4-5 1.4-1.2 3.4-1.2 4.8 0l-1.3-15.3V8.5c0-2.2 1.8-4 4-4z" fill="#FFFFFF" stroke="#3B2747" stroke-width="2.2" stroke-linejoin="round"/>
-      <path d="M18.5 21.7v6.8M24.9 23.9v5.4M31 27.3v3.6" fill="none" stroke="#3B2747" stroke-width="2" stroke-linecap="round" opacity=".55"/>
-    </svg></div>
     <div class="callouts" id="callouts" aria-hidden="true"></div>
     <div class="top" id="topUi">
       <header class="bar">
@@ -1439,7 +1419,7 @@ const ui = {
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
   homeSound: $('homeSound'), homeMusic: $('homeMusic'), treatBtn: $('treatBtn'), treat: $('treat'), treatSub: $('treatSub'), treatRow: $('treatRow'),
-  treatText: $('treatText'), treatOpen: $('treatOpen'), treatClose: $('treatClose'), srStatus: $('srStatus'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'), hand: $('hand'),
+  treatText: $('treatText'), treatOpen: $('treatOpen'), treatClose: $('treatClose'), srStatus: $('srStatus'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
   modes: $('modes'), rush: $('rushBtn'), rushSub: $('rushSub'), winMovesLabel: $('winMovesLabel'), winParLabel: $('winParLabel'),
@@ -2045,24 +2025,146 @@ function buildLevel(n, resume = null) {
   hideHand(); if (showsHand()) handTimer = setTimeout(showHand, 900);
   kbFocus = null;
 }
-/* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made. */
+/* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made.
+   The very first board goes further: whenever the player stops to think, the hand comes back with the next move. */
 let handTimer = 0, handOn = false, boardTouched = false, handLevel = 0;   // a player who has already touched the board needs no hand
 const showsHand = () => !rush && moveCount === 0 && !boardTouched && !sel && (levelNo <= 2 || (!daily && !!def.teach));   // (a daily before level 3 came from a link)
-function placeHand() {
-  const m = plan && plan[0]; if (!m) return false;
-  const top = m.src.kind === 'stack' ? dishSlotY(stacks[m.src.i].tiles.length - 1) : jarSlotY(jars[m.src.i].tiles.length - 1);
-  const g0 = srcView(m.src).group.position, g1 = jars[m.dst].view.group.position, box = stage.getBoundingClientRect();
-  const a = screenPoint(new THREE.Vector3(g0.x, top + 0.25, g0.z)), b = screenPoint(new THREE.Vector3(g1.x, 1.4, g1.z));
-  const h = ui.hand.style;
-  h.setProperty('--x0', (a.x - box.left) + 'px'); h.setProperty('--y0', (a.y - box.top) + 'px');
-  h.setProperty('--x1', (b.x - box.left) + 'px'); h.setProperty('--y1', (b.y - box.top) + 'px');
-  return true;
+const firstBoard = () => levelNo === 1 && !rush;   // (a daily played before level 1 is cleared came from a link: still a first board)
+function showHand(again = false) {
+  if (homeOpen || won || !(again ? firstBoard() && !sel : showsHand()) || !plan || !plan[0]) return;
+  if (!guide) guide = makeGuide();
+  guide.move = plan[0]; dressGhost(topOf(plan[0].src));
+  handOn = true; handT0 = performance.now(); poseGuide(0);
 }
-function showHand() {
-  if (homeOpen || !showsHand() || !placeHand()) return;
-  handOn = true; ui.hand.classList.add(REDUCED ? 'still' : 'go');
+function hideHand() {
+  clearTimeout(handTimer); handOn = false;
+  if (guide) guide.hand.visible = guide.ghost.visible = guide.ripple.visible = false;
 }
-function hideHand() { clearTimeout(handTimer); handOn = false; ui.hand.classList.remove('go', 'still'); }
+
+/* ---------------- the guide hand ----------------
+   A white cartoon glove with a raspberry cuff and the ink outline of the controls, lit like the candy and casting its
+   shadow on the counter. It reaches in from the player's side, presses the tile, glides over to the jar and presses
+   its badge, while a see-through copy of the tile lifts and flies in, the way the real one will. It is posed against
+   the camera every frame, so it reads the same on any screen, and it is not in playGroup, so a tap never lands on it.
+   Built on first use. Reduced motion: it rests on the tile, still. */
+let guide = null, handT0 = 0;
+const HAND_LOOP = 3400, HAND_SIZE = 1.05, HAND_TILT = 0.6, HAND_LEAN = 0.4;   // ms per demo; size; tilt toward the viewer and lean sideways (radians)
+function makeGuide() {
+  const glove = new THREE.MeshPhysicalMaterial({ color: 0xFFFFFF, roughness: 0.4, clearcoat: 0.6, clearcoatRoughness: 0.2 });
+  const cuff = new THREE.MeshPhysicalMaterial({ color: new THREE.Color(RASP), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 });
+  // the outline: back faces pushed out along the normals, in ink
+  const ink = new THREE.ShaderMaterial({
+    side: THREE.BackSide, uniforms: { color: { value: new THREE.Color(INK) }, width: { value: 0.028 } },
+    vertexShader: `uniform float width; void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position + normal * width, 1.0); }`,
+    fragmentShader: `uniform vec3 color; void main() { gl_FragColor = vec4(color, 1.0);
+      #include <colorspace_fragment>
+    }` });
+  // the fingertip is the origin: +y runs up the finger to the wrist, +z is the back of the hand, +x the thumb side
+  const hand = new THREE.Group();
+  const part = (geo, mat, at) => {
+    const m = new THREE.Mesh(geo, mat); m.position.copy(at); m.castShadow = true; m.add(new THREE.Mesh(geo, ink)); hand.add(m); return m;
+  };
+  const bone = (a, b, r) => {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), len = d.length();
+    part(new THREE.CapsuleGeometry(r, len, 8, 20), glove, A.add(B).multiplyScalar(0.5)).quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  };
+  // parts meet at an angle or sit well inside one another: a near-flush overlap would draw a broken outline
+  bone([0, 0.1, 0], [0, 0.8, -0.03], 0.1);   // the pointing finger
+  part(new RoundedBoxGeometry(0.62, 0.6, 0.3, 4, 0.12), glove, new THREE.Vector3(-0.21, 1, -0.02));   // the back of the hand
+  [[-0.17, 0.098], [-0.32, 0.092], [-0.46, 0.082]].forEach(([x, r]) => {   // three fingers curled into the palm
+    bone([x, 0.8, -0.04], [x, 0.58, -0.2], r); bone([x, 0.58, -0.2], [x, 0.74, -0.33], r * 0.95);
+  });
+  bone([0.15, 1.16, -0.1], [0.25, 0.9, -0.15], 0.105); bone([0.25, 0.9, -0.15], [0.08, 0.68, -0.27], 0.095);   // the thumb, tucked in
+  const band = part(turned([v2(0, -0.12), v2(0.3, -0.12), v2(0.35, -0.07), v2(0.36, 0), v2(0.35, 0.07), v2(0.3, 0.12), v2(0, 0.12)], 24, 40),
+    cuff, new THREE.Vector3(-0.21, 1.42, -0.02));
+  band.scale.z = 0.62;
+  // the tile's see-through copy, dressed for each demo, and the ring a press leaves
+  const ghost = new THREE.Group(), gBody = new THREE.Mesh(tileGeo), gTop = new THREE.Mesh(topDecalGeo), gFront = new THREE.Mesh(frontDecalGeo);
+  gTop.rotation.x = -Math.PI / 2; gTop.position.y = TILE_H / 2 + 0.002; gFront.position.z = TILE_W / 2 + 0.002; ghost.add(gBody, gTop, gFront);
+  const ripple = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 64),
+    new THREE.MeshBasicMaterial({ color: new THREE.Color(RASP), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  ripple.renderOrder = 6;
+  hand.visible = ghost.visible = ripple.visible = false; scene.add(hand, ghost, ripple);
+  return { hand, ghost, parts: [gBody, gTop, gFront], ripple, move: null, face: null };
+}
+function dressGhost(tile) {
+  const face = tile.hidden ? '?' : tile.v; if (guide.face === face) return; guide.face = face;
+  [[tileMaterial(face), 0.5], [digitMaterial(face), 0.8], [digitMaterial(face, true), 0.8]].forEach(([mat, alpha], i) => {
+    const mesh = guide.parts[i]; mesh.material.dispose();
+    mesh.material = Object.assign(mat.clone(), { transparent: true, depthWrite: false }); mesh.userData.alpha = alpha;
+  });
+}
+const gRight = new THREE.Vector3(), gUp = new THREE.Vector3(), gBack = new THREE.Vector3(), gToCam = new THREE.Vector3(), gF = new THREE.Vector3(), gB = new THREE.Vector3(),
+  gX = new THREE.Vector3(), gTmp = new THREE.Vector3(), gFA = new THREE.Vector3(), gFB = new THREE.Vector3(), gBasis = new THREE.Matrix4(), Y_UP = new THREE.Vector3(0, 1, 0);
+const spotA = new THREE.Vector3(), spotB = new THREE.Vector3(), hoverA = new THREE.Vector3(), liftA = new THREE.Vector3(), hoverB = new THREE.Vector3(),
+  ghostFrom = new THREE.Vector3(), ghostAbove = new THREE.Vector3(), ghostCtrl = new THREE.Vector3();
+/* where the fingertip presses: near the front of the top tile on a dish, or under the number on a jar's badge
+   (a jar's own tiles sit behind glass) */
+const badgeSpot = (v, out) => out.set(v.x, BADGE_Y, v.z).addScaledVector(gUp, -0.3).addScaledVector(gBack, 0.15);
+/* the line from fingertip to wrist: down the screen, leaning to one side and tilted toward the viewer, never into the counter */
+function handAxis(lean, out) {
+  out.copy(gUp).multiplyScalar(-Math.cos(lean)).addScaledVector(gRight, Math.sin(lean)).multiplyScalar(Math.cos(HAND_TILT)).addScaledVector(gBack, Math.sin(HAND_TILT));
+  if (out.y < 0.08) out.y = 0.08;
+  return out.normalize();
+}
+/* low on the screen the hand lies further over, clear of the coach line; near the right edge it comes from the left */
+const leanAt = p => { gTmp.copy(p).project(camera); const l = HAND_LEAN + 0.5 * clamp01((-gTmp.y - 0.2) / 0.5); return gTmp.x > 0.55 ? -l : l; };
+function poseGuide(ms) {
+  const g = guide, m = g.move, t = ms % HAND_LOOP, span = (a, b) => clamp01((t - a) / (b - a));
+  gRight.setFromMatrixColumn(camera.matrixWorld, 0); gUp.setFromMatrixColumn(camera.matrixWorld, 1); gBack.setFromMatrixColumn(camera.matrixWorld, 2);
+  const from = srcView(m.src).group.position, to = jars[m.dst].view.group.position, k = srcList(m.src).length - 1;
+  if (m.src.kind === 'stack') {
+    gToCam.set(camera.position.x - from.x, 0, camera.position.z - from.z).normalize();
+    spotA.set(from.x, dishSlotY(k) + TILE_H / 2 + 0.1, from.z).addScaledVector(gToCam, 0.3);
+  } else badgeSpot(from, spotA);
+  badgeSpot(to, spotB);
+  const leanA = leanAt(spotA), leanB = leanAt(spotB);
+  const fA = handAxis(leanA, gFA), fB = handAxis(leanB, gFB);
+  hoverA.copy(spotA).addScaledVector(fA, 0.5); liftA.copy(spotA).addScaledVector(fA, 0.35).addScaledVector(Y_UP, 0.3); hoverB.copy(spotB).addScaledVector(fB, 0.45);
+  // the hand: in, press the tile, over to the jar, press its badge, out, and a rest before the next round
+  const tip = g.hand.position; let scale = 1;
+  if (REDUCED) { tip.copy(spotA); gF.copy(fA); }
+  else if (t < 320) { const e = ease.outCubic(span(0, 320)); tip.copy(hoverA).addScaledVector(fA, 0.4 * (1 - e)); gF.copy(fA); scale = ease.outBack(e); }
+  else if (t < 620) { tip.lerpVectors(hoverA, spotA, ease.inOutCubic(span(320, 620))); gF.copy(fA); }
+  else if (t < 780) { tip.copy(spotA).addScaledVector(fA, -0.08 * Math.sin(Math.PI * span(620, 780))); gF.copy(fA); }
+  else if (t < 1040) { tip.lerpVectors(spotA, liftA, ease.outCubic(span(780, 1040))); gF.copy(fA); }
+  else if (t < 1800) {
+    const e = ease.inOutCubic(span(1040, 1800));
+    tip.lerpVectors(liftA, hoverB, e).addScaledVector(Y_UP, 0.6 * Math.sin(Math.PI * e)); handAxis(leanA + (leanB - leanA) * e, gF);
+  }
+  else if (t < 2000) { tip.lerpVectors(hoverB, spotB, ease.inOutCubic(span(1800, 2000))); gF.copy(fB); }
+  else if (t < 2160) { tip.copy(spotB).addScaledVector(fB, -0.08 * Math.sin(Math.PI * span(2000, 2160))); gF.copy(fB); }
+  else if (t < 2400) { tip.lerpVectors(spotB, hoverB, ease.outCubic(span(2160, 2400))); gF.copy(fB); }
+  else { const e = span(2400, 2700); tip.copy(hoverB).addScaledVector(fB, 0.3 * ease.inQuad(e)); gF.copy(fB); scale = 1 - ease.inQuad(e); }
+  gB.copy(gBack).addScaledVector(gF, -gF.dot(gBack)).normalize(); gX.crossVectors(gF, gB);
+  g.hand.quaternion.setFromRotationMatrix(gBasis.makeBasis(gX, gF, gB));
+  g.hand.scale.setScalar(HAND_SIZE * Math.max(0.001, scale)); g.hand.visible = scale > 0.01;
+  // the copy of the tile: lifts when the tile is pressed, flies in when the badge is, fades once it has landed
+  const gh = g.ghost, slot = jars[m.dst].tiles.length;
+  gh.visible = !REDUCED && t > 820 && t < 2820;
+  if (gh.visible) {
+    ghostFrom.set(from.x, srcSlotY(m.src, k) + 0.42 * ease.outBack(span(820, 1010)), from.z);
+    ghostAbove.set(to.x, 3.35, to.z); ghostCtrl.copy(ghostFrom).lerp(ghostAbove, 0.5); ghostCtrl.y = Math.max(ghostFrom.y, 3.35) + 1;
+    gh.rotation.set(0, 0, 0);
+    if (t < 2040) { gh.position.copy(ghostFrom); gh.rotation.z = 0.05 * Math.sin(t * 0.009); }
+    else if (t < 2350) {
+      const e = ease.inOutCubic(span(2040, 2350)), a = (1 - e) * (1 - e), b = 2 * (1 - e) * e, c = e * e;
+      gh.position.set(0, 0, 0).addScaledVector(ghostFrom, a).addScaledVector(ghostCtrl, b).addScaledVector(ghostAbove, c); gh.rotation.y = Math.sin(e * Math.PI) * 0.7;
+    }
+    else gh.position.set(to.x, 3.35 + (to.y + jarSlotY(slot) - 3.35) * ease.inQuad(span(2350, 2520)), to.z);
+    const fade = Math.min(span(820, 900), 1 - span(2520, 2820));
+    for (const p of g.parts) p.material.opacity = p.userData.alpha * fade;
+  }
+  // the ring a press leaves: flat on the tile, or around the badge, facing the viewer
+  const r = g.ripple, pressA = span(640, 1160), pressB = span(2020, 2540), onA = t >= 640 && t < 1160, onB = t >= 2020 && t < 2540;
+  r.visible = !REDUCED && (onA || onB);
+  if (r.visible) {
+    const e = onA ? pressA : pressB, onTile = onA && m.src.kind === 'stack';
+    if (onTile) { r.position.set(from.x, dishSlotY(k) + TILE_H / 2 + 0.015, from.z); r.rotation.set(-Math.PI / 2, 0, 0); r.scale.setScalar(0.3 + 0.45 * ease.outCubic(e)); }
+    else { r.position.set((onA ? from : to).x, BADGE_Y, (onA ? from : to).z).addScaledVector(gBack, 0.02); r.quaternion.copy(camera.quaternion); r.scale.setScalar(0.42 + 0.35 * ease.outCubic(e)); }
+    r.material.opacity = 0.9 * (1 - e);
+  }
+}
 function refreshHits() {
   hitMeshes = [];
   const own = (view, owner) => { view.group.userData.owner = owner; view.hit.userData = { volume: true, owner }; hitMeshes.push(view.hit); };
@@ -2507,7 +2609,8 @@ const replaying = () => replayOf === levelNo && !daily && !rush;
 function replayLevel() { replayOf = levelNo; goLevel(levelNo); }
 function restart() { if (!daily && !rush) { save.board = null; persist(); } goLevel(levelNo); }
 
-/* idle coaching: after 8 s without a tap (sooner while a rule is being learned) the next good move pulses, free of charge */
+/* idle coaching: after 8 s without a tap (sooner while a rule is being learned) the next good move pulses, free of charge;
+   on the first board the hand shows it instead */
 let idleTimer = 0;
 function armIdle() {
   clearTimeout(idleTimer);
@@ -2516,10 +2619,13 @@ function armIdle() {
   const id = buildId, delay = def.exact || def.teach || softDead ? 2200 : 8000;
   idleTimer = setTimeout(() => {
     if (id !== buildId || won || dead || !plan || homeOpen) return;
-    if (!busy && !flights && !sel && !splitArmed) {
-      const m = plan[0], ring = srcView(m.src).selRing;
-      ringTo(ring, 0.8, 260).then(() => wait(380)).then(() => { if (!sel) ringTo(ring, 0, 300); });
-      pulseBadge(jars[m.dst].view, 2);
+    if (!busy && !flights && !sel && !splitArmed && !handOn) {
+      if (firstBoard()) showHand(true);   // the first board: the hand comes back to show the next move
+      else {
+        const m = plan[0], ring = srcView(m.src).selRing;
+        ringTo(ring, 0.8, 260).then(() => wait(380)).then(() => { if (!sel) ringTo(ring, 0, 300); });
+        pulseBadge(jars[m.dst].view, 2);
+      }
     }
     armIdle();
   }, delay);
@@ -3309,7 +3415,7 @@ for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { 
 
 /* ---------------- loop ---------------- */
 const clock = new THREE.Clock(); let frames = 0, slowMs = 0, frameNo = 0, renders = 0, drawNext = false;
-const liveScene = () => !!(tweens.size || flights || bursts.length || (confetti && confetti.moving) || sel || kick.amount);
+const liveScene = () => !!(tweens.size || flights || bursts.length || (confetti && confetti.moving) || sel || kick.amount || (handOn && !REDUCED));
 function loop() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime, now = performance.now();
   if (rush && !rush.over && !homeOpen) { if (rushLeft() <= 0) endRush(); else renderRushHud(); }
@@ -3323,6 +3429,7 @@ function loop() {
     const b = finaleJar.view.badge, s = b.userData.base * (1 + 0.07 * Math.sin(t * 4.5)); b.scale.set(s, s, 1);
   }
   updateBursts(dt); updateConfetti(confetti, dt);
+  if (handOn) poseGuide(now - handT0);
   // A board where nothing moves but the gently bobbing badges is drawn every other frame: the same look for about
   // half the battery. Not in the first 90 frames, which measure how fast this device draws.
   frameNo++;
@@ -3361,7 +3468,7 @@ async function start(hot) {
     pendingChallenge = challenge; ui.challengeBeat.textContent = String(challenge.beat); prepareRun(challenge.seed);
     ui.challenge.hidden = false; ui.home.inert = true; ui.challengePlay.focus({ preventScroll: true });
   }
-  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); drawNext = true; if (handOn) placeHand(); }).observe(stage);
+  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); drawNext = true; }).observe(stage);
   renderer.setAnimationLoop(loop);
   // hooks for automated play-tests and for measuring the build against the Taste File rubric
   const toPage = screenPoint;
@@ -3372,7 +3479,7 @@ async function start(hot) {
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
-    get hand() { return handOn; }, openTreat, cardImage: () => drawCard(resultCard()).toDataURL('image/png'), dailyCardImage: key => drawCard(dailyCard(key)).toDataURL('image/png'), get frameNo() { return frameNo; }, get renders() { return renders; }, get liveScene() { return liveScene(); }, get challenge() { return !ui.challenge.hidden && pendingChallenge; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
+    get hand() { return handOn; }, handPose(ms) { if (!handOn) return null; poseGuide(ms); const m = guide.move; return { tip: toPage(guide.hand.position), a: toPage(spotA), b: toPage(spotB), src: { ...m.src }, dst: m.dst, shown: guide.hand.visible, ghost: guide.ghost.visible }; }, openTreat, cardImage: () => drawCard(resultCard()).toDataURL('image/png'), dailyCardImage: key => drawCard(dailyCard(key)).toDataURL('image/png'), get frameNo() { return frameNo; }, get renders() { return renders; }, get liveScene() { return liveScene(); }, get challenge() { return !ui.challenge.hidden && pendingChallenge; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel: n => { daily = null; rush = null; replayOf = 0; goLevel(n); }, get replaying() { return replaying(); }, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },   // (a test's goLevel jumps to a level, out of any daily or rush)
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
