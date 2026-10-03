@@ -276,3 +276,18 @@ test('week: Monday to Sunday around any day, across a month and a year', () => {
   assert.deepEqual([weekOf('2027-01-01')[0], weekOf('2027-01-01')[6]], ['2026-12-28', '2027-01-03']);
   for (const k of weekOf('2027-03-30')) assert.ok(weekOf(k).includes('2027-03-30'));
 });
+
+import { dailyUrl, parseDailyLink } from '../../src/meta.mjs';
+test('daily links: the date and the moves go out, and come back only when they make sense', () => {
+  assert.equal(dailyUrl('https://x.dev/sum-sort/', '2026-10-07', 9), 'https://x.dev/sum-sort/?daily=2026-10-07&moves=9');
+  assert.equal(dailyUrl('https://x.dev/', '2026-10-07', 0), 'https://x.dev/?daily=2026-10-07');
+  assert.equal(dailyUrl('', '2026-10-07', 9), '');
+  assert.deepEqual(parseDailyLink('?daily=2026-10-07&moves=9'), { key: '2026-10-07', moves: 9 });
+  assert.deepEqual(parseDailyLink('?daily=2026-10-07'), { key: '2026-10-07', moves: null });
+  assert.deepEqual(parseDailyLink('?daily=2026-10-07&moves=abc'), { key: '2026-10-07', moves: null });
+  assert.deepEqual(parseDailyLink('?daily=2026-10-07&moves=0'), { key: '2026-10-07', moves: null });
+  for (const bad of ['', '?daily=', '?daily=2026-02-31', '?daily=2026-9-7', '?daily=2026-09-30', '?daily=2026-10-07x', '?rush=1&beat=2'])
+    assert.equal(parseDailyLink(bad), null, bad);
+  const u = new URL(dailyUrl('https://x.dev/', '2027-01-03', 14));
+  assert.deepEqual(parseDailyLink(u.search), { key: '2027-01-03', moves: 14 });
+});

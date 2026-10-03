@@ -72,7 +72,7 @@ Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 
 
 ## Sharing
 
-Every result can be shared: the daily, a level, a Sugar Rush score. The text is spoiler-free (stars, moves against par, one coloured square per seal, the streak, the link). On phones whose share sheet takes images, a picture of the result goes with it. A Sugar Rush share carries a challenge link: whoever opens it plays the same boards with the score to beat.
+Every result can be shared: the daily, a level, a Sugar Rush score. The text is spoiler-free (stars, moves against par, one coloured square per seal, the streak, the link). On phones whose share sheet takes images, a picture of the result goes with it. A Sugar Rush share carries a challenge link: whoever opens it plays the same boards with the score to beat. A daily share links to the daily: whoever opens it gets a card for today's board and can play it at once, even on their first visit.
 
 ## Sound
 

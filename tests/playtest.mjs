@@ -380,6 +380,30 @@ await page.evaluate(() => __sumSort.play()); await go(20); await settled();
   await page.click('#homeBtn', { force: true }); await page.waitForTimeout(800);
   const h = await page.evaluate(() => ({ level: __sumSort.level, home: __sumSort.home, board: __sumSort.save.board, last: __sumSort.save.last, replaying: __sumSort.replaying }));
   pass('Home in the middle of a replay goes on to the next new level', h.level === 25 && h.home && !h.board && h.last === 25 && !h.replaying, JSON.stringify(h)); }
+// 21. a shared daily is a link to today's board: a brand-new player gets a card with the rule, then the board with the first-move hand
+await page.addInitScript(() => { window.__sumSortToday = '2026-10-07';
+  if (location.search.includes('daily=') && !sessionStorage.getItem('__new')) { localStorage.removeItem('sumsort.proto.v1'); sessionStorage.setItem('__new', '1'); } });   // a new player, once
+await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0); await page.evaluate(() => __sumSort.dropQuality());
+{ const card = await page.evaluate(() => ({ c: __sumSort.challenge, search: location.search, title: document.getElementById('challengeTitle').textContent,
+    text: document.getElementById('challengeText').textContent, level: __sumSort.level }));
+  pass('a shared daily opens a card for today\'s board, even for a new player', !!card.c && card.c.daily === '2026-10-07' && card.search === '' && card.title === 'Daily #7'
+    && /^A friend solved today's board in 9 moves\. .*Fill each jar/.test(card.text) && card.level === 1, JSON.stringify(card));
+  await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
+  await tapEl('#challengePlay'); await settled();
+  await page.waitForFunction(() => __sumSort.hand, null, { timeout: 30000 });
+  const d = await page.evaluate(() => ({ daily: __sumSort.daily, level: __sumSort.level, hand: __sumSort.hand }));
+  const w = await playOut();
+  const after = await page.evaluate(() => ({ result: !!__sumSort.save.daily['2026-10-07'], last: __sumSort.save.last, streak: __sumSort.save.streak && __sumSort.save.streak.count, share: __sumSort.resultText() }));
+  pass('the shared daily plays from level 1 with the hand, and its own result links back to the daily', d.daily === '2026-10-07' && d.level === 1 && d.hand && w.shown
+    && after.result && after.last === 1 && after.streak === 1 && /\?daily=2026-10-07&moves=\d+$/.test(after.share), JSON.stringify({ d, after }));
+  // a friend's link after today's is done: their moves against yours, and yours to send back
+  await page.goto(URL_ + '?daily=2026-10-07&moves=99'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0);
+  await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
+  const back = await page.evaluate(() => ({ text: document.getElementById('challengeText').textContent, label: document.getElementById('challengePlayLabel').textContent }));
+  await tapEl('#challengePlay'); await page.waitForTimeout(400);
+  const sent = await page.evaluate(() => ({ t: window.__copied.at(-1) || '', open: !document.getElementById('challenge').hidden, daily: __sumSort.daily }));
+  pass('a friend\'s daily after yours compares the moves and sends yours back', /^A friend solved today's board in 99 moves; you took \d+\. You win this one! Send yours back\.$/.test(back.text)
+    && back.label === 'Share yours' && /^Sum Sort Daily #7 .*\?daily=2026-10-07&moves=\d+$/s.test(sent.t) && !sent.open && !sent.daily, JSON.stringify({ back, sent })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

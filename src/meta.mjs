@@ -209,6 +209,17 @@ export function rushShareText({ score, boards, newBest = false, beat = null, url
 export function challengeUrl(base, seed, score) {
   return base ? `${base}?rush=${seed >>> 0}&beat=${Math.max(0, Math.floor(score))}` : '';
 }
+/* A shared daily is a link to the daily: whoever opens it gets a card to play today's board, even before level 19.
+   It carries the date it was played and the sharer's moves, for the card to name. */
+export function dailyUrl(base, key, moves) {
+  return base ? `${base}?daily=${key}${moves > 0 ? `&moves=${Math.floor(moves)}` : ''}` : '';
+}
+/* the daily in a page address, or null: a real calendar date from the first daily on; moves only when sane */
+export function parseDailyLink(search) {
+  const q = new URLSearchParams(search || ''), key = q.get('daily'), moves = q.get('moves');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key || '') || addDays(key, 0) !== key || key < DAILY_FIRST) return null;
+  return { key, moves: /^\d{1,3}$/.test(moves || '') && Number(moves) > 0 ? Number(moves) : null };
+}
 /* the challenge in a page address, or null; anything malformed is ignored */
 export function parseChallenge(search) {
   const q = new URLSearchParams(search || ''), seed = q.get('rush'), beat = q.get('beat');

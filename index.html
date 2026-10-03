@@ -337,6 +337,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .challenge-card .bolt svg{width:32px;height:32px;fill:#FFFFFF}
 .challenge-card .eyebrow{margin:6px 0 0;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#C2561A}
 .challenge-card h2{margin:0;font:700 44px/1 var(--display);color:var(--raspberry)}
+.challenge-card .cal{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;align-content:center;line-height:1;text-shadow:0 1px 0 rgba(60,20,120,.35)}
+.challenge-card .cal small{font:800 11px var(--body);letter-spacing:.1em;text-transform:uppercase;opacity:.92}
+.challenge-card .cal b{font:700 25px var(--display);margin-top:1px}
+.challenge-card .cal[hidden],.challenge-card .bolt[hidden]{display:none}
+.challenge-card.invite .eyebrow{color:#6F45C9}
 .challenge-text{margin:4px 0 6px;font-size:14px;font-weight:700;color:var(--ink-soft);text-wrap:balance}
 .shop-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .shop-head h2{margin:0 0 0 4px;font:700 30px var(--display);color:var(--raspberry)}
@@ -671,15 +676,16 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 
   <section class="shop" id="challenge" role="dialog" aria-modal="true" aria-labelledby="challengeTitle" hidden>
     <div class="shop-card challenge-card">
-      <span class="bolt gummy c-orange" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 2 4.5 13.5h6L9.5 22l9-12h-6z"/></svg></span>
-      <p class="eyebrow">Sugar Rush challenge</p>
+      <span class="bolt gummy c-orange" id="challengeBolt" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 2 4.5 13.5h6L9.5 22l9-12h-6z"/></svg></span>
+      <span class="cal gummy c-grape" id="challengeCal" aria-hidden="true" hidden><small id="challengeMon">Oct</small><b id="challengeDay">1</b></span>
+      <p class="eyebrow" id="challengeEyebrow">Sugar Rush challenge</p>
       <h2 id="challengeTitle">Beat <span id="challengeBeat">0</span></h2>
-      <p class="challenge-text">A friend scored this in Sugar Rush. You get the same boards and one minute. Fill each jar with tiles that add up to its number; clean seals in a row score more.</p>
+      <p class="challenge-text" id="challengeText">A friend scored this in Sugar Rush. You get the same boards and one minute. Fill each jar with tiles that add up to its number; clean seals in a row score more.</p>
       <div class="win-actions">
         <button id="challengeLater" class="ghost raised" type="button" aria-label="Not now">
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
-        <button id="challengePlay" class="cta gummy c-orange" type="button">Play it
+        <button id="challengePlay" class="cta gummy c-orange" type="button"><span id="challengePlayLabel">Play it</span>
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
       </div>
@@ -1158,6 +1164,17 @@ function rushShareText({ score, boards, newBest = false, beat = null, url = '' }
 function challengeUrl(base, seed, score) {
   return base ? `${base}?rush=${seed >>> 0}&beat=${Math.max(0, Math.floor(score))}` : '';
 }
+/* A shared daily is a link to the daily: whoever opens it gets a card to play today's board, even before level 19.
+   It carries the date it was played and the sharer's moves, for the card to name. */
+function dailyUrl(base, key, moves) {
+  return base ? `${base}?daily=${key}${moves > 0 ? `&moves=${Math.floor(moves)}` : ''}` : '';
+}
+/* the daily in a page address, or null: a real calendar date from the first daily on; moves only when sane */
+function parseDailyLink(search) {
+  const q = new URLSearchParams(search || ''), key = q.get('daily'), moves = q.get('moves');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key || '') || addDays(key, 0) !== key || key < DAILY_FIRST) return null;
+  return { key, moves: /^\d{1,3}$/.test(moves || '') && Number(moves) > 0 ? Number(moves) : null };
+}
 /* the challenge in a page address, or null; anything malformed is ignored */
 function parseChallenge(search) {
   const q = new URLSearchParams(search || ''), seed = q.get('rush'), beat = q.get('beat');
@@ -1353,7 +1370,9 @@ const ui = {
   homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
   winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext'),
   shop: $('shop'), shopClose: $('shopClose'), record: $('record'),
-  challenge: $('challenge'), challengeBeat: $('challengeBeat'), challengePlay: $('challengePlay'), challengeLater: $('challengeLater'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
+  challenge: $('challenge'), challengeBeat: $('challengeBeat'), challengeCard: $('challenge').firstElementChild, challengeBolt: $('challengeBolt'),
+  challengeCal: $('challengeCal'), challengeMon: $('challengeMon'), challengeDay: $('challengeDay'), challengeEyebrow: $('challengeEyebrow'),
+  challengeTitle: $('challengeTitle'), challengeText: $('challengeText'), challengePlayLabel: $('challengePlayLabel'), challengePlay: $('challengePlay'), challengeLater: $('challengeLater'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
   reward: $('winReward'), rewardSw: $('rewardSw'), rewardName: $('rewardName'), rewardUse: $('rewardUse')
 };
 
@@ -1950,7 +1969,7 @@ function buildLevel(n, resume = null) {
 }
 /* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made. */
 let handTimer = 0, handOn = false, boardTouched = false, handLevel = 0;   // a player who has already touched the board needs no hand
-const showsHand = () => !daily && !rush && moveCount === 0 && !boardTouched && !sel && (levelNo <= 2 || !!def.teach);
+const showsHand = () => !rush && moveCount === 0 && !boardTouched && !sel && (levelNo <= 2 || (!daily && !!def.teach));   // (a daily before level 3 came from a link)
 function placeHand() {
   const m = plan && plan[0]; if (!m) return false;
   const top = m.src.kind === 'stack' ? dishSlotY(stacks[m.src.i].tiles.length - 1) : jarSlotY(jars[m.src.i].tiles.length - 1);
@@ -2658,7 +2677,7 @@ function resultText() {
 function dailyShareText(key) {
   const r = save.daily[key]; if (!r) return '';
   return shareText({ title: `Sum Sort Daily #${dailyNumber(key)}`, stars: r.stars, moves: r.moves, par: r.par, seals: r.seals || [], boosters: r.boosters || 0,
-    streak: streakNow(save.streak, todayKey()), url: shareUrl(location) });
+    streak: streakNow(save.streak, todayKey()), url: dailyUrl(shareUrl(location), key, r.moves) });
 }
 /* The same result as a picture, for share sheets that take images (stories, chats): 1080 x 1350, the room's colours,
    the wordmark, the stars or the score, the seal squares, the streak, the link. Nothing about the board itself.
@@ -2673,7 +2692,7 @@ function resultCard() {
 function dailyCard(key) {
   const r = save.daily[key]; if (!r) return null;
   return { title: `Daily #${dailyNumber(key)} · ${WEEKDAYS[weekdayOf(key)]}`, stars: r.stars, line: `${r.moves} moves · par ${r.par}`, seals: r.seals || [],
-    streak: streakNow(save.streak, todayKey()), foot: 'Same board for everyone today', url: shareUrl(location) };
+    streak: streakNow(save.streak, todayKey()), foot: 'Same board for everyone today', url: dailyUrl(shareUrl(location), key, r.moves) };
 }
 function drawCard(c) {
   const W = 1080, H = 1350, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
@@ -2793,7 +2812,9 @@ function closeChallenge(play) {
   if (ui.challenge.hidden) return;
   ui.challenge.hidden = true; ui.home.inert = false;
   const c = pendingChallenge; pendingChallenge = null;
-  if (play && c) startRush(c); else ui.play.focus({ preventScroll: true });
+  if (play && c && c.daily && save.daily[c.daily]) shareOut(dailyShareText(c.daily), how => { ui.dailySub.textContent = how === 'Copied' ? 'Copied!' : how; setTimeout(renderDaily, 2600); });
+  else if (play && c && c.daily) startDaily(c.daily);
+  else if (play && c) startRush(c); else ui.play.focus({ preventScroll: true });
 }
 function closeShop() { if (ui.shop.hidden) return; ui.shop.hidden = true; ui.home.inert = false; ui.tally.focus({ preventScroll: true }); }
 
@@ -2885,9 +2906,32 @@ function playDaily() {
     shareOut(dailyShareText(key), how => { ui.dailySub.textContent = how === 'Copied' ? 'Copied!' : how; sfx.select(8); setTimeout(renderDaily, 2600); });
     return;
   }
+  startDaily(key);
+}
+/* today's board; a shared daily's card starts it too, before the daily opens on home (its words teach the rule) */
+function startDaily(key) {
+  if (!homeOpen || save.daily[key]) return;
   leaveHome();
   sfx.select(7); buzz(8);
   rush = null; daily = key; buildLevel(levelNo); fitCamera(false);   // one mode at a time, as startRush clears the daily
+}
+/* A shared daily's card: today's board for whoever opens it. A player who has already played today's gets the
+   friend's moves against their own instead, and sends theirs back. */
+function openInvite(link) {
+  const key = todayKey(), r = dailyRecipe(key), mine = save.daily[key], theirs = link.key === key ? link.moves : null;
+  pendingChallenge = { daily: key };
+  ui.challengeCard.classList.add('invite'); ui.challengeBolt.hidden = true; ui.challengeCal.hidden = false;
+  ui.challengeMon.textContent = dailyLabel(key).split(' ')[2]; ui.challengeDay.textContent = String(Number(key.slice(8)));
+  ui.challengeEyebrow.textContent = 'Daily puzzle'; ui.challengeTitle.textContent = `Daily #${dailyNumber(key)}`;
+  ui.challengeText.textContent = mine ? (theirs
+      ? `A friend solved today's board in ${plural(theirs, 'move')}; you took ${mine.moves}. ${mine.moves < theirs ? 'You win this one!' : mine.moves === theirs ? "It's a tie!" : 'They win this one.'}`
+      : `You have played today's board: ${plural(mine.moves, 'move')}, par ${mine.par}.`) + ' Send yours back.'
+    : (link.key !== key ? "That daily has gone, but today's is ready. "
+      : theirs ? `A friend solved today's board in ${plural(theirs, 'move')}. ` : "A friend sent you today's board. ")
+      + `The same board for everyone, ${r.level.toLowerCase()} on a ${WEEKDAYS[weekdayOf(key)]}. Fill each jar with tiles that add up to its number.`;
+  ui.challengePlayLabel.textContent = mine ? 'Share yours' : 'Play it';
+  ui.challengePlay.className = 'cta gummy c-grape';
+  ui.challenge.hidden = false; ui.home.inert = true; ui.challengePlay.focus({ preventScroll: true });
 }
 
 /* ---------------- camera ---------------- */
@@ -3168,9 +3212,10 @@ async function start(hot) {
   fitCamera(false);
   if (hot && hot.level) ui.home.classList.add('off'); else showHome(false);   // a republish mid-game keeps the player in the game
   // a challenge link opens its card over home; the address is cleaned so a reload does not ask again
-  const challenge = parseChallenge(location.search);
+  const challenge = parseChallenge(location.search), invite = !challenge && parseDailyLink(location.search);
+  if ((challenge || invite) && homeOpen) try { window.history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* the address stays */ }   // (not `history`: that name is the undo list here)
+  if (invite && homeOpen) openInvite(invite);
   if (challenge && homeOpen) {
-    try { window.history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* the address stays */ }   // (not `history`: that name is the undo list here)
     pendingChallenge = challenge; ui.challengeBeat.textContent = String(challenge.beat); prepareRun(challenge.seed);
     ui.challenge.hidden = false; ui.home.inert = true; ui.challengePlay.focus({ preventScroll: true });
   }
