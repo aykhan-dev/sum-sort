@@ -1,0 +1,200 @@
+{
+ "level": 21,
+ "viewport": {
+  "cssWidth": 1024,
+  "cssHeight": 768,
+  "devicePixelRatio": 2,
+  "pixelRatio": 2,
+  "drawingBuffer": [
+   2048,
+   1536
+  ]
+ },
+ "camera": {
+  "fovYDeg": 32,
+  "near": 0.1,
+  "far": 120,
+  "aspect": 1.333333,
+  "position": [
+   0,
+   12.46222,
+   14.43734
+  ],
+  "target": [
+   0,
+   1.46416,
+   1.93954
+  ],
+  "quaternion": [
+   -0.353048,
+   0,
+   0,
+   0.935605
+  ],
+  "viewDir": [
+   0,
+   0.66063,
+   0.75071
+  ],
+  "narrow": false
+ },
+ "fitLimits": {
+  "x": 0.9259259259259258,
+  "y0": -0.5833333333333333,
+  "y1": 0.7265625
+ },
+ "layout": {
+  "minX": -4.15,
+  "maxX": 4.15,
+  "minZ": -1,
+  "maxZ": 4.2,
+  "zones": [
+   {
+    "min": [
+     -4.15,
+     0,
+     -1
+    ],
+    "max": [
+     4.15,
+     3.7,
+     0.9
+    ]
+   },
+   {
+    "min": [
+     -3.3,
+     0,
+     2.1
+    ],
+    "max": [
+     3.3,
+     2.7,
+     4.2
+    ]
+   }
+  ]
+ },
+ "sun": {
+  "position": [
+   -4.5,
+   10,
+   8.1
+  ],
+  "target": [
+   0,
+   0,
+   1.6
+  ],
+  "shadowCamera": {
+   "left": -6.75,
+   "right": 6.75,
+   "top": 6.75,
+   "bottom": -6.75,
+   "near": 1,
+   "far": 40
+  },
+  "mapSize": [
+   2048,
+   2048
+  ]
+ },
+ "jars": [
+  {
+   "position": [
+    -3.15,
+    0,
+    0
+   ],
+   "target": 6,
+   "sum": 0,
+   "tiles": [],
+   "sealed": false,
+   "ribbon": false,
+   "spare": false,
+   "finale": false
+  },
+  {
+   "position": [
+    -1.05,
+    0,
+    0
+   ],
+   "target": 9,
+   "sum": 0,
+   "tiles": [],
+   "sealed": false,
+   "ribbon": false,
+   "spare": false,
+   "finale": false
+  },
+  {
+   "position": [
+    1.05,
+    0,
+    0
+   ],
+   "target": 6,
+   "sum": 0,
+   "tiles": [],
+   "sealed": false,
+   "ribbon": false,
+   "spare": false,
+   "finale": false
+  },
+  {
+   "position": [
+    3.15,
+    0,
+    0
+   ],
+   "target": 7,
+   "sum": 0,
+   "tiles": [],
+   "sealed": false,
+   "ribbon": false,
+   "spare": false,
+   "finale": false
+  }
+ ],
+ "stacks": [
+  {
+   "position": [
+    -2.2,
+    0,
+    3.1
+   ],
+   "tiles": [
+    2,
+    2,
+    2,
+    5
+   ]
+  },
+  {
+   "position": [
+    0,
+    0,
+    3.1
+   ],
+   "tiles": [
+    1,
+    2,
+    4
+   ]
+  },
+  {
+   "position": [
+    2.2,
+    0,
+    3.1
+   ],
+   "tiles": [
+    1,
+    3,
+    4,
+    2
+   ]
+  }
+ ]
+}
