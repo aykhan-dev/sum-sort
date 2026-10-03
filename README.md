@@ -70,6 +70,10 @@ From level 25 a second card sits beside the daily: a minute of quick, small boar
 
 Stars from levels and dailies open candy boxes at 15, 40, 70, 105, 145, 190 and 240 stars. Each box holds a new counter theme for the room around the board. The star tally on the home screen opens the candy shop.
 
+## Sound
+
+Every sound is made in the browser, no audio files: the effects, and a soft music loop that plays faster in a rush. Home has a music button beside the sound button; the sound button silences both.
+
 ## Install and offline
 
 Served over https (GitHub Pages), the page registers a service worker: after one visit the game opens and plays with no network, and browsers that support it offer to install it. A new build reaches players on their next visit. Shared links show `og.png` as their preview; its address is set by `SITE` in `scripts/build.mjs`.

@@ -354,6 +354,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .reward small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9A6A0A}
 .reward b{font:600 15px var(--display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .reward .chip{padding:0 12px}
+.home-btns{display:flex;gap:8px}
 .install{display:inline-flex;align-items:center;gap:6px;padding:0 16px 0 12px;font-size:14px}
 .install svg.i{width:18px;height:18px}
 .home-mid{display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;min-height:0;width:100%}
@@ -595,9 +596,14 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
       <button class="chip install" id="installBtn" type="button" hidden>
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></svg>Install
       </button>
+      <span class="home-btns">
+      <button id="homeMusic" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Music">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/><path class="mute" d="M3 3l18 18"/></svg>
+      </button>
       <button id="homeSound" class="icon-btn raised" type="button" aria-pressed="true" aria-label="Sound">
         <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5z"/><path class="wave" d="M15.5 8.5a5 5 0 0 1 0 7"/><path class="wave" d="M18.5 5.5a9.5 9.5 0 0 1 0 13"/><path class="mute" d="m16 9 5 6M21 9l-5 6"/></svg>
       </button>
+      </span>
     </div>
     <div class="home-mid">
       <h1 class="wordmark" id="homeTitle"><span>Sum</span><span>Sort</span></h1>
@@ -1254,7 +1260,7 @@ const ui = {
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
-  homeSound: $('homeSound'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'), hand: $('hand'),
+  homeSound: $('homeSound'), homeMusic: $('homeMusic'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'), hand: $('hand'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
   modes: $('modes'), rush: $('rushBtn'), rushSub: $('rushSub'), winMovesLabel: $('winMovesLabel'), winParLabel: $('winParLabel'),
@@ -1266,7 +1272,7 @@ const ui = {
 
 /* ---------------- saved progress (this browser only) ---------------- */
 const STORE = 'sumsort.proto.v1';
-let save = { stars: {}, last: 1, sound: true, daily: {}, streak: null, theme: 'strawberry', boxSeen: 0 };
+let save = { stars: {}, last: 1, sound: true, music: true, daily: {}, streak: null, theme: 'strawberry', boxSeen: 0 };
 try { const raw = localStorage.getItem(STORE); if (raw) save = Object.assign(save, JSON.parse(raw)); } catch (e) { /* play without saving */ }
 if (!save.daily || typeof save.daily !== 'object') save.daily = {};
 function persist() { try { localStorage.setItem(STORE, JSON.stringify(save)); } catch (e) { /* play without saving */ } }
@@ -1344,6 +1350,46 @@ const sfx = {
   box: () => [0, 4, 2, 5, 4, 5].forEach((s, i) => tone(NOTES[s] * (i > 3 ? 4 : 2), 0.32, { type: i % 2 ? 'sine' : 'triangle', gain: 0.045, delay: 0.9 + i * 0.07 })),
   chapter: () => [0, 2, 4, 5, 4, 5, 5].forEach((s, i) => { tone(NOTES[s] * 2, 0.5, { type: 'triangle', gain: 0.05, delay: i * 0.12 }); tone(NOTES[s], 0.5, { gain: 0.03, delay: i * 0.12 }); })
 };
+/* ---------------- music: a soft candy-shop loop, made on the fly ----------------
+   F, D minor, B flat, C: a music-box arpeggio over a quiet bass, mixed well under the effects. A rush plays it faster.
+   It starts with the first touch (browsers allow sound only after one), stops in a hidden tab, and has its own
+   switch on home; the sound button silences everything. */
+const CHORDS = [[53, 57, 60, 65], [50, 53, 57, 62], [46, 50, 53, 58], [48, 52, 55, 60]];   // MIDI notes
+const midi = n => 440 * Math.pow(2, (n - 69) / 12);
+let musicOn = save.music !== false, musicGain = null, musicTimer = 0, nextNote = 0, noteNo = 0, musicReady = false;
+function musicVoice(freq, t, dur, type, gain) {
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(musicGain); o.start(t); o.stop(t + dur + 0.05);
+}
+function scheduleMusic() {
+  const step = 60 / (rush && !rush.over ? 128 : 92) / 2;   // eighth notes
+  if (nextNote < actx.currentTime) nextNote = actx.currentTime + 0.05;   // after a stall, pick up from now
+  while (nextNote < actx.currentTime + 0.25) {
+    const bar = Math.floor(noteNo / 8) % 4, i = noteNo % 8, ch = CHORDS[bar];
+    if (i === 0 || i === 4) musicVoice(midi(ch[0] - 12), nextNote, step * 3.5, 'sine', 0.05);
+    musicVoice(midi(ch[[0, 1, 2, 3, 2, 1, 2, 3][i]] + 12), nextNote, step * 1.7, 'triangle', i % 2 ? 0.013 : 0.02);
+    if (i === 6 && bar % 2) musicVoice(midi(ch[3] + 24), nextNote, 0.6, 'sine', 0.01);
+    nextNote += step; noteNo++;
+  }
+}
+function startMusic() {
+  if (!soundOn || !musicOn || !musicReady || musicTimer || document.hidden) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+    if (!musicGain) { musicGain = actx.createGain(); musicGain.connect(actx.destination); }
+    const t = actx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setValueAtTime(0.0001, t); musicGain.gain.exponentialRampToValueAtTime(1, t + 1.5);
+    nextNote = t + 0.1; musicTimer = setInterval(scheduleMusic, 60); scheduleMusic();
+  } catch (e) { /* music is optional */ }
+}
+function stopMusic() {
+  clearInterval(musicTimer); musicTimer = 0;
+  if (musicGain && actx) { const t = actx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setTargetAtTime(0.0001, t, 0.12); }
+}
+addEventListener('pointerdown', () => { musicReady = true; startMusic(); }, { once: true, capture: true });
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopMusic(); else startMusic(); });
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* haptics are optional */ } };
 
 /* ---------------- renderer & scene ---------------- */
@@ -2764,7 +2810,13 @@ ui.rewardUse.addEventListener('click', () => {
   save.boxSeen = Math.max(Number(save.boxSeen) || 0, themeById(ui.reward.dataset.id).at); persist();
 });
 ui.daily.addEventListener('click', playDaily);
-function setSound(on) { soundOn = on; for (const b of [ui.sound, ui.homeSound]) b.setAttribute('aria-pressed', String(on)); save.sound = on; persist(); }
+function setSound(on) {
+  soundOn = on; for (const b of [ui.sound, ui.homeSound]) b.setAttribute('aria-pressed', String(on)); save.sound = on; persist();
+  if (on) startMusic(); else stopMusic();
+}
+function setMusic(on) { musicOn = on; ui.homeMusic.setAttribute('aria-pressed', String(on)); save.music = on; persist(); if (on) startMusic(); else stopMusic(); }
+ui.homeMusic.setAttribute('aria-pressed', String(musicOn));
+ui.homeMusic.addEventListener('click', () => { musicReady = true; setMusic(!musicOn); });
 for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { setSound(!soundOn); if (soundOn) sfx.select(5); }); b.setAttribute('aria-pressed', String(soundOn)); }
 
 /* ---------------- loop ---------------- */
@@ -2817,7 +2869,7 @@ async function start(hot) {
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
-    get hand() { return handOn; },
+    get hand() { return handOn; }, get music() { return !!musicTimer; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },

@@ -193,8 +193,11 @@ pass('home from the win card shows the next level and the stars', h8.open && h8.
       locked: all.filter(b => b.disabled).length, lockedRight: all.filter(b => b.disabled).every(b => at(b) > total) }; });
   await page.keyboard.press('Escape');
   pass('the star tally opens the candy shop: every counter, the first in use, the rest locked until their box', shop.open && shop.themes === 8 && shop.inUse.join() === 'strawberry' && shop.locked >= 6 && shop.lockedRight && await page.evaluate(() => document.getElementById('shop').hidden), JSON.stringify(shop)); }
-const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound', '#starTally'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
+const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound', '#homeMusic', '#starTally'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));
 pass('home controls are at least 48 px', Object.values(homeSizes).every(v => v.split('x').every(n => +n >= 48)), JSON.stringify(homeSizes));
+await tapEl('#homeMusic'); { const m = await page.evaluate(() => ({ pressed: document.getElementById('homeMusic').getAttribute('aria-pressed'), saved: __sumSort.save.music, playing: __sumSort.music })); await tapEl('#homeMusic');
+  const back = await page.evaluate(() => ({ pressed: document.getElementById('homeMusic').getAttribute('aria-pressed'), saved: __sumSort.save.music }));
+  pass('the music button turns the music off and on, and remembers it', m.pressed === 'false' && m.saved === false && !m.playing && back.pressed === 'true' && back.saved === true, JSON.stringify({ m, back })); }
 await tapEl('#homeSound'); pass('home sound button toggles both sound buttons', (await page.evaluate(() => ['soundBtn', 'homeSound'].map(id => document.getElementById(id).getAttribute('aria-pressed')).join())) === 'false,false'); await tapEl('#homeSound');
 await tapEl('#playBtn'); h8 = await H(); pass('Play starts the next level', !h8.open && h8.level === 4 && h8.moves === 0);
 // 8. generated level beyond the stored range, and reload
