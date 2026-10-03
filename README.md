@@ -30,6 +30,7 @@ On GitHub Pages: repository Settings → Pages → Deploy from a branch → `mai
 | `tests/unit/` | Unit tests for the pure modules (node's built-in runner, about a second). |
 | `tests/playtest.mjs` | Plays the built page in headless Chromium with real touches. |
 | `docs/ROADMAP.md` | What gets built next, and why. |
+| `docs/DESIGN_SYSTEM.md` | Tokens, components and states, and the link to the Figma design system. |
 | `src/sw.src.js` | Service worker source. The build stamps its version and writes `sw.js`. |
 | `manifest.webmanifest`, `icons/`, `og.png` | Install manifest, app icons and the link-preview image. `scripts/make-art.mjs` draws them from the game. |
 | `vendor/three/` | three.js r170 (MIT), so the page needs no CDN for code. |
