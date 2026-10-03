@@ -320,6 +320,15 @@ await page.goto(URL_ + '?rush=4242&beat=50'); await page.waitForFunction(() => w
   await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
   const shared = await page.evaluate(() => window.__copied.at(-1) || '');
   pass('a challenge link plays its seed against its score, cleans the address, and shares a link back', card.c && card.c.seed === 4242 && card.c.beat === 50 && card.search === '' && /beat 50$/.test(r0.hud) && end.title === 'You beat it!' && new RegExp(`\\?rush=4242&beat=${end.score}$`).test(shared), JSON.stringify({ card, r0, end, shared })); }
+// 17. a streak freeze earned at a week covers one missed day by itself
+await tapEl('#winHomeBtn');   // out of the challenge the way a player leaves it
+await page.evaluate(() => { window.__sumSortToday = '2026-10-11'; __sumSort.save.streak = { count: 7, best: 7, last: '2026-10-09', freezes: 1 }; __sumSort.goLevel(30); __sumSort.showHome(); });
+{ const sub = await page.evaluate(() => document.getElementById('dailySub').textContent);
+  await page.waitForFunction(() => !document.getElementById('home').classList.contains('off'));
+  await tapEl('#dailyBtn'); await settled(); const w = await playOut();
+  const st = await page.evaluate(() => __sumSort.save.streak);
+  pass('a freeze holds a streak over a missed day, and says so', sub === 'A freeze holds it' && st.count === 8 && st.freezes === 0 && st.saved && /^A freeze covered the day you missed/.test(w.text), JSON.stringify({ sub, st, text: w.text }));
+  await tapEl('#winHomeBtn'); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

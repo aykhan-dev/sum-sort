@@ -1885,9 +1885,11 @@ async function winLevel() {
   ui.winMovesLabel.textContent = 'Moves'; ui.winParLabel.textContent = 'Par';
   ui.winMoves.textContent = moveCount; ui.winPar.textContent = def.par;
   const nextMark = STREAK_MILESTONES.find(m => m > (save.streak ? save.streak.count : 0));
-  const streakNote = !daily || !save.streak ? ''
-    : milestone ? `${nextMark ? `Next mark: ${nextMark} days. ` : ''}A new board tomorrow.`
-    : (save.streak.count > 1 ? `${save.streak.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.';
+  const st = save.streak, streakNote = !daily || !st ? ''
+    : st.saved && streakGrew && !milestone ? `A freeze covered the day you missed: ${st.count}-day streak!`
+    : (st.saved && streakGrew ? 'A freeze covered the day you missed. ' : '')
+    + (milestone ? `${nextMark ? `Next mark: ${nextMark} days. ` : ''}${st.earned && streakGrew ? 'You earned a streak freeze.' : 'A new board tomorrow.'}`
+      : (st.count > 1 ? `${st.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.');
   ui.winText.textContent = daily ? streakNote
     : chapterDone && next ? `Next up: ${next.name}. ${next.rule}`
     : runDone ? `Next run: levels ${run.to + 1}–${run.to + 10}.`
@@ -2166,9 +2168,11 @@ function renderDaily() {
     const day = WEEKDAYS[weekdayOf(key)];
     ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)}`; ui.dailyName.textContent = `${levelNo >= RUSH_OPENS ? day.slice(0, 3) : day} · ${r.level}`;
     const narrow = levelNo >= RUSH_OPENS;   // the card shares its row with Sugar Rush
-    ui.dailySub.textContent = streak ? 'Keep your streak' : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
+    const held = streak && save.streak && dayGap(save.streak.last, key) === 2;   // yesterday was missed; a freeze is holding the streak
+    ui.dailySub.textContent = streak ? (held ? 'A freeze holds it' : 'Keep your streak') : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
     ui.dailySide.innerHTML = (streak ? flame(streak) : '') + `<span class="go gummy c-grape">${PLAY_ICON}</span>`;
-    ui.daily.setAttribute('aria-label', `Play daily puzzle ${dailyNumber(key)}, ${WEEKDAYS[weekdayOf(key)]}, ${r.level}.` + (streak ? ` Keep your ${streak}-day streak` : ''));
+    const freezes = save.streak && save.streak.freezes ? ` ${plural(save.streak.freezes, 'streak freeze')} in hand.` : '';
+    ui.daily.setAttribute('aria-label', `Play daily puzzle ${dailyNumber(key)}, ${WEEKDAYS[weekdayOf(key)]}, ${r.level}.` + (streak ? ` Keep your ${streak}-day streak.` : '') + freezes);
   }
 }
 function playDaily() {
@@ -2180,7 +2184,7 @@ function playDaily() {
   }
   leaveHome();
   sfx.select(7); buzz(8);
-  daily = key; buildLevel(levelNo); fitCamera(false);
+  rush = null; daily = key; buildLevel(levelNo); fitCamera(false);   // one mode at a time, as startRush clears the daily
 }
 
 /* ---------------- camera ---------------- */

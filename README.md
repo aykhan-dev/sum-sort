@@ -80,4 +80,4 @@ Served over https (GitHub Pages), the page registers a service worker: after one
 
 ## Status
 
-Prototype. Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser, not yet on real phones.
+Prototype, now with a daily puzzle, Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of about 60 checks), not yet on real phones.

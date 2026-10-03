@@ -60,18 +60,32 @@ export function generateDaily(key, opts = { tries: 60, runs: 400, tol: 0.06 }) {
   }
   return def && { ...def, daily: key };
 }
-/* Streak: dailies finished on consecutive days. Finishing today's again changes nothing; a missed day starts over. */
+/* days from one date key to another (1 = the next day); Infinity without a first date */
+export const dayGap = (from, to) => from ? Math.round((keyUTC(to) - keyUTC(from)) / 86400000) : Infinity;
+/* Streak: dailies finished on consecutive days. Finishing today's again changes nothing; a missed day starts over,
+   unless a freeze covers it. A freeze is earned on each milestone from a week up (at most two held), and spent by
+   itself the day it saves the streak: `saved` says the last daily used one, `earned` that it brought one. */
+export const FREEZE_MAX = 2;
 export function streakAfter(streak, key) {
-  const s = { count: 0, best: 0, last: null, ...(streak || {}) };
+  const s = { count: 0, best: 0, last: null, freezes: 0, ...(streak || {}) };
   if (s.last === key) return s;
-  const count = s.last === addDays(key, -1) ? s.count + 1 : 1;
-  return { count, best: Math.max(s.best, count), last: key };
+  const gap = dayGap(s.last, key);
+  let freezes = s.freezes || 0, saved = false, count = 1;
+  if (gap === 1) count = s.count + 1;
+  else if (gap === 2 && freezes > 0) { count = s.count + 1; freezes--; saved = true; }
+  const earned = count >= 7 && STREAK_MILESTONES.includes(count) && freezes < FREEZE_MAX;
+  if (earned) freezes++;
+  return { count, best: Math.max(s.best, count), last: key, freezes, saved, earned };
 }
 /* Days in a row worth a celebration of their own, like finishing a chapter. */
 export const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
 export const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
-/* the streak as it stands today: still alive if the last daily was today or yesterday */
-export const streakNow = (streak, today) => streak && (streak.last === today || streak.last === addDays(today, -1)) ? streak.count : 0;
+/* the streak as it stands today: still alive if the last daily was today or yesterday, or the day before with a freeze */
+export const streakNow = (streak, today) => {
+  if (!streak) return 0;
+  const gap = dayGap(streak.last, today);
+  return gap <= 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;   // a missed day with a freeze in hand still counts
+};
 export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
 
 /* ---------------- sharing ----------------

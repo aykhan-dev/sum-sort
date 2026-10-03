@@ -51,8 +51,19 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | F13 | **Endless runs**: past level 47, every run of ten levels closes with the chapter-finish celebration | Endless players get a goal every ten levels | 3 | 1 | done |
 | F14 | **Keyboard play**: arrows move a ring between jars and stacks, Enter taps, U undoes, H hints; each spot is read out | Desktop visitors from shared links, and players who use a keyboard or a screen reader | 3 | 2 | done |
 | F15 | **Challenge links**: a shared Sugar Rush result is a link to the same boards with the score to beat | Every share becomes an invitation to play, not just a brag | 5 | 2 | done |
-| F16 | **Streak freeze**: earned on milestones from a week, forgives one missed day by itself | The day a long streak breaks is the day most daily players stop | 4 | 1 | todo |
+| F16 | **Streak freeze**: earned on milestones from a week, forgives one missed day by itself | The day a long streak breaks is the day most daily players stop | 4 | 1 | done |
 | M1 | **Your record**: levels cleared, 3-star levels, best combo, dailies, best streak, rush best, in the candy shop (was: a debug metrics panel) | Pride, and a number to beat in every mode | 2 | 1 | done |
+
+## Recommended next: needs people, data or a server
+
+These could not be done well from a headless browser overnight, and are the highest-value next steps.
+
+1. **Real phones.** Everything here was tested in software-rendered headless Chromium (about 2 frames a second). Check frame rate, touch feel, audio and haptics on a low-end Android and an iPhone SE before launch.
+2. **Measure the north star.** Day-1 and day-7 return, levels per session, share taps, challenge links opened. Needs consented analytics (a privacy-friendly service, or a tiny endpoint).
+3. **Localization.** Azerbaijani, Turkish and Russian would widen the home market. Copy lives inline in `src/page.src.html`; extract it into one table first, then translate with native review.
+4. **Server features.** A daily leaderboard and challenge-link results ("12 friends beat 340") need a small backend. Daily reminders need push notifications.
+5. **Calibrate difficulty with real players.** The fail-rate model is a simulated casual player; real completion data should retune the chapter targets and the daily week.
+6. **Repository access.** The Claude GitHub App could not push to `aykhan-dev/sum-sort` (HTTP 403), so this branch was delivered as a git bundle.
 
 ## How each item is done
 
@@ -85,4 +96,5 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | 00:43 | Review 2 | Second self-review, of R1 through F13, found 9 issues, all fixed: a resumed board showed a ribbon already untied (refreshLocks compared against a field syncBadge also writes), a spare or split before the first move was not kept (and Play threw it away), the snapshot waited for the tile to land so leaving mid-flight lost the move, a resumed board did not single out its last jar, the hand came back after Home and Play on a touched board, keyboard-only players never got music, a test board's combo counted in the record, the level signature was serialized on every move, and the sealed look was copied by hand for resumed jars. 53 play-test checks pass. |
 | 00:52 | F14 | The board takes keyboard focus: arrows move an ink ring (left and right in reading order, up and down to the nearest jar or stack), Enter or Space taps, Escape puts a lifted tile back, U undoes, H hints. The ring shows only once a key is used and hides on touch. A hidden live region reads each spot ("Jar: needs 7, 2 tiles in it, top 3"; "Holding an 8"). |
 | 01:15 | F15 | A Sugar Rush share now carries `?rush=<seed>&beat=<score>`; boards come from the seed alone, so the friend who opens it plays the same boards. The link opens a "Beat 340" card over home (even for a brand-new player, with a one-line rule); the clock shows "· beat 340"; the end card says "You beat it!" or how far short; Play again replays the same boards; the address is cleaned so a reload does not ask again. Found while testing: `history.replaceState` failed silently because the module's undo list is also named `history` (now `window.history`). |
+| 01:35 | F16 | A streak freeze is earned at each milestone from 7 days (two held at most) and spent by itself when exactly one day was missed: the streak goes on and the win card says "A freeze covered the day you missed: 8-day streak!". While a freeze is holding the streak, the daily card says "A freeze holds it"; freezes in hand are read out in the card's label. Opening the daily now also clears a finished rush still attached to the board (found by the play-test). |
 

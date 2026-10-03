@@ -54,7 +54,7 @@ test('daily seeds: stable, and different every day', () => {
 });
 
 test('streak: consecutive days grow it, the same day keeps it, a missed day starts over', () => {
-  let s = streakAfter(null, '2026-10-03'); assert.deepEqual(s, { count: 1, best: 1, last: '2026-10-03' });
+  let s = streakAfter(null, '2026-10-03'); assert.deepEqual(s, { count: 1, best: 1, last: '2026-10-03', freezes: 0, saved: false, earned: false });
   s = streakAfter(s, '2026-10-04'); assert.equal(s.count, 2);
   s = streakAfter(s, '2026-10-04'); assert.equal(s.count, 2);
   s = streakAfter(s, '2026-10-05'); assert.equal(s.count, 3); assert.equal(s.best, 3);
@@ -232,4 +232,22 @@ test('challenge links: a rush run travels as its seed and score, and nothing els
   for (const bad of ['', '?rush=12', '?beat=3', '?rush=-1&beat=3', '?rush=abc&beat=3', '?rush=1&beat=9999999', '?rush=99999999999&beat=1', '?rush=1e3&beat=1'])
     assert.equal(parseChallenge(bad), null, bad);
   assert.deepEqual(rushBoard(4242, 0), rushBoard(parseChallenge('?rush=4242&beat=1').seed, 0), 'the same seed, the same first board');
+});
+
+import { dayGap, FREEZE_MAX } from '../../src/meta.mjs';
+
+test('streak freeze: earned on milestones from a week, spent by itself on one missed day, never more than two', () => {
+  assert.equal(dayGap('2026-10-01', '2026-10-03'), 2); assert.equal(dayGap(null, '2026-10-03'), Infinity);
+  let s = null, key = '2026-10-01';
+  for (let d = 0; d < 7; d++) { s = streakAfter(s, key); key = addDays(key, 1); }
+  assert.equal(s.count, 7); assert.equal(s.freezes, 1); assert.equal(s.earned, true);
+  key = addDays(key, 1);                       // a missed day
+  assert.equal(streakNow(s, key), 7, 'with a freeze in hand the streak is still alive');
+  s = streakAfter(s, key);
+  assert.equal(s.count, 8); assert.equal(s.saved, true); assert.equal(s.freezes, 0);
+  s = streakAfter(s, addDays(key, 2));         // another missed day, no freeze left
+  assert.equal(s.count, 1); assert.equal(s.saved, false);
+  let t = { count: 29, best: 29, last: '2026-12-01', freezes: FREEZE_MAX };
+  t = streakAfter(t, '2026-12-02'); assert.equal(t.count, 30); assert.equal(t.freezes, FREEZE_MAX, 'held freezes are capped'); assert.equal(t.earned, false);
+  assert.equal(streakAfter({ count: 5, best: 5, last: '2026-10-01', freezes: 1 }, '2026-10-04').count, 1, 'a freeze covers one missed day, not two');
 });
