@@ -292,6 +292,18 @@ await tapEl('#dailyBtn'); await settled();
   const tag = await page.evaluate(() => ({ hidden: document.getElementById('winChapter').hidden, text: document.getElementById('winChapter').textContent, streak: __sumSort.save.streak.count }));
   pass('a 3-day streak gets the chapter rung: its own title, tag and second wave', w.title === '3-day streak!' && /chapter-done/.test(w.cls) && !tag.hidden && tag.text === '3 dailies in a row' && tag.streak === 3 && /^Next mark: 7 days/.test(w.text), JSON.stringify({ w, tag }));
   await page.screenshot({ path: SHOTS + '/win-streak.png' }); await tapEl('#winHomeBtn'); }
+// 15. the board can be played with the keyboard alone, and every spot is read out
+await page.evaluate(() => __sumSort.play()); await go(14); await settled(); await page.focus('#scene');
+{ await page.keyboard.press('ArrowRight');
+  const first = await page.evaluate(() => ({ f: __sumSort.kbFocus, sr: document.getElementById('srStatus').textContent }));
+  const m = await page.evaluate(() => __sumSort.plan[0]);
+  for (let k = 0; k < 12; k++) { const f = await page.evaluate(() => __sumSort.kbFocus); if (f && f.kind === m.src.kind && f.i === m.src.i) break; await page.keyboard.press('ArrowRight'); }
+  await page.keyboard.press('Enter'); const lifted = await page.evaluate(() => __sumSort.sel);
+  await page.keyboard.press('ArrowUp');
+  for (let k = 0; k < 12; k++) { const f = await page.evaluate(() => __sumSort.kbFocus); if (f && f.kind === 'jar' && f.i === m.dst) break; await page.keyboard.press('ArrowRight'); }
+  await page.keyboard.press('Enter'); await settled();
+  const after = await page.evaluate(() => ({ moves: __sumSort.moves, sr: document.getElementById('srStatus').textContent }));
+  pass('arrows and Enter play a move, and each spot is read out', !!first.f && /^Stack \d: top tile \d/.test(first.sr) && lifted && lifted.kind === m.src.kind && after.moves === 1 && /^Jar/.test(after.sr), JSON.stringify({ first, after })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

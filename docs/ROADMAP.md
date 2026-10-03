@@ -49,7 +49,7 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | F11 | **First-move hand**: on the first levels a finger shows "this tile, then this jar" until the first move | The first ten seconds decide whether a new visitor stays | 4 | 1 | done |
 | F12 | **Streak milestones**: 3, 7, 14 and 30 days in a row get their own celebration and a mark on the daily card | Makes the streak worth protecting | 3 | 1 | done |
 | F13 | **Endless runs**: past level 47, every run of ten levels closes with the chapter-finish celebration | Endless players get a goal every ten levels | 3 | 1 | done |
-| F14 | **Keyboard play**: arrows move a ring between jars and stacks, Enter taps, U undoes, H hints; each spot is read out | Desktop visitors from shared links, and players who use a keyboard or a screen reader | 3 | 2 | todo |
+| F14 | **Keyboard play**: arrows move a ring between jars and stacks, Enter taps, U undoes, H hints; each spot is read out | Desktop visitors from shared links, and players who use a keyboard or a screen reader | 3 | 2 | done |
 | M1 | **Your record**: levels cleared, 3-star levels, best combo, dailies, best streak, rush best, in the candy shop (was: a debug metrics panel) | Pride, and a number to beat in every mode | 2 | 1 | done |
 
 ## How each item is done
@@ -81,4 +81,5 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | 00:20 | M1 | Turned "local metrics" into a player-facing record under the counters in the candy shop: six tiles, each a number to beat. Best combo is now kept across levels. A debug panel would have served nobody without a backend to send numbers to. |
 | 00:29 | F13 | Levels 56, 66, 76… close a run of ten: "Run complete!", a "Levels 47–56 cleared" tag, the second wave of candy and the chapter fanfare, and "Next run: levels 57–66." The journey bar already counted these runs; now finishing one pays off. |
 | 00:43 | Review 2 | Second self-review, of R1 through F13, found 9 issues, all fixed: a resumed board showed a ribbon already untied (refreshLocks compared against a field syncBadge also writes), a spare or split before the first move was not kept (and Play threw it away), the snapshot waited for the tile to land so leaving mid-flight lost the move, a resumed board did not single out its last jar, the hand came back after Home and Play on a touched board, keyboard-only players never got music, a test board's combo counted in the record, the level signature was serialized on every move, and the sealed look was copied by hand for resumed jars. 53 play-test checks pass. |
+| 00:52 | F14 | The board takes keyboard focus: arrows move an ink ring (left and right in reading order, up and down to the nearest jar or stack), Enter or Space taps, Escape puts a lifted tile back, U undoes, H hints. The ring shows only once a key is used and hides on touch. A hidden live region reads each spot ("Jar: needs 7, 2 tiles in it, top 3"; "Holding an 8"). |
 

@@ -76,6 +76,8 @@ body{
 *{box-sizing:border-box}
 button{font-family:inherit;color:inherit}
 button:focus-visible{outline:3px solid var(--raspberry);outline-offset:2px}
+.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+#scene:focus{outline:none}
 svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
 .app{position:relative;height:100%;min-height:500px;overflow:hidden}
@@ -505,7 +507,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 
 <div class="app" id="app">
   <main class="stage" id="stage">
-    <canvas id="scene" aria-label="Sum Sort level: glass jars with number badges and stacks of numbered gummy tiles on a candy counter"></canvas>
+    <canvas id="scene" tabindex="0" aria-label="Sum Sort level: glass jars with number badges and stacks of numbered gummy tiles on a candy counter. Arrow keys move between jars and stacks, Enter picks up or drops a tile."></canvas>
+    <p class="sr-only" id="srStatus" aria-live="polite"></p>
     <div class="vignette" aria-hidden="true"></div>
     <div class="flash" id="flash" aria-hidden="true"></div>
     <div class="hand" id="hand" aria-hidden="true"><svg viewBox="0 0 48 48">
@@ -1267,7 +1270,7 @@ const ui = {
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
-  homeSound: $('homeSound'), homeMusic: $('homeMusic'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'), hand: $('hand'),
+  homeSound: $('homeSound'), homeMusic: $('homeMusic'), srStatus: $('srStatus'), play: $('playBtn'), callouts: $('callouts'), flash: $('flash'), hand: $('hand'),
   daily: $('dailyBtn'), dailyMon: $('dailyMon'), dailyDay: $('dailyDay'), dailyEyebrow: $('dailyEyebrow'), dailyName: $('dailyName'),
   dailySub: $('dailySub'), dailySide: $('dailySide'), levelTag: $('levelTag'), install: $('installBtn'),
   modes: $('modes'), rush: $('rushBtn'), rushSub: $('rushSub'), winMovesLabel: $('winMovesLabel'), winParLabel: $('winParLabel'),
@@ -1659,6 +1662,7 @@ function makeJarView({ target = null, spare = false, locked = false } = {}) {
   group.add(blob(2.4));
   const goldRing = ringMesh(0.88, GOLD, 0.03); group.add(goldRing);
   const selRing = ringMesh(0.9, RASP, 0.035); group.add(selRing);
+  const focusRing = ringMesh(1.06, INK, 0.03); group.add(focusRing);
   const lid = makeLid(); lid.position.y = LID_Y; lid.visible = false; group.add(lid);
   const badge = makeBadge(); group.add(badge);
   const hit = new THREE.Mesh(jarHitGeo, hitMat); hit.position.y = 1.7; group.add(hit);
@@ -1670,7 +1674,7 @@ function makeJarView({ target = null, spare = false, locked = false } = {}) {
     [-1, 1].forEach(sx => { const loop = new THREE.Mesh(bowGeo, ribbonMat); loop.position.x = sx * 0.17; loop.rotation.z = sx * 0.5; loop.scale.y = 0.7; bow.add(loop); });
     bow.add(new THREE.Mesh(knotGeo, ribbonMat)); ribbon.add(bow); group.add(ribbon);
   }
-  const view = { group, glass, goldRing, selRing, lid, badge, hit, ribbon, ribbonOn: locked, state: { target, sum: 0, sealed: false, spare, flash: false, locked } };
+  const view = { group, glass, goldRing, selRing, focusRing, lid, badge, hit, ribbon, ribbonOn: locked, state: { target, sum: 0, sealed: false, spare, flash: false, locked } };
   drawBadge(view); return view;
 }
 function makeDishView() {
@@ -1679,8 +1683,9 @@ function makeDishView() {
   const gilt = new THREE.Mesh(dishRimGeo, goldMat); gilt.rotation.x = Math.PI / 2; gilt.position.y = 0.178; group.add(gilt);
   group.add(blob(2.5));
   const selRing = ringMesh(1.0, RASP, 0.04); group.add(selRing);
+  const focusRing = ringMesh(1.14, INK, 0.035); group.add(focusRing);
   const hit = new THREE.Mesh(dishHitGeo, hitMat); hit.position.y = 1.5; group.add(hit);
-  return { group, selRing, hit };
+  return { group, selRing, focusRing, hit };
 }
 
 /* particles: sugar sparkles */
@@ -1862,6 +1867,7 @@ function buildLevel(n, resume = null) {
   boardSig = daily || rush ? '' : levelSig(def);
   if (n !== handLevel) { boardTouched = false; handLevel = n; }   // a touch on this level counts until another level is built
   hideHand(); if (showsHand()) handTimer = setTimeout(showHand, 900);
+  kbFocus = null;
 }
 /* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made. */
 let handTimer = 0, handOn = false, boardTouched = false, handLevel = 0;   // a player who has already touched the board needs no hand
@@ -2833,6 +2839,55 @@ ui.shopClose.addEventListener('click', closeShop);
 ui.shop.addEventListener('click', e => { if (e.target === ui.shop) closeShop(); });
 ui.themes.addEventListener('click', e => { const b = e.target.closest('.theme'); if (b && !b.disabled) { useTheme(b.dataset.id); renderShop(); } });
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShop(); });
+
+/* ---------------- keyboard play ----------------
+   With the board focused: arrows move a ring between jars and stacks (left and right along the board, up and down
+   between the jars and the stacks), Enter or Space taps, Escape puts a lifted tile back, U undoes, H hints.
+   The ring only shows once a key is used, and a touch hides it again. Each move of the ring is read out. */
+let kbFocus = null;   // { kind, i }
+const kbSpots = () => [...jars.map((j, i) => ({ kind: 'jar', i, p: j.view.group.position })), ...stacks.map((st, i) => ({ kind: 'stack', i, p: st.view.group.position }))];
+function describeSpot(h) {
+  if (h.kind === 'stack') {
+    const t = stacks[h.i].tiles, top = t[t.length - 1];
+    return `Stack ${h.i + 1}: ${top ? `top tile ${top.v}, ${plural(t.length, 'tile')}` : 'empty'}`;
+  }
+  const j = jars[h.i], n = j.tiles.length;
+  if (j.spare) return `Spare jar: ${n ? plural(n, 'tile') : 'empty'}, holds any 4`;
+  if (j.sealed) return `Jar of ${j.t}: sealed`;
+  if (isLocked(j)) return `Jar of ${j.t}: tied shut, seal ${plural(j.lock - sealedCount(), 'more jar')} first`;
+  return `Jar: needs ${j.t - jarSum(j)}${n ? `, ${plural(n, 'tile')} in it, top ${j.tiles[n - 1].v}` : ''}`;
+}
+function showKbFocus(h) {
+  for (const sp of kbSpots()) { const v = srcView(sp), on = !!h && sp.kind === h.kind && sp.i === h.i; ringTo(v.focusRing, on ? 0.75 : 0, 140); }
+  kbFocus = h;
+  if (h) ui.srStatus.textContent = describeSpot(h) + (sel ? `. Holding ${sel.tile.v === 8 ? 'an' : 'a'} ${sel.tile.v}.` : '');
+}
+function moveKbFocus(key) {
+  const spots = kbSpots(); if (!spots.length) return;
+  const cur = kbFocus && spots.find(s => s.kind === kbFocus.kind && s.i === kbFocus.i);
+  if (!cur) { showKbFocus(sel ? { kind: 'jar', i: 0 } : stacks.length ? { kind: 'stack', i: 0 } : { kind: 'jar', i: 0 }); return; }
+  const kind = key === 'ArrowUp' ? 'jar' : key === 'ArrowDown' ? 'stack' : null;
+  let pick;
+  if (kind) {   // the nearest spot of the other kind, by position on the counter
+    const pool = spots.filter(s => s.kind === kind && s !== cur);
+    pick = pool.sort((a, b) => Math.hypot(a.p.x - cur.p.x, a.p.z - cur.p.z) - Math.hypot(b.p.x - cur.p.x, b.p.z - cur.p.z))[0];
+  } else {      // left and right walk the board in reading order: back row first, left to right
+    const order = spots.slice().sort((a, b) => (Math.abs(a.p.z - b.p.z) > 0.5 ? a.p.z - b.p.z : a.p.x - b.p.x));
+    const k = order.indexOf(cur), d = key === 'ArrowRight' ? 1 : -1;
+    pick = order[(k + d + order.length) % order.length];
+  }
+  if (pick) showKbFocus({ kind: pick.kind, i: pick.i });
+}
+canvas.addEventListener('keydown', e => {
+  if (homeOpen || !ui.win.hidden) return;
+  const k = e.key;
+  if (k.startsWith('Arrow')) { e.preventDefault(); moveKbFocus(k); return; }
+  if ((k === 'Enter' || k === ' ') && kbFocus) { e.preventDefault(); tap({ ...kbFocus }); showKbFocus(kbFocus); return; }
+  if (k === 'Escape' && sel) { e.preventDefault(); tap(null); showKbFocus(kbFocus); return; }
+  if ((k === 'u' || k === 'U') && !ui.undo.hidden) { e.preventDefault(); ui.undo.click(); return; }
+  if ((k === 'h' || k === 'H') && !ui.hint.hidden) { e.preventDefault(); ui.hint.click(); }
+});
+canvas.addEventListener('pointerdown', () => { if (kbFocus) showKbFocus(null); }, true);
 ui.rewardUse.addEventListener('click', () => {
   useTheme(ui.reward.dataset.id); ui.rewardUse.textContent = 'In use'; ui.rewardUse.disabled = true;
   save.boxSeen = Math.max(Number(save.boxSeen) || 0, themeById(ui.reward.dataset.id).at); persist();
@@ -2897,7 +2952,7 @@ async function start(hot) {
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
-    get hand() { return handOn; }, get music() { return !!musicTimer; },
+    get hand() { return handOn; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
