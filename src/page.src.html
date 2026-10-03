@@ -853,7 +853,8 @@ function stopMusic() {
   clearInterval(musicTimer); musicTimer = 0;
   if (musicGain && actx) { const t = actx.currentTime; musicGain.gain.cancelScheduledValues(t); musicGain.gain.setTargetAtTime(0.0001, t, 0.12); }
 }
-addEventListener('pointerdown', () => { musicReady = true; startMusic(); }, { once: true, capture: true });
+const armMusic = () => { musicReady = true; startMusic(); removeEventListener('pointerdown', armMusic, true); removeEventListener('keydown', armMusic, true); };
+addEventListener('pointerdown', armMusic, true); addEventListener('keydown', armMusic, true);   // a touch or a key: either lets a browser play sound
 document.addEventListener('visibilitychange', () => { if (document.hidden) stopMusic(); else startMusic(); });
 const buzz = ms => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* haptics are optional */ } };
 
@@ -1127,7 +1128,7 @@ function makeJarView({ target = null, spare = false, locked = false } = {}) {
     [-1, 1].forEach(sx => { const loop = new THREE.Mesh(bowGeo, ribbonMat); loop.position.x = sx * 0.17; loop.rotation.z = sx * 0.5; loop.scale.y = 0.7; bow.add(loop); });
     bow.add(new THREE.Mesh(knotGeo, ribbonMat)); ribbon.add(bow); group.add(ribbon);
   }
-  const view = { group, glass, goldRing, selRing, lid, badge, hit, ribbon, state: { target, sum: 0, sealed: false, spare, flash: false, locked } };
+  const view = { group, glass, goldRing, selRing, lid, badge, hit, ribbon, ribbonOn: locked, state: { target, sum: 0, sealed: false, spare, flash: false, locked } };
   drawBadge(view); return view;
 }
 function makeDishView() {
@@ -1267,7 +1268,7 @@ function buildLevel(n, resume = null) {
       const mesh = makeTileMesh(v, !!h); mesh.position.y = jarSlotY(k); view.group.add(mesh);
       return { v, hidden: !!h, mesh };
     });
-    if (b.sealed) { view.lid.visible = true; view.lid.position.y = LID_Y; view.lidDown = true; view.goldRing.material.opacity = 0.9; }
+    if (b.sealed) showSealed(view);
     return { t: b.t, lock: b.lock, exact: b.exact, tiles, sealed: b.sealed, spare: b.spare, view };
   });
   stacks = board.stacks.map(vals => {
@@ -1315,10 +1316,13 @@ function buildLevel(n, resume = null) {
     });
   }
   analyse(); updateHud(); armIdle();
-  hideHand(); boardTouched = false; if (showsHand()) handTimer = setTimeout(showHand, 900);
+  updateFinale();
+  boardSig = daily || rush ? '' : levelSig(def);
+  if (n !== handLevel) { boardTouched = false; handLevel = n; }   // a touch on this level counts until another level is built
+  hideHand(); if (showsHand()) handTimer = setTimeout(showHand, 900);
 }
 /* The first levels (and the one teaching jar-to-jar moves) show the first move with a hand until it is made. */
-let handTimer = 0, handOn = false, boardTouched = false;   // a player who has already touched the board needs no hand
+let handTimer = 0, handOn = false, boardTouched = false, handLevel = 0;   // a player who has already touched the board needs no hand
 const showsHand = () => !daily && !rush && moveCount === 0 && !boardTouched && !sel && (levelNo <= 2 || !!def.teach);
 function placeHand() {
   const m = plan && plan[0]; if (!m) return false;
@@ -1400,8 +1404,8 @@ function refreshLocks(animated = true) {
   jars.forEach(j => {
     if (!j.lock) return;
     const locked = isLocked(j), r = j.view.ribbon;
-    if (locked === j.view.state.locked) return;
-    j.view.state.locked = locked; drawBadge(j.view);
+    if (locked === j.view.ribbonOn) return;   // the ribbon's own flag: syncBadge also writes state.locked
+    j.view.ribbonOn = locked; j.view.state.locked = locked; drawBadge(j.view);
     if (!animated || REDUCED) { r.visible = locked; r.scale.setScalar(1); return; }
     if (locked) { r.visible = true; tween(220, k => r.scale.setScalar(Math.max(0.001, k)), ease.outBack); }
     else {
@@ -1472,8 +1476,9 @@ function afterChange(move) { if (handOn) hideHand(); refreshLocks(); analyse(mov
    comes back to the same tiles, sealed jars and undo steps. A snapshot carries the level's content and is dropped
    if the level it was made for has changed since (a new version of the game). */
 const levelSig = d => JSON.stringify([d.jars, d.stacks, d.locks || null, d.fill || null, !!d.hidden]);
+let boardSig = '';   // the level's signature, worked out once per board
 function boardSnapshot() {
-  return { level: levelNo, sig: levelSig(def),
+  return { level: levelNo, sig: boardSig,
     jars: jars.map(j => ({ t: j.t, lock: j.lock, exact: j.exact, spare: j.spare, sealed: j.sealed, tiles: j.tiles.map(x => [x.v, x.hidden ? 1 : 0]) })),
     stacks: stacks.map(s => s.tiles.map(x => [x.v, x.hidden ? 1 : 0])),
     moves: moveCount, allow: { ...allow }, spareUsed, rescued, chain, bestChain, sealLog: sealLog.slice(), boostersUsed,
@@ -1481,7 +1486,7 @@ function boardSnapshot() {
 }
 function keepBoard() {
   if (daily || rush || won || levelNo === TEST_LEVEL || !def) return;
-  save.board = moveCount ? boardSnapshot() : null; persist();
+  save.board = moveCount || boostersUsed ? boardSnapshot() : null; persist();
 }
 function resumable(n) {
   const b = save.board;
@@ -1602,14 +1607,14 @@ function moveTo(di) {
   history.push({ type: 'move', src: { kind: src.kind, i: src.i }, dst: di, seals });
   moveCount++;
   chain = comboStep(chain, { clean: src.kind === 'stack' && dst.t != null, seals }); bestChain = Math.max(bestChain, chain);
-  if (chain > (Number(save.bestCombo) || 0)) save.bestCombo = chain;   // written with the next save
+  if (levelNo !== TEST_LEVEL && chain > (Number(save.bestCombo) || 0)) save.bestCombo = chain;   // written with the next save
   const combo = seals ? chain : 0;
   if (seals) sealLog.push(chain);
   if (seals && rush) { rush.score += rushSealPoints(chain); renderRushHud(true); }
   const finishing = jars.every(j => j.t == null || j.sealed);
   if (finishing) { won = true; clearTimeout(idleTimer); }   // play ends with the winning tap; the celebration follows the tile
   if (finishing && rush) rushCredit();   // the board counts now, not when the lid lands: the clock may run out meanwhile
-  updateHud();
+  updateHud(); keepBoard();   // written now: leaving during the flight keeps the move
   // the winning tile flies in slow motion while the camera leans toward its jar
   // the winning tile flies in slow motion while the camera leans toward its jar (not in a rush: the clock is running)
   const slowMo = finishing && !REDUCED && !rush;
@@ -1623,6 +1628,9 @@ function moveTo(di) {
     settle();
   });
 }
+/* how a sealed jar looks once its lid is down: shared by the seal animation and by a resumed board */
+const SEALED_RING = 0.9;
+function showSealed(v) { v.lid.visible = true; v.lid.position.y = LID_Y; v.lid.rotation.z = 0; v.lidDown = true; v.goldRing.material.opacity = SEALED_RING; }
 async function sealAnim(j, combo = 0, final = false) {
   const v = j.view, token = v.lidToken = (v.lidToken || 0) + 1;
   v.lid.visible = true; v.lid.position.y = 4.1; v.lid.rotation.z = 0.3;
@@ -1633,7 +1641,7 @@ async function sealAnim(j, combo = 0, final = false) {
   burst(new THREE.Vector3(v.group.position.x, 2.55, v.group.position.z), final ? 56 : 28, PAL_GOLD, final ? 1.45 : 1);
   if (final && !REDUCED) { ui.flash.classList.remove('go'); void ui.flash.offsetWidth; ui.flash.classList.add('go'); }
   syncBadge(j); sfx.seal(sealedCount() - 1); buzz(final ? [24, 30, 40] : 18);
-  ringTo(v.goldRing, 0.9, 420); hop(v.group, 0.22, 400);
+  ringTo(v.goldRing, SEALED_RING, 420); hop(v.group, 0.22, 400);
   if (combo >= 2) callout(j, combo);
   await wait(160);
 }
@@ -1687,12 +1695,12 @@ async function undo() {
     list.splice(list.length - 2, 2).forEach(p => view.group.remove(p.mesh));
     list.push(h.orig); h.orig.mesh.position.set(0, srcSlotY(h.loc, list.length - 1), 0); h.orig.mesh.rotation.set(0, 0, 0);
     view.group.add(h.orig.mesh); popIn(h.orig.mesh); sfx.split();
-    allow.split++;
+    allow.split++; keepBoard();
   } else {
     const dst = jars[h.dst], tile = dst.tiles.pop();
     if (h.seals) unsealAnim(dst);   // the lid lifts while the tile is already on its way back
     tile.flying = true; syncBadge(dst);
-    const back = srcList(h.src), slot = back.length; back.push(tile);
+    const back = srcList(h.src), slot = back.length; back.push(tile); keepBoard();
     await flyTo(tile.mesh, srcView(h.src).group, srcSlotY(h.src, slot), h.src.kind === 'stack' ? 3.0 : 3.35);
     if (id !== buildId) return;
     tile.flying = false;
@@ -1706,7 +1714,7 @@ async function addSpare() {
   deselect(); setSplitArmed(false); busy++; spareUsed = true; rescued = true; allow.spare--; chain = 0; boostersUsed++; updateHud();
   const j = { t: null, lock: 0, exact: false, tiles: [], sealed: false, spare: true, view: makeJarView({ spare: true }) };
   jars.push(j); j.view.group.scale.setScalar(0.001); playGroup.add(j.view.group);
-  refreshHits();
+  refreshHits(); keepBoard();
   const slide = layoutPlay(true); fitCamera(true);
   tween(380, k => j.view.group.scale.setScalar(Math.max(0.001, k)), ease.outBack);
   await slide;
@@ -1746,7 +1754,7 @@ async function doSplit(loc) {
   list.push(...parts);
   burst(new THREE.Vector3(view.group.position.x, srcSlotY(loc, k) + 0.4, view.group.position.z), 14, PAL_SUGAR, 0.6);
   sfx.split(); buzz(12);
-  history.push({ type: 'split', loc, orig: tile });
+  history.push({ type: 'split', loc, orig: tile }); keepBoard();
   toast(`Split the ${tile.v} into ${big} and ${small}.`);
   await wait(240);
   if (id !== buildId) return;
@@ -2073,7 +2081,7 @@ function play() {
   if (!homeOpen) return;
   leaveHome();
   sfx.select(5); buzz(8);
-  if (moveCount === 0 && !won) goLevel(levelNo); else armIdle();   // a fresh board makes its entrance again; a level in progress just carries on
+  if (moveCount === 0 && !boostersUsed && !won) goLevel(levelNo); else armIdle();   // a fresh board makes its entrance again; a level in progress just carries on
 }
 /* Home from a finished level leaves that level behind: the next one is set up to wait. */
 function goHome() {
