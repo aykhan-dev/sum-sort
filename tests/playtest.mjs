@@ -191,6 +191,9 @@ pass('home from the win card shows the next level and the stars', h8.open && h8.
     const at = b => Number((b.querySelector('.ts').textContent.match(/\d+/) || [0])[0]);
     return { open: !document.getElementById('shop').hidden, themes: all.length, total, inUse: all.filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.id),
       locked: all.filter(b => b.disabled).length, lockedRight: all.filter(b => b.disabled).every(b => at(b) > total) }; });
+  const rec = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#record span')].map(e => [e.querySelector('small').textContent, e.querySelector('b').textContent])));
+  const cleared = await page.evaluate(() => Object.keys(__sumSort.save.stars).length);
+  pass('the shop shows the player\'s record', Object.keys(rec).length === 6 && Number(rec.Levels) === cleared && /^×\d+$/.test(rec['Best combo']), JSON.stringify(rec));
   await page.keyboard.press('Escape');
   pass('the star tally opens the candy shop: every counter, the first in use, the rest locked until their box', shop.open && shop.themes === 8 && shop.inUse.join() === 'strawberry' && shop.locked >= 6 && shop.lockedRight && await page.evaluate(() => document.getElementById('shop').hidden), JSON.stringify(shop)); }
 const homeSizes = await page.evaluate(() => Object.fromEntries(['#playBtn', '#homeSound', '#homeMusic', '#starTally'].map(q => { const r = document.querySelector(q).getBoundingClientRect(); return [q, Math.round(r.width) + 'x' + Math.round(r.height)]; })));

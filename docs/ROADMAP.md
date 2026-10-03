@@ -48,7 +48,7 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | R1 | **Resume boards**: a half-played level survives a detour to the daily or a rush, and closing the tab | Found in review: progress silently lost is the fastest way to lose a player | 4 | 2 | done |
 | F11 | **First-move hand**: on the first levels a finger shows "this tile, then this jar" until the first move | The first ten seconds decide whether a new visitor stays | 4 | 1 | done |
 | F12 | **Streak milestones**: 3, 7, 14 and 30 days in a row get their own celebration and a mark on the daily card | Makes the streak worth protecting | 3 | 1 | done |
-| M1 | **Local metrics**: counts of sessions, streak days, shares, levels per session, kept on the device and shown in a debug panel | So later tuning has numbers | 2 | 1 | later |
+| M1 | **Your record**: levels cleared, 3-star levels, best combo, dailies, best streak, rush best, in the candy shop (was: a debug metrics panel) | Pride, and a number to beat in every mode | 2 | 1 | done |
 
 ## How each item is done
 
@@ -76,4 +76,5 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | 23:52 | F11 | On levels 1–2 and the jar-to-jar lesson, a hand presses the first tile of the plan, glides to its jar and presses again, on a loop, until the player touches the board; it never comes back that level, and never appears over a selection. Static under reduced motion. Found while testing: the play-test's "board cannot be touched through home" tap landed on the Play button (every run logged COVERED), so the next "Play" tap hit the board and selected a tile. That check now taps a jar under the wordmark and asserts home stays open. |
 | 00:03 | F12 | A daily win that lands the streak on 3, 7, 14, 30, 50 or 100 days gets the chapter rung: "7-day streak!" as the title, a "7 dailies in a row" tag, a second wave of candy and the chapter fanfare; the note names the next mark. From a week on, the flame on the daily card grows and glows. Win titles longer than ten characters step down a size so they stay on one line. |
 | 00:11 | F9 | A procedural candy-shop loop made with Web Audio, no files: F, D minor, B flat, C as a music-box arpeggio over a quiet bass, mixed under the effects (peak about 0.07 against 0.045–0.07 per effect). 92 BPM, 128 in a rush. Starts with the first touch (browser rule), stops in a hidden tab, picks up from now after a stall. A music button beside sound on home; the sound button silences both. |
+| 00:20 | M1 | Turned "local metrics" into a player-facing record under the counters in the candy shop: six tiles, each a number to beat. Best combo is now kept across levels. A debug panel would have served nobody without a backend to send numbers to. |
 
