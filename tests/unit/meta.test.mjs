@@ -325,3 +325,15 @@ test('streak at risk: two days or more, no freeze to cover a miss, in the day\'s
   assert.equal(hoursMinutes(3 * h + 12 * 60000 + 59000), '3h 12m');
   assert.equal(hoursMinutes(45 * 60000), '45m');
 });
+
+import { fullWeek, weekStillOpen, WEEK_BONUS } from '../../src/meta.mjs';
+test('full week: every daily Monday to Sunday; open until a day of it is missed', () => {
+  const played = new Set(['2026-10-05', '2026-10-06', '2026-10-07']), has = k => played.has(k);
+  assert.equal(WEEK_BONUS > 0, true);
+  assert.equal(fullWeek('2026-10-07', has), false);
+  assert.equal(weekStillOpen('2026-10-07', has), true);
+  assert.equal(weekStillOpen('2026-10-09', has), false);              // Thursday was missed
+  for (const k of ['2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']) played.add(k);
+  assert.equal(fullWeek('2026-10-11', has), true);
+  assert.equal(weekStillOpen('2026-10-03', () => true), false);        // the first daily came on a Thursday
+});

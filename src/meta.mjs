@@ -38,6 +38,11 @@ export const addDays = (key, n) => { const d = new Date(keyUTC(key) + n * 864000
 export const dailyNumber = key => Math.round((keyUTC(key) - DAILY_EPOCH) / 86400000) + 1;
 export const weekdayOf = key => (new Date(keyUTC(key)).getUTCDay() + 6) % 7;   // 0 = Monday
 export const weekOf = key => Array.from({ length: 7 }, (_, i) => addDays(key, i - weekdayOf(key)));   // Monday to Sunday
+/* every daily of a week, Monday to Sunday, earns a bonus once, on the win that completes it */
+export const WEEK_BONUS = 5;
+export const fullWeek = (key, has) => weekOf(key).every(has);
+/* the full week is still open on `key` if no earlier day of its week was missed (or came before the first daily) */
+export const weekStillOpen = (key, has) => weekOf(key).every(k => k >= key || (k >= DAILY_FIRST && has(k)));
 export const dailyLabel = key => { const d = new Date(keyUTC(key)); return `${WEEKDAYS[weekdayOf(key)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
 export const dailyRecipe = key => ({ ch: 'daily', ...DAILY_RECIPES[weekdayOf(key)] });
 /* FNV-1a over the date text: a different, stable seed for every day */

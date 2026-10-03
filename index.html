@@ -463,7 +463,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .win-card .journey{margin:6px 0 0;width:100%}
 .win-card .jbar{height:9px}
 /* the daily's week: a stamp for each day played, Monday to Sunday */
-.week{display:flex;justify-content:space-between;width:100%;max-width:252px}
+.week{display:flex;justify-content:space-between;width:100%;max-width:262px}
 .wd{display:grid;justify-items:center;gap:3px;font:800 11px var(--body);color:var(--ink-soft)}
 .wd i{font-style:normal}
 .wd b{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--ground);box-shadow:inset 0 0 0 1.5px var(--line)}
@@ -474,6 +474,9 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .wd.this b{outline:2.5px solid var(--ink);outline-offset:2px}
 .wd.miss b{background:transparent;opacity:.55}
 .wd.off{opacity:.35}
+.wd.prize i{color:#D9962B}
+.wd.prize b{width:34px;border-radius:999px;font:700 13px var(--display);color:#9A6A12;background:#FFF4D6;box-shadow:inset 0 0 0 1.5px #F2D48A}
+.wd.prize.won b{background:#F2B63A;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.14),inset 0 2px 0 rgba(255,255,255,.35)}
 .play{flex:none;width:min(100%,360px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
 .play svg{width:24px;height:24px;fill:currentColor;flex:none}
 @keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
@@ -1035,6 +1038,11 @@ const addDays = (key, n) => { const d = new Date(keyUTC(key) + n * 86400000); re
 const dailyNumber = key => Math.round((keyUTC(key) - DAILY_EPOCH) / 86400000) + 1;
 const weekdayOf = key => (new Date(keyUTC(key)).getUTCDay() + 6) % 7;   // 0 = Monday
 const weekOf = key => Array.from({ length: 7 }, (_, i) => addDays(key, i - weekdayOf(key)));   // Monday to Sunday
+/* every daily of a week, Monday to Sunday, earns a bonus once, on the win that completes it */
+const WEEK_BONUS = 5;
+const fullWeek = (key, has) => weekOf(key).every(has);
+/* the full week is still open on `key` if no earlier day of its week was missed (or came before the first daily) */
+const weekStillOpen = (key, has) => weekOf(key).every(k => k >= key || (k >= DAILY_FIRST && has(k)));
 const dailyLabel = key => { const d = new Date(keyUTC(key)); return `${WEEKDAYS[weekdayOf(key)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
 const dailyRecipe = key => ({ ch: 'daily', ...DAILY_RECIPES[weekdayOf(key)] });
 /* FNV-1a over the date text: a different, stable seed for every day */
@@ -2539,6 +2547,7 @@ function recordWin() {
     const before = save.streak ? save.streak.count : 0, grows = dayGap(save.streak && save.streak.last, daily) > 0;
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
     bonus = prev || !grows ? 0 : streakBonus(save.streak.count); if (bonus) save.daily[daily].bonus = bonus;   // a streak pays: +1 star from three days, more from a week
+    if (!prev && fullWeek(daily, k => !!save.daily[k])) save.daily[daily].week = WEEK_BONUS;   // every daily of the week, paid once
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; save.board = null; }
   const opened = boxesOpened(starsBefore, totalStars());
   // a streak landing on 3, 7, 14, 30 days gets the chapter rung: a second wave of candy and the long flourish
@@ -2628,12 +2637,13 @@ function streakTip(key) {
 }
 function renderWeek(key) {
   const days = weekOf(key), today = todayKey(), done = days.filter(k => save.daily[k]).length, wd = weekdayOf(key);
+  const has = k => !!save.daily[k], paid = days.some(k => save.daily[k] && save.daily[k].week), open = !paid && weekStillOpen(key, has);
   ui.winWeekRow.innerHTML = days.map((k, i) => {
     const r = save.daily[k], state = r ? (r.stars >= 3 ? 'on gold' : 'on') : k < DAILY_FIRST ? 'off' : k < today ? 'miss' : '';
     return `<span class="wd ${state}${k === key ? ' this' : ''}"><i>${WEEKDAYS[i][0]}</i><b>${r ? TICK : ''}</b></span>`;
-  }).join('');
-  ui.winWeekRow.setAttribute('aria-label', `This week: ${done} of 7 dailies played`);
-  ui.winWeekNote.textContent = done === 7 ? 'Every daily this week!'
+  }).join('') + (paid || open ? `<span class="wd prize${paid ? ' won' : ''}"><i>★</i><b>+${WEEK_BONUS}</b></span>` : '');   // the full week's prize, while it can still be won
+  ui.winWeekRow.setAttribute('aria-label', `This week: ${done} of 7 dailies played.` + (paid ? ` Full week: ${WEEK_BONUS} bonus stars.` : open ? ` All seven earn ${WEEK_BONUS} bonus stars.` : ''));
+  ui.winWeekNote.textContent = done === 7 ? (paid ? `Every daily this week: +${plural(WEEK_BONUS, 'star')}!` : 'Every daily this week!')
     : wd === 6 ? `${done} of 7 this week. A new week starts tomorrow.`
     : `${done} of 7 this week. Tomorrow: ${WEEKDAYS[wd + 1]}, ${dailyRecipe(addDays(key, 1)).level.toLowerCase()}.`;
 }
@@ -2846,7 +2856,7 @@ function nextText(after) {
 
 /* ---------------- candy boxes ----------------
    Stars from levels and dailies pile up and open boxes; each box holds a counter theme for the whole room. */
-const totalStars = () => [...Object.values(save.stars), ...Object.values(save.daily).map(r => r && (Number(r.stars) || 0) + (Number(r.bonus) || 0)), save.treat && save.treat.stars].reduce((a, b) => a + (Number(b) || 0), 0);
+const totalStars = () => [...Object.values(save.stars), ...Object.values(save.daily).map(r => r && (Number(r.stars) || 0) + (Number(r.bonus) || 0) + (Number(r.week) || 0)), save.treat && save.treat.stars].reduce((a, b) => a + (Number(b) || 0), 0);
 const swatchVars = t => `--s1:${t.sky[0]};--s2:${t.sky[1]};--s3:${t.sky[2]};--c:${t.counter}`;
 const swatchStyle = (el, t) => { el.style.cssText = swatchVars(t); };
 function useTheme(id) {

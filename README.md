@@ -60,7 +60,7 @@ Boosters arrive one at a time: Undo (level 11), Hint (13), +1 Jar (15), Split (2
 
 ## Daily puzzle
 
-From level 19 the home screen offers one extra board a day, the same for everyone on that calendar date. It uses only the rules of the first three chapters. Monday is easy and the week climbs to Sunday (model fail rate 20% to 60%). Finishing dailies on consecutive days builds a streak, and a streak pays: each daily won on it adds bonus stars (+1 from three days in a row, +2 from a week, +3 from two weeks). In the day's last six hours, a streak with no freeze to cover a miss shows on the daily card when it ends. A daily never moves the level progress. The daily's win card stamps the day on the week's row and says what tomorrow brings.
+From level 19 the home screen offers one extra board a day, the same for everyone on that calendar date. It uses only the rules of the first three chapters. Monday is easy and the week climbs to Sunday (model fail rate 20% to 60%). Finishing dailies on consecutive days builds a streak, and a streak pays: each daily won on it adds bonus stars (+1 from three days in a row, +2 from a week, +3 from two weeks). Every daily of a week, Monday to Sunday, earns 5 more. In the day's last six hours, a streak with no freeze to cover a miss shows on the daily card when it ends. A daily never moves the level progress. The daily's win card stamps the day on the week's row and says what tomorrow brings.
 
 ## Sugar Rush
 
@@ -84,4 +84,4 @@ Served over https (GitHub Pages), the page registers a service worker: after one
 
 ## Status
 
-Prototype, now with a daily puzzle (streaks, bonuses, a daily treat, shareable links), Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of about 75 checks), not yet on real phones.
+Prototype, now with a daily puzzle (streaks, bonuses, a daily treat, shareable links), Sugar Rush with challenge links, combos, a journey, candy-box themes, sharing, offline install, music and keyboard play (see `docs/ROADMAP.md`). Fonts load from Google Fonts. Progress is saved in the browser's local storage only. Tested in a software-rendered headless browser (unit tests and a play-test of 76 checks), not yet on real phones.

@@ -222,7 +222,7 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-05'; __sumSort.show
   pass('the daily card opens today\'s board', /^Play daily puzzle 5, Monday, Easy/.test(card) && d.daily === '2026-10-05' && /Daily #5 Monday/i.test(d.tag), JSON.stringify(d));
   const w = await playOut(); log('win daily', w); await page.screenshot({ path: SHOTS + '/win-daily.png' });
   const wk = await page.evaluate(() => ({ hidden: winWeek.hidden, days: [...winWeekRow.children].map(e => e.className.trim()), note: winWeekNote.textContent, journey: winJourney.hidden }));
-  pass('the daily win card shows the week: today stamped, and what tomorrow brings', !wk.hidden && wk.journey && wk.days.length === 7 && /^wd on( gold)? this$/.test(wk.days[0]) && wk.days.slice(1).every(c => c === 'wd') && wk.note === '1 of 7 this week. Tomorrow: Tuesday, easy.', JSON.stringify(wk));
+  pass('the daily win card shows the week: today stamped, and what tomorrow brings', !wk.hidden && wk.journey && wk.days.length === 8 && /^wd on( gold)? this$/.test(wk.days[0]) && wk.days.slice(1, 7).every(c => c === 'wd') && wk.days[7] === 'wd prize' && wk.note === '1 of 7 this week. Tomorrow: Tuesday, easy.', JSON.stringify(wk));
   const after = await page.evaluate(() => ({ result: __sumSort.save.daily['2026-10-05'], streak: __sumSort.save.streak, last: __sumSort.save.last }));
   pass('a daily win records the day and starts a streak, and leaves the levels alone', w.shown && /^Daily #5/.test(await page.evaluate(() => document.getElementById('winEyebrow').textContent)) && after.result && after.result.stars >= 1 && after.streak.count === 1 && after.last === 102, JSON.stringify(after));
   await tapEl('#nextBtn');
@@ -429,6 +429,7 @@ await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(
   await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.showHome(); }); await page.waitForTimeout(300); const next = await T();
   await page.evaluate(() => { __sumSort.openTreat(); treatOpen.click(); }); await page.waitForTimeout(300); const day2 = await T();
   await page.evaluate(() => { treatClose.click(); window.__sumSortToday = '2026-10-10'; __sumSort.showHome(); __sumSort.openTreat(); }); await page.waitForTimeout(300); const gap = await T();
+  await page.evaluate(() => treatClose.click());   // leave home clear for the next section
   pass('days in a row climb the treats; a missed day starts the week over', !shut.sheet && shut.focus === 'treatBtn' && next.ready && day2.t.day === 2 && day2.t.stars === 2 && gap.sub === 'Day 1 of 7',
     JSON.stringify({ shut, next: next.ready, day2: day2.t, gap: gap.sub })); }
 // 23. in the day's last hours, a streak with no freeze to cover a miss says when it ends
@@ -440,6 +441,15 @@ await page.goto(URL_ + '?daily=2026-10-07&moves=9'); await page.waitForFunction(
   await page.evaluate(() => { __sumSort.save.streak.freezes = 0; window.__sumSortNow = '2026-10-08T12:00:00'; __sumSort.showHome(); }); await page.waitForTimeout(300); const noon = await D();
   pass('a streak at risk says when it ends, only late and only with no freeze', late.risk && late.sub === 'Ends in 2h 13m' && !covered.risk && !noon.risk && noon.sub === 'Keep it going',
     JSON.stringify({ late, covered, noon })); }
+// 24. every daily of a week, Monday to Sunday, pays a bonus once, on the win that completes it
+await page.evaluate(() => { const s = __sumSort.save, r = { stars: 3, moves: 9, par: 9, seals: [0], boosters: 0 };
+  for (const k of ['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17']) s.daily[k] = { ...r };
+  s.streak = { count: 6, best: 6, last: '2026-10-17', freezes: 0 }; window.__sumSortToday = '2026-10-18'; __sumSort.showHome(); });
+await tapEl('#dailyBtn'); await settled();
+{ const t0 = await page.evaluate(() => __sumSort.totalStars()); await playOut();
+  const fw = await page.evaluate(() => ({ r: __sumSort.save.daily['2026-10-18'], note: document.getElementById('winWeekNote').textContent, prize: document.getElementById('winWeekRow').lastElementChild.className, total: __sumSort.totalStars() }));
+  pass('a full week of dailies pays its bonus once, on the win that completes it', fw.r.week === 5 && fw.note === 'Every daily this week: +5 stars!' && fw.prize === 'wd prize won'
+    && fw.total === t0 + fw.r.stars + fw.r.bonus + 5, JSON.stringify({ t0, fw })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
