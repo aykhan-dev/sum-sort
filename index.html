@@ -55,6 +55,10 @@
   --body:'Nunito',ui-rounded,system-ui,-apple-system,'Segoe UI',sans-serif;
   color-scheme:light;
 }
+/* Squircles: every rounded rectangle in the UI has continuous corners (a superellipse, the shape of a gummy) wherever
+   the browser can draw them (corner-shape). A squircle corner reads tighter than a circular one of the same radius,
+   so there the radii grow by --sq. Circles and pills stay round; elsewhere the same rules give plain rounded corners. */
+@supports (corner-shape:squircle){:root{--sq:1.5}}
 /* flavour sets: base, highlight, shade */
 /* raspberry carries white text, so it is the deeper cut: 4.5:1 or better from top to bottom */
 .c-rasp{--chip:#CF3358;--chip-hi:#D63A5F;--chip-lo:#A82743}
@@ -112,11 +116,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .bar-left{display:flex;align-items:center;gap:8px;min-width:0}
 /* the level is a label, not a control: it sits flat on the counter */
 .level-tag{
-  display:inline-flex;align-items:center;gap:10px;min-width:0;border-radius:18px;padding:4px 14px 4px 4px;
+  display:inline-flex;align-items:center;gap:10px;min-width:0;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;padding:4px 14px 4px 4px;
   background:var(--frost);border:1px solid var(--frost-edge);
 }
 .level-tag .num{
-  min-width:40px;height:40px;border-radius:13px;padding:0 8px;
+  min-width:40px;height:40px;border-radius:calc(13px * var(--sq,1));corner-shape:squircle;padding:0 8px;
   display:grid;place-items:center;font:700 21px var(--display);font-variant-numeric:tabular-nums;
   text-shadow:0 1px 0 rgba(120,20,50,.35);
 }
@@ -181,7 +185,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .win{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgba(255,236,228,.45);background:color-mix(in srgb,color-mix(in srgb,var(--stage),#FFFFFF 45%) 45%,transparent);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
 .win-card{
   position:relative;width:min(100%,300px);margin-top:26px;
-  background:var(--card);border:1px solid var(--frost-edge);border-radius:30px;padding:0 22px 22px;text-align:center;
+  background:var(--card);border:1px solid var(--frost-edge);border-radius:calc(30px * var(--sq,1));corner-shape:squircle;padding:0 22px 22px;text-align:center;
   box-shadow:0 6px 0 var(--line-deep),0 30px 50px -22px rgba(110,40,90,.6);
   animation:pop .45s cubic-bezier(.3,1.6,.5,1) both;
   display:grid;gap:6px;justify-items:center;
@@ -201,7 +205,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   font:600 15px var(--display);color:var(--ink);background:var(--ground);border:1px solid var(--line);
 }
 .chapter-tag::before{
-  content:"";width:18px;height:18px;border-radius:6px;
+  content:"";width:18px;height:18px;border-radius:calc(6px * var(--sq,1));corner-shape:squircle;
   background:linear-gradient(180deg,var(--chip-hi),var(--chip) 52%,var(--chip-lo));box-shadow:inset 0 2px 0 rgba(255,255,255,.5);
 }
 .stars svg{width:54px;height:54px;fill:#EFE3EC;stroke:#DCCBD8;stroke-width:1.4;stroke-linejoin:round;paint-order:stroke}
@@ -216,7 +220,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .win-card h2.long{font-size:31px}   /* "7-day streak!", "Ribbons done!": one line on a phone */
 .stats{display:flex;gap:8px;margin-top:8px}
 .stat{
-  display:grid;gap:1px;min-width:86px;padding:8px 14px;border-radius:16px;background:var(--ground);border:1px solid var(--line);
+  display:grid;gap:1px;min-width:86px;padding:8px 14px;border-radius:calc(16px * var(--sq,1));corner-shape:squircle;background:var(--ground);border:1px solid var(--line);
   font-variant-numeric:tabular-nums;
 }
 .stat small{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
@@ -225,13 +229,13 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .win-actions{display:flex;gap:10px;align-items:stretch;margin-top:12px;width:100%}
 .cta{
   flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
-  font:700 18px var(--display);border:0;border-radius:18px;padding:13px 18px;min-height:52px;
+  font:700 18px var(--display);border:0;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;padding:13px 18px;min-height:52px;
   text-shadow:0 1px 0 rgba(120,20,50,.35);
   box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 5px 0 var(--chip-lo),0 14px 20px -12px rgba(199,48,79,.7);
   transition:transform .08s ease,box-shadow .08s ease;
 }
 .cta:active{transform:translateY(4px);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 1px 0 var(--chip-lo)}
-.ghost{width:54px;min-height:52px;border-radius:18px;display:grid;place-items:center;color:var(--ink)}
+.ghost{width:54px;min-height:52px;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;color:var(--ink)}
 .win-card .bonus{margin:4px 0 0;padding:5px 13px;border-radius:999px;background:#FFF4D6;border:1px solid #F2D48A;font:800 13px var(--body);color:var(--ink)}
 .win-card .bonus::before{content:"★ ";color:#D9962B}
 .chip.retry{display:inline-flex;align-items:center;gap:6px;margin-top:2px}
@@ -249,7 +253,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 /* coach strip: tip in normal play, the fail state when the board is dead */
 .strip{
   display:flex;align-items:center;justify-content:center;gap:10px;min-height:42px;justify-self:center;
-  max-width:100%;padding:6px 14px;border-radius:18px;border:1px solid transparent;
+  max-width:100%;padding:6px 14px;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;border:1px solid transparent;
   font-size:13.5px;font-weight:700;color:var(--ink-soft);text-align:center;line-height:1.3;
 }
 .strip p{margin:0;min-width:0;max-width:72ch;text-wrap:balance}
@@ -269,10 +273,10 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 /* booster tray */
 .tray{display:grid;grid-template-columns:repeat(var(--cols,4),minmax(0,1fr));gap:10px;max-width:calc(var(--cols,4) * 115px);width:100%;justify-self:center}
 .boost{
-  position:relative;display:grid;justify-items:center;gap:5px;padding:9px 4px 8px;border-radius:20px;
+  position:relative;display:grid;justify-items:center;gap:5px;padding:9px 4px 8px;border-radius:calc(20px * var(--sq,1));corner-shape:squircle;
   font:800 13px var(--body);color:var(--ink);
 }
-.boost .ico{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:var(--ink)}   /* ink icons: 3.4:1 or better on every chip */
+.boost .ico{width:40px;height:40px;border-radius:calc(13px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;color:var(--ink)}   /* ink icons: 3.4:1 or better on every chip */
 .boost .ico svg.i{width:22px;height:22px;stroke-width:2.4}
 .boost:disabled{cursor:default;transform:none;color:var(--ink-soft);box-shadow:0 4px 0 var(--line)}
 .boost:disabled .ico{filter:grayscale(.85) opacity(.55)}
@@ -315,15 +319,15 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 /* candy shop: every counter the boxes hold, and how far the next box is */
 .shop{position:absolute;inset:0;z-index:8;display:grid;place-items:center;padding:16px;background:rgba(59,39,71,.26);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
 .shop-card{
-  width:min(100%,400px);max-height:100%;overflow:auto;background:var(--card);border-radius:28px;padding:16px 16px 18px;
+  width:min(100%,400px);max-height:100%;overflow:auto;background:var(--card);border-radius:calc(28px * var(--sq,1));corner-shape:squircle;padding:16px 16px 18px;
   box-shadow:0 6px 0 var(--line-deep),0 30px 50px -22px rgba(110,40,90,.6);animation:pop .35s cubic-bezier(.3,1.6,.5,1) both;
 }
 .challenge-card{width:min(100%,330px);display:grid;justify-items:center;text-align:center;gap:6px;padding:22px 20px 20px}
-.challenge-card .bolt{width:56px;height:56px;border-radius:18px;display:grid;place-items:center}
+.challenge-card .bolt{width:56px;height:56px;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center}
 .challenge-card .bolt svg{width:32px;height:32px;fill:#FFFFFF}
 .challenge-card .eyebrow{margin:6px 0 0;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#C2561A}
 .challenge-card h2{margin:0;font:700 44px/1 var(--display);color:var(--raspberry)}
-.challenge-card .cal{width:56px;height:56px;border-radius:18px;display:grid;place-items:center;align-content:center;line-height:1;text-shadow:0 1px 0 rgba(60,20,120,.35)}
+.challenge-card .cal{width:56px;height:56px;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;align-content:center;line-height:1;text-shadow:0 1px 0 rgba(60,20,120,.35)}
 .challenge-card .cal small{font:800 11px var(--body);letter-spacing:.1em;text-transform:uppercase;opacity:.92}
 .challenge-card .cal b{font:700 25px var(--display);margin-top:1px}
 .challenge-card .cal[hidden],.challenge-card .bolt[hidden]{display:none}
@@ -331,34 +335,53 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .treat{position:relative;color:var(--raspberry-deep)}
 .treat.ready::after{content:"";position:absolute;top:3px;right:3px;width:12px;height:12px;border-radius:50%;background:var(--raspberry);border:2px solid var(--card)}
 .treat-card{width:min(100%,360px);display:grid;gap:10px;text-align:center}
-.treats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
-.td{display:grid;justify-items:center;gap:2px;padding:9px 4px 8px;border-radius:16px;background:var(--ground);border:1px solid var(--line);font:800 11px var(--body);color:var(--ink-soft)}
-.td b{font:700 20px/1.1 var(--display);color:var(--ink)}
-.td b::before{content:"★";color:var(--gold);margin-right:2px;font-size:.8em}
-.td.got{background:#FFF4D6;border-color:#F2D48A}
-.td.got small::after{content:" ✓";color:var(--raspberry-deep)}
-.td.now{border:2px solid var(--raspberry);box-shadow:0 4px 12px -6px rgba(199,48,79,.6)}
-.td.big{grid-column:span 2}
-.td.big b{font-size:24px}
-.td small{font:inherit}
+.treats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 8px;padding-top:4px}
+/* a day: a little candy tile with its stars. Opened days turn gold with a tick; today is lifted and ringed in raspberry;
+   day 7 is the big one. */
+.td{
+  position:relative;display:grid;justify-items:center;align-content:center;gap:5px;min-height:72px;padding:9px 4px 8px;
+  border-radius:calc(17px * var(--sq,1));corner-shape:squircle;
+  background:linear-gradient(180deg,#FFFFFF 0%,#FFF5EF 100%);border:1px solid var(--line);
+  box-shadow:inset 0 2px 0 #FFFFFF,0 3px 0 var(--line-deep),0 10px 14px -12px rgba(110,40,90,.5);
+  font:800 11px var(--body);letter-spacing:.03em;color:var(--ink-soft);
+}
+.td small{font:inherit;line-height:1}
+.td .amt{display:flex;align-items:center;gap:3px}
+.td .st{width:21px;height:21px;fill:var(--gold);stroke:var(--gold-deep);stroke-width:1.5;stroke-linejoin:round;paint-order:stroke;filter:drop-shadow(0 1.5px 0 var(--gold-deep))}
+.td b{font:700 21px/1 var(--display);color:var(--ink)}
+.td.got{background:linear-gradient(180deg,#FFF7DD 0%,#FFE6A3 100%);border-color:#F2D48A;box-shadow:inset 0 2px 0 rgba(255,255,255,.75),0 3px 0 #E6C26B,0 10px 14px -12px rgba(217,150,43,.6)}
+.td.got small{color:#9A6A12}
+.td .tick{position:absolute;top:-7px;right:-6px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  background:var(--raspberry);border:2px solid var(--card);box-shadow:0 2px 0 var(--raspberry-deep);color:#FFFFFF}
+.td .tick svg.i{width:13px;height:13px;stroke-width:3.4}
+.td.now{border:2px solid var(--raspberry);translate:0 -2px;
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.8),0 4px 0 var(--raspberry-deep),0 12px 18px -10px rgba(199,48,79,.55)}
+.td.now:not(.got){background:linear-gradient(180deg,#FFFFFF 0%,#FFEAF0 100%)}
+.td.now small{color:var(--raspberry-ink)}
+.td.big{grid-column:span 2;background:radial-gradient(120% 140% at 50% 0%,#FFFFFF 0%,#FFF0E2 45%,#FFE0E9 100%);border-color:#F8C6D3}
+.td.big .st{width:28px;height:28px}
+.td.big .st.s{width:17px;height:17px;margin:0 -1px;translate:0 3px;opacity:.9}
+.td.big b{font-size:27px;margin-left:2px}
+.td.big.got{background:linear-gradient(180deg,#FFF7DD 0%,#FFE6A3 100%)}
 .treat-card .challenge-text{margin:2px 0}
 .challenge-text{margin:4px 0 6px;font-size:14px;font-weight:700;color:var(--ink-soft);text-wrap:balance}
 .shop-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .shop-head h2{margin:0 0 0 4px;font:700 30px var(--display);color:var(--raspberry)}
 .shop-sub{margin:2px 4px 10px;font-size:13.5px;font-weight:700;color:var(--ink-soft)}
-.shop-bar{height:12px;margin:0 4px;border-radius:6px;background:var(--ground);box-shadow:inset 0 0 0 1px var(--line);overflow:hidden}
-.shop-bar i{display:block;height:100%;border-radius:6px;background:linear-gradient(180deg,#FFD466,var(--gold) 55%,var(--gold-deep))}
+.shop-bar{height:18px;margin:0 4px;padding:3px;border-radius:999px;background:var(--ground);box-shadow:inset 0 2px 3px rgba(110,40,90,.16),inset 0 0 0 1px var(--line)}
+.shop-bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(180deg,#FFD466,var(--gold) 55%,var(--gold-deep));
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.6),0 1px 1px rgba(160,100,20,.3)}
 .shop-h{margin:18px 4px 8px;font:600 19px var(--display);color:var(--ink)}
 .record{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
-.record span{display:grid;gap:2px;align-content:start;padding:8px 4px 7px;border-radius:14px;background:var(--ground);border:1px solid var(--line);text-align:center}
+.record span{display:grid;gap:2px;align-content:start;padding:8px 4px 7px;border-radius:calc(14px * var(--sq,1));corner-shape:squircle;background:var(--ground);border:1px solid var(--line);text-align:center}
 .record b{font:700 22px/1.05 var(--display);color:var(--ink);font-variant-numeric:tabular-nums}
 .record small{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);line-height:1.2}
 .themes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
-.theme{display:grid;gap:3px;justify-items:center;padding:8px 8px 9px;border-radius:20px;font:800 12.5px var(--body);color:var(--ink-soft)}
-.theme .sw{position:relative;width:100%;height:62px;border-radius:14px;overflow:hidden;margin-bottom:3px;
+.theme{display:grid;gap:3px;justify-items:center;padding:8px 8px 9px;border-radius:calc(20px * var(--sq,1));corner-shape:squircle;font:800 12.5px var(--body);color:var(--ink-soft)}
+.theme .sw{position:relative;width:100%;height:62px;border-radius:calc(14px * var(--sq,1));corner-shape:squircle;overflow:hidden;margin-bottom:3px;
   background:linear-gradient(180deg,var(--s1),var(--s2) 55%,var(--s3))}
 .theme .sw::after{content:"";position:absolute;left:-12%;right:-12%;bottom:-34%;height:66%;border-radius:50%;background:var(--c);box-shadow:inset 0 3px 0 rgba(255,255,255,.55)}
-.theme .sw i{position:absolute;z-index:1;bottom:16px;width:20px;height:20px;border-radius:6px;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 2px 0 rgba(59,39,71,.22)}
+.theme .sw i{position:absolute;z-index:1;bottom:16px;width:20px;height:20px;border-radius:calc(6px * var(--sq,1));corner-shape:squircle;box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 2px 0 rgba(59,39,71,.22)}
 .theme .sw i:first-child{left:calc(50% - 23px);background:#9063F6}.theme .sw i:last-child{left:calc(50% + 3px);background:#F68741}
 .theme .tn{font:600 15px var(--display);color:var(--ink)}
 .theme[aria-pressed="true"]{border-color:var(--raspberry);box-shadow:0 4px 0 var(--raspberry-deep),var(--lift)}
@@ -367,10 +390,10 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .theme:disabled .sw{filter:grayscale(.75) opacity(.5)}
 /* a box opened on the win card */
 .reward{
-  display:flex;align-items:center;gap:8px;width:100%;margin-top:6px;padding:6px 6px 6px 7px;border-radius:18px;text-align:left;
+  display:flex;align-items:center;gap:8px;width:100%;margin-top:6px;padding:6px 6px 6px 7px;border-radius:calc(18px * var(--sq,1));corner-shape:squircle;text-align:left;
   background:linear-gradient(90deg,#FFF3D2,#FFFFFF);border:1px solid #F2D48A;animation:pop .45s cubic-bezier(.3,1.6,.5,1) .55s both;
 }
-.reward .sw{flex:none;width:36px;height:36px;border-radius:12px;background:linear-gradient(180deg,var(--s1),var(--s3));box-shadow:inset 0 -12px 0 var(--c),0 2px 0 rgba(59,39,71,.18)}
+.reward .sw{flex:none;width:36px;height:36px;border-radius:calc(12px * var(--sq,1));corner-shape:squircle;background:linear-gradient(180deg,var(--s1),var(--s3));box-shadow:inset 0 -12px 0 var(--c),0 2px 0 rgba(59,39,71,.18)}
 .reward .rtxt{display:grid;min-width:0;flex:1}
 .reward small{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9A6A0A}
 .reward b{font:600 15px var(--display);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -389,7 +412,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 /* the whole game in one line: two tiles add up to what the jar asks for */
 .motif{display:flex;align-items:center;gap:9px;font:700 22px var(--display);color:var(--ink-soft)}
 .motif .t{
-  width:44px;height:44px;border-radius:13px;display:grid;place-items:center;font:700 25px var(--display);
+  width:44px;height:44px;border-radius:calc(13px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;font:700 25px var(--display);
   box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.12),0 3px 0 rgba(59,39,71,.22);
 }
 .motif .t2{background:#9063F6;color:#332354}
@@ -426,7 +449,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .home-level{display:grid;justify-items:center;gap:8px}
 .home-level .eyebrow{font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft)}
 .home-level .num{
-  min-width:108px;height:108px;padding:0 22px;border-radius:32px;display:grid;place-items:center;
+  min-width:108px;height:108px;padding:0 22px;border-radius:calc(32px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;
   font:700 60px/1 var(--display);font-variant-numeric:tabular-nums;text-shadow:0 2px 0 rgba(120,20,50,.35);
   box-shadow:inset 0 3px 0 rgba(255,255,255,.5),inset 0 -5px 0 rgba(0,0,0,.10),0 6px 0 var(--chip-lo),0 22px 26px -16px rgba(199,48,79,.7);
 }
@@ -435,17 +458,19 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .journey{display:grid;justify-items:center;gap:7px;margin-top:4px;width:min(100%,260px)}
 .jrow{display:flex;align-items:center;gap:8px}
 .jcount{font:700 15px var(--display);color:var(--ink-soft);font-variant-numeric:tabular-nums}
-.jbar{display:flex;gap:3px;width:100%;height:10px}
-.jbar i{flex:1;border-radius:5px;background:rgba(255,255,255,.7);box-shadow:inset 0 0 0 1px var(--line-deep)}
-.jbar i.on{background:linear-gradient(180deg,var(--chip-hi),var(--chip) 60%,var(--chip-lo));box-shadow:none}
-.jbar i.now{box-shadow:inset 0 0 0 2px var(--chip);animation:seg 1.4s ease-in-out infinite}
+/* a candy track: a sunken channel with one gummy segment per level; the level being played breathes in its colour */
+.jbar{display:flex;gap:3px;width:100%;height:18px;padding:3px;border-radius:999px;
+  background:rgba(255,255,255,.62);box-shadow:inset 0 2px 3px rgba(110,40,90,.18),inset 0 0 0 1px rgba(110,40,90,.08),0 1px 0 rgba(255,255,255,.9)}
+.jbar i{flex:1;border-radius:999px;background:rgba(110,40,90,.11)}
+.jbar i.on{background:linear-gradient(180deg,var(--chip-hi),var(--chip) 55%,var(--chip-lo));box-shadow:inset 0 1.5px 0 rgba(255,255,255,.55),0 1px 1px rgba(59,39,71,.18)}
+.jbar i.now{background:color-mix(in srgb,var(--chip) 22%,#FFFFFF);box-shadow:inset 0 0 0 1.5px var(--chip);animation:seg 1.4s ease-in-out infinite}
 .jbar i.fill{animation:segfill .7s cubic-bezier(.3,1.6,.5,1) .35s both}
-@keyframes seg{50%{background:color-mix(in srgb,var(--chip) 25%,#FFFFFF)}}
+@keyframes seg{50%{background:color-mix(in srgb,var(--chip) 55%,#FFFFFF)}}
 @keyframes segfill{from{scale:1 .2;opacity:.2}to{scale:1 1;opacity:1}}
 .jnext{margin:0;font-size:13px;font-weight:700;color:var(--ink-soft);text-align:center;text-wrap:balance}
 .jnext b{color:var(--ink);font-weight:800}
 .win-card .journey{margin:6px 0 0;width:100%}
-.win-card .jbar{height:9px}
+.win-card .jbar{height:16px}
 /* the daily's week: a stamp for each day played, Monday to Sunday */
 .week{display:flex;justify-content:space-between;width:100%;max-width:262px}
 .wd{display:grid;justify-items:center;gap:3px;font:800 11px var(--body);color:var(--ink-soft)}
@@ -461,18 +486,18 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .wd.prize i{color:#D9962B}
 .wd.prize b{width:34px;border-radius:999px;font:700 13px var(--display);color:#9A6A12;background:#FFF4D6;box-shadow:inset 0 0 0 1.5px #F2D48A}
 .wd.prize.won b{background:#F2B63A;color:#fff;box-shadow:inset 0 -3px 0 rgba(0,0,0,.14),inset 0 2px 0 rgba(255,255,255,.35)}
-.play{flex:none;width:min(100%,360px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
+.play{flex:none;width:min(100%,360px);min-height:66px;font-size:26px;border-radius:calc(22px * var(--sq,1));corner-shape:squircle;animation:breathe 2.4s ease-in-out infinite}
 .play svg{width:24px;height:24px;fill:currentColor;flex:none}
 @keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
 /* the daily puzzle: a card under Play. Locked until the rules it uses are taught, then one board a day. */
 .modes{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:min(100%,360px)}
 .modes.two{grid-template-columns:minmax(0,1fr) 82px}
 .daily{
-  width:100%;min-height:64px;border-radius:20px;padding:8px 12px 8px 8px;
+  width:100%;min-height:64px;border-radius:calc(20px * var(--sq,1));corner-shape:squircle;padding:8px 12px 8px 8px;
   display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;
 }
 .daily .cal{
-  width:48px;height:48px;border-radius:14px;display:grid;place-items:center;align-content:center;line-height:1;
+  width:48px;height:48px;border-radius:calc(14px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;align-content:center;line-height:1;
   text-shadow:0 1px 0 rgba(60,20,120,.35);
 }
 .daily .cal small{font:800 10px var(--body);letter-spacing:.1em;text-transform:uppercase;opacity:.92}
@@ -486,7 +511,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .flame{display:inline-flex;align-items:center;gap:2px;color:#D8572A}
 .flame svg{width:22px;height:22px;fill:#FF8C42;stroke:#D8572A;stroke-width:1.6;stroke-linejoin:round}
 .flame.hot svg{width:27px;height:27px;fill:#FF7A2E;filter:drop-shadow(0 0 5px rgba(255,140,66,.75))}
-.daily .go{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#FFFFFF}
+.daily .go{width:34px;height:34px;border-radius:calc(12px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;color:#FFFFFF}
 .daily .go svg{width:16px;height:16px;fill:currentColor}
 .daily .go svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4}
 .daily .tick{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--gold);color:var(--ink);box-shadow:0 2px 0 var(--gold-deep)}
@@ -499,8 +524,8 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .modes.two .daily .go{display:none}
 .modes.two .daily .dname{font-size:16px}
 /* Sugar Rush: a minute of quick boards, next to the daily */
-.rush{display:grid;justify-items:center;align-content:center;gap:1px;padding:6px 4px;border-radius:20px;min-height:64px;line-height:1.1}
-.rush .bolt{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;margin-bottom:2px;text-shadow:none}
+.rush{display:grid;justify-items:center;align-content:center;gap:1px;padding:6px 4px;border-radius:calc(20px * var(--sq,1));corner-shape:squircle;min-height:64px;line-height:1.1}
+.rush .bolt{width:30px;height:30px;border-radius:calc(10px * var(--sq,1));corner-shape:squircle;display:grid;place-items:center;margin-bottom:2px;text-shadow:none}
 .rush .bolt svg{width:18px;height:18px;fill:#FFFFFF;stroke:none}
 .rush .rname{font:600 15px var(--display);color:var(--ink)}
 .rush .rsub{font-size:11.5px;font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -514,12 +539,12 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .stars .bolt-big{width:84px;height:84px;margin-bottom:-4px;filter:drop-shadow(0 4px 0 #DE6C23) drop-shadow(0 10px 12px rgba(222,108,35,.35));animation:star .45s cubic-bezier(.3,1.7,.5,1) both}
 /* shorter phones: the level number gives up some size, so the motif (the game in one line) keeps its room */
 @media (max-height:700px){
-  .home-level .num{min-width:88px;height:88px;font-size:50px;border-radius:28px}
+  .home-level .num{min-width:88px;height:88px;font-size:50px;border-radius:calc(28px * var(--sq,1));corner-shape:squircle}
   .wordmark{font-size:clamp(46px,min(17vw,11vh),92px)}
 }
 @media (max-height:600px){
   .motif{display:none}
-  .home-level .num{min-width:84px;height:84px;font-size:46px;border-radius:26px}
+  .home-level .num{min-width:84px;height:84px;font-size:46px;border-radius:calc(26px * var(--sq,1));corner-shape:squircle}
   .home .jnext{display:none}
 }
 
@@ -1462,6 +1487,17 @@ function mixHex(a, b, t) {
   return '#' + ((1 << 24) + (m(16) << 16) + (m(8) << 8) + m(0)).toString(16).slice(1);
 }
 const rand = (a, b) => a + Math.random() * (b - a);
+/* a squircle on a canvas: the same superellipse corner (|x|^4 + |y|^4 = 1) that corner-shape draws on the page, so its
+   radii are half again a round corner's, as --sq makes them in the CSS */
+function squirclePath(g, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  const root = v => Math.sign(v) * Math.sqrt(Math.abs(v));
+  g.beginPath();
+  for (const [cx, cy, a] of [[x + w - r, y + r, -0.5], [x + w - r, y + h - r, 0], [x + r, y + h - r, 0.5], [x + r, y + r, 1]]) {
+    for (let i = 0; i <= 16; i++) { const t = (a + i / 32) * Math.PI; g.lineTo(cx + r * root(Math.cos(t)), cy + r * root(Math.sin(t))); }
+  }
+  g.closePath();
+}
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 const tweens = new Set();
@@ -1771,7 +1807,7 @@ function drawBadge(view) {
     const lx = 196, ly = 190;
     g.beginPath(); g.arc(lx, ly, 40, 0, Math.PI * 2); g.fillStyle = RASP; g.fill();
     g.strokeStyle = '#FFFFFF'; g.lineWidth = 8; g.beginPath(); g.arc(lx, ly - 8, 11, Math.PI, 0); g.stroke();
-    g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(lx - 17, ly - 8, 34, 26, 6); g.fill();
+    g.fillStyle = '#FFFFFF'; squirclePath(g, lx - 17, ly - 8, 34, 26, 9); g.fill();
   }
   tex.needsUpdate = true;
 }
@@ -2990,7 +3026,7 @@ function drawCard(c) {
   g.save(); g.translate(W / 2, 175); g.rotate(-0.07); word('Sum', -60, -50, 150, RASP, '#C7304F'); word('Sort', 90, 75, 150, INK, '#1F1228'); g.restore();
   // the card
   g.save(); g.shadowColor = 'rgba(110,40,90,0.30)'; g.shadowBlur = 50; g.shadowOffsetY = 18;
-  g.fillStyle = '#FFFFFF'; g.beginPath(); g.roundRect(90, 360, W - 180, 760, 64); g.fill(); g.restore();
+  g.fillStyle = '#FFFFFF'; squirclePath(g, 90, 360, W - 180, 760, 96); g.fill(); g.restore();
   g.fillStyle = INK_SOFT; g.font = `800 40px ${B}`; g.fillText(c.title.toUpperCase(), W / 2, 440);
   let y = 590;
   if (c.big != null) { word('⚡ ' + c.big, W / 2, y, 190, RASP, '#C7304F'); }
@@ -3002,7 +3038,7 @@ function drawCard(c) {
   g.fillStyle = INK; g.font = `600 58px ${F}`; g.fillText(c.line, W / 2, 750);
   if (c.seals && c.seals.length) {   // one square per seal, as in the text: green clean, gold combo, grape after a reshuffle
     const n = c.seals.length, size = Math.min(76, 760 / n - 14), gap = 14, x0 = W / 2 - (n * size + (n - 1) * gap) / 2;
-    c.seals.forEach((ch, i) => { g.fillStyle = ch >= 2 ? GOLD : ch === 1 ? '#3EBF7A' : '#9063F6'; g.beginPath(); g.roundRect(x0 + i * (size + gap), 820, size, size, 18); g.fill(); });
+    c.seals.forEach((ch, i) => { g.fillStyle = ch >= 2 ? GOLD : ch === 1 ? '#3EBF7A' : '#9063F6'; squirclePath(g, x0 + i * (size + gap), 820, size, size, 27); g.fill(); });
   }
   if (c.streak > 1) { g.fillStyle = '#D8572A'; g.font = `800 44px ${B}`; g.fillText(`🔥 ${c.streak}-day streak`, W / 2, 960); }
   g.fillStyle = RASP; g.font = `800 42px ${B}`; g.fillText(c.foot, W / 2, c.streak > 1 ? 1040 : 990);
@@ -3116,9 +3152,11 @@ function renderTreat() {
 }
 function drawTreatSheet(popDay = 0) {
   const t = save.treat, today = todayKey(), ready = treatReady(t, today), day = treatDay(t, today), next = day % 7 + 1;
+  const star = STAR.replace('<svg', '<svg class="st"'), little = STAR.replace('<svg', '<svg class="st s"');
   ui.treatRow.innerHTML = TREATS.map((n, i) => {
-    const d = i + 1, got = d < day || (d === day && !ready);
-    return `<span class="td${got ? ' got' : ''}${d === day ? ' now' : ''}${d === 7 ? ' big' : ''}${d === popDay ? ' pop' : ''}"><small>Day ${d}</small><b>${n}</b></span>`;
+    const d = i + 1, got = d < day || (d === day && !ready), stars = d === 7 ? little + star + little : star;
+    return `<span class="td${got ? ' got' : ''}${d === day ? ' now' : ''}${d === 7 ? ' big' : ''}${d === popDay ? ' pop' : ''}">`
+      + `<small>${d === day && ready ? 'Today' : `Day ${d}`}</small><span class="amt">${stars}<b>${n}</b></span>${got ? `<i class="tick">${TICK}</i>` : ''}</span>`;
   }).join('');
   ui.treatRow.setAttribute('aria-label', `Day ${day} of 7` + (ready ? ', ready to open' : ', opened'));
   ui.treatSub.textContent = ready ? `Day ${day} of 7` : `Day ${day} of 7 · opened`;
