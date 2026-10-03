@@ -213,3 +213,10 @@ test('sugar rush: score and clock', () => {
   assert.equal(rushShareText({ score: 340, boards: 7, newBest: true, url: 'https://x/' }), 'Sum Sort Sugar Rush ⚡ 340\n7 boards in the rush · new best\nhttps://x/');
   assert.equal(rushShareText({ score: 120, boards: 1 }), 'Sum Sort Sugar Rush ⚡ 120\n1 board in the rush');
 });
+
+import { streakMilestone, STREAK_MILESTONES } from '../../src/meta.mjs';
+
+test('streak milestones: a celebration on the days that matter, nowhere else', () => {
+  assert.deepEqual([1, 2, 3, 4, 7, 8, 14, 30, 31].map(streakMilestone), [0, 0, 3, 0, 7, 0, 14, 30, 0]);
+  STREAK_MILESTONES.forEach((n, i) => { if (i) assert.ok(n > STREAK_MILESTONES[i - 1]); });
+});

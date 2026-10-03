@@ -227,6 +227,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .stars svg.on:nth-child(3){animation-delay:.28s}
 .win-card .eyebrow{margin:6px 0 0;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft)}
 .win-card h2{margin:0;font:700 42px var(--display);color:var(--raspberry);line-height:1;letter-spacing:.2px}
+.win-card h2.long{font-size:31px}   /* "7-day streak!", "Ribbons done!": one line on a phone */
 .stats{display:flex;gap:8px;margin-top:8px}
 .stat{
   display:grid;gap:1px;min-width:86px;padding:8px 14px;border-radius:16px;background:var(--ground);border:1px solid var(--line);
@@ -441,6 +442,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .daily .dside{display:flex;align-items:center;gap:6px;font:700 17px var(--display);font-variant-numeric:tabular-nums}
 .flame{display:inline-flex;align-items:center;gap:2px;color:#D8572A}
 .flame svg{width:22px;height:22px;fill:#FF8C42;stroke:#D8572A;stroke-width:1.6;stroke-linejoin:round}
+.flame.hot svg{width:27px;height:27px;fill:#FF7A2E;filter:drop-shadow(0 0 5px rgba(255,140,66,.75))}
 .daily .go{width:34px;height:34px;border-radius:12px;display:grid;place-items:center;color:#FFFFFF}
 .daily .go svg{width:16px;height:16px;fill:currentColor}
 .daily .go svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.4}
@@ -956,6 +958,9 @@ function streakAfter(streak, key) {
   const count = s.last === addDays(key, -1) ? s.count + 1 : 1;
   return { count, best: Math.max(s.best, count), last: key };
 }
+/* Days in a row worth a celebration of their own, like finishing a chapter. */
+const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
+const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
 /* the streak as it stands today: still alive if the last daily was today or yesterday */
 const streakNow = (streak, today) => streak && (streak.last === today || streak.last === addDays(today, -1)) ? streak.count : 0;
 const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
@@ -2291,6 +2296,8 @@ async function winLevel() {
     save.streak = streakAfter(save.streak, daily); streakGrew = save.streak.count !== before || !prev;
   } else { save.stars[levelNo] = Math.max(save.stars[levelNo] || 0, stars); if (levelNo !== TEST_LEVEL) save.last = levelNo + 1; save.board = null; }
   const opened = boxesOpened(starsBefore, totalStars());
+  // a streak landing on 3, 7, 14, 30 days gets the chapter rung: a second wave of candy and the long flourish
+  const milestone = daily && streakGrew ? streakMilestone(save.streak.count) : 0, big = chapterDone || !!milestone;
   persist();
   if (opened.length) sfx.box();
   // rung 3: level cleared
@@ -2298,7 +2305,7 @@ async function winLevel() {
   jars.forEach((j, i) => setTimeout(() => { if (id === buildId) hop(j.view.group, 0.3, 420); }, i * 70 * SPEED));
   const area = { x0: L.minX, x1: L.maxX, z0: L.minZ, z1: L.maxZ };
   const rain = Math.round(Math.min(60, 20 + tiles * 3) * (perfect ? 1.5 : 1) * (lowQuality ? 0.5 : 1));
-  if (!REDUCED) confetti = makeConfetti(rain + (chapterDone ? 60 : 0), area, chapterDone ? rain : 0);
+  if (!REDUCED) confetti = makeConfetti(rain + (big ? 60 : 0), area, big ? rain : 0);
   // rung 4: three stars. Every jar fires its sparks again and the flourish climbs higher.
   if (perfect) {
     jars.forEach((j, i) => setTimeout(() => {
@@ -2308,21 +2315,26 @@ async function winLevel() {
     setTimeout(() => { if (id === buildId) { sfx.perfect(); buzz([20, 40, 30, 40, 60]); } }, 520 * SPEED);
   }
   // rung 5: chapter finished. A second wave of candy and a longer flourish.
-  if (chapterDone) setTimeout(() => { if (id === buildId) { sfx.chapter(); buzz([30, 50, 30, 50, 90]); } }, (perfect ? 1000 : 560) * SPEED);
-  await wait(chapterDone ? 1500 : perfect ? 1300 : 1100);
+  if (big) setTimeout(() => { if (id === buildId) { sfx.chapter(); buzz([30, 50, 30, 50, 90]); } }, (perfect ? 1000 : 560) * SPEED);
+  await wait(big ? 1500 : perfect ? 1300 : 1100);
   if (id !== buildId) return;
   const next = CHAPTERS[CHAPTERS.indexOf(ch) + 1];
-  ui.winCard.classList.toggle('perfect', perfect); ui.winCard.classList.toggle('chapter-done', chapterDone);
+  ui.winCard.classList.toggle('perfect', perfect); ui.winCard.classList.toggle('chapter-done', big);
   ui.winEyebrow.textContent = daily ? `Daily #${dailyNumber(daily)} · ${dailyLabel(daily)}` : `Level ${levelNo} cleared`;
-  ui.winTitle.textContent = chapterDone ? `${ch.name} done!` : perfect ? 'Perfect!' : stars >= 2 ? 'Sweet!' : 'Sealed!';
+  ui.winTitle.textContent = chapterDone ? `${ch.name} done!` : milestone ? `${milestone}-day streak!` : perfect ? 'Perfect!' : stars >= 2 ? 'Sweet!' : 'Sealed!';
+  ui.winTitle.classList.toggle('long', ui.winTitle.textContent.length > 10);
   ui.winStars.innerHTML = [1, 2, 3].map(i => STAR.replace('<svg', `<svg class="${i <= stars ? 'on' : ''}"`)).join('');
   ui.winStars.setAttribute('aria-label', `${stars} of 3 stars`);
-  ui.winChapter.hidden = !chapterDone;
+  ui.winChapter.hidden = !big;
   if (chapterDone) { ui.winChapter.className = `chapter-tag ${CHAPTER_TINT[ch.id]}`; ui.winChapter.textContent = `Chapter complete: ${ch.name}`; }
+  else if (milestone) { ui.winChapter.className = 'chapter-tag c-orange'; ui.winChapter.textContent = `${milestone} dailies in a row`; }
   ui.winStats.hidden = !!def.exact || !!def.teach;
   ui.winMovesLabel.textContent = 'Moves'; ui.winParLabel.textContent = 'Par';
   ui.winMoves.textContent = moveCount; ui.winPar.textContent = def.par;
-  const streakNote = daily && save.streak ? (save.streak.count > 1 ? `${save.streak.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.' : '';
+  const nextMark = STREAK_MILESTONES.find(m => m > (save.streak ? save.streak.count : 0));
+  const streakNote = !daily || !save.streak ? ''
+    : milestone ? `${nextMark ? `Next mark: ${nextMark} days. ` : ''}A new board tomorrow.`
+    : (save.streak.count > 1 ? `${save.streak.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.';
   ui.winText.textContent = daily ? streakNote
     : chapterDone && next ? `Next up: ${next.name}. ${next.rule}`
     : def.exact || def.teach ? 'All jars sealed.'
@@ -2414,7 +2426,7 @@ function endRush() {
   if (!REDUCED && isBest && L) confetti = makeConfetti(40, { x0: L.minX, x1: L.maxX, z0: L.minZ, z1: L.maxZ });
   ui.winCard.classList.toggle('perfect', isBest && rush.score > 0); ui.winCard.classList.remove('chapter-done');
   ui.winEyebrow.textContent = `Sugar Rush · ${plural(rush.boards, 'board')}`;
-  ui.winTitle.textContent = isBest && rush.score > 0 ? 'New best!' : "Time's up!";
+  ui.winTitle.textContent = isBest && rush.score > 0 ? 'New best!' : "Time's up!"; ui.winTitle.classList.remove('long');
   ui.winStars.innerHTML = BOLT_BIG; ui.winStars.setAttribute('aria-label', 'Sugar Rush');
   ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true;
   ui.winMovesLabel.textContent = 'Score'; ui.winParLabel.textContent = 'Best';
@@ -2565,7 +2577,7 @@ function renderDaily() {
   ui.dailyMon.textContent = dailyLabel(key).split(' ')[2]; ui.dailyDay.textContent = String(Number(key.slice(8)));
   ui.daily.classList.toggle('locked', locked);
   ui.daily.setAttribute('aria-disabled', String(locked));
-  const flame = n => `<span class="flame">${FLAME}${n}</span>`;
+  const flame = n => `<span class="flame${n >= 7 ? ' hot' : ''}">${FLAME}${n}</span>`;   // a week or more: the flame grows
   if (locked) {
     const left = DAILY_OPENS - levelNo;
     ui.dailyEyebrow.textContent = 'Daily puzzle'; ui.dailyName.textContent = `Opens at level ${DAILY_OPENS}`;

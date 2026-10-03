@@ -275,6 +275,13 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-07'; }); await go(2
   const h13 = await H(); await tapEl('#playBtn'); await settled();
   const reloaded = board(await S());
   pass('a half-played level comes back as it was after the daily, and after closing the tab', inDaily === '2026-10-07' && before.moves === 3 && JSON.stringify(back) === JSON.stringify(before) && h13.level === 26 && JSON.stringify(reloaded) === JSON.stringify(before), JSON.stringify({ before, back, reloaded })); }
+// 14. a streak landing on 3 days gets its own celebration
+await page.evaluate(() => { window.__sumSortToday = '2026-10-08'; __sumSort.save.streak = { count: 2, best: 2, last: '2026-10-07' }; __sumSort.showHome(); });
+await tapEl('#dailyBtn'); await settled();
+{ const w = await playOut();
+  const tag = await page.evaluate(() => ({ hidden: document.getElementById('winChapter').hidden, text: document.getElementById('winChapter').textContent, streak: __sumSort.save.streak.count }));
+  pass('a 3-day streak gets the chapter rung: its own title, tag and second wave', w.title === '3-day streak!' && /chapter-done/.test(w.cls) && !tag.hidden && tag.text === '3 dailies in a row' && tag.streak === 3 && /^Next mark: 7 days/.test(w.text), JSON.stringify({ w, tag }));
+  await page.screenshot({ path: SHOTS + '/win-streak.png' }); await tapEl('#winHomeBtn'); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

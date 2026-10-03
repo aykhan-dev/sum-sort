@@ -67,6 +67,9 @@ export function streakAfter(streak, key) {
   const count = s.last === addDays(key, -1) ? s.count + 1 : 1;
   return { count, best: Math.max(s.best, count), last: key };
 }
+/* Days in a row worth a celebration of their own, like finishing a chapter. */
+export const STREAK_MILESTONES = [3, 7, 14, 30, 50, 100];
+export const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
 /* the streak as it stands today: still alive if the last daily was today or yesterday */
 export const streakNow = (streak, today) => streak && (streak.last === today || streak.last === addDays(today, -1)) ? streak.count : 0;
 export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
