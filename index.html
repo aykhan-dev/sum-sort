@@ -1014,7 +1014,8 @@ const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
 const streakNow = (streak, today) => {
   if (!streak) return 0;
   const gap = dayGap(streak.last, today);
-  return gap <= 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;   // a missed day with a freeze in hand still counts
+  // today or yesterday, or a missed day with a freeze in hand; a last daily dated after today (a clock set back) is not
+  return gap === 0 || gap === 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;
 };
 const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
 
@@ -2556,14 +2557,14 @@ function endRush() {
   if (!REDUCED && isBest && L) confetti = makeConfetti(40, { x0: L.minX, x1: L.maxX, z0: L.minZ, z1: L.maxZ });
   ui.winCard.classList.toggle('perfect', isBest && rush.score > 0); ui.winCard.classList.remove('chapter-done');
   ui.winEyebrow.textContent = `Sugar Rush · ${plural(rush.boards, 'board')}`;
-  const beaten = rush.beat != null && rush.score > rush.beat;
-  ui.winTitle.textContent = beaten ? 'You beat it!' : isBest && rush.score > 0 ? 'New best!' : "Time's up!";
+  const beaten = rush.beat != null && rush.score > rush.beat, tied = rush.beat != null && rush.score === rush.beat;
+  ui.winTitle.textContent = beaten ? 'You beat it!' : tied ? "It's a tie!" : isBest && rush.score > 0 ? 'New best!' : "Time's up!";
   ui.winTitle.classList.toggle('long', ui.winTitle.textContent.length > 10);
   ui.winStars.innerHTML = BOLT_BIG; ui.winStars.setAttribute('aria-label', 'Sugar Rush');
   ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true;
   ui.winMovesLabel.textContent = 'Score'; ui.winParLabel.textContent = 'Best';
   ui.winMoves.textContent = rush.score; ui.winPar.textContent = save.rush.best;
-  ui.winText.textContent = rush.beat != null ? (beaten ? `${rush.score - rush.beat} over the challenge. Share it back.` : `${rush.beat - rush.score} short of ${rush.beat}. Same boards, one more try?`)
+  ui.winText.textContent = rush.beat != null ? (beaten ? `${rush.score - rush.beat} over the challenge. Share it back.` : tied ? `Level with ${rush.beat}. One more seal wins it.` : `${rush.beat - rush.score} short of ${rush.beat}. Same boards, one more try?`)
     : isBest && prev.best ? `${rush.score - prev.best} more than your last best.` : rush.boards ? 'Clean seals in a row score double, triple and up.' : 'Clear a board to win time back.';
   ui.nextLabel.textContent = 'Play again'; ui.next.querySelector('svg').outerHTML = REPLAY_ICON; ui.next.className = 'cta gummy c-orange';
   ui.winShare.hidden = false; ui.winShare.classList.remove('copied'); ui.shareTip.textContent = '';
@@ -2667,7 +2668,7 @@ function closeChallenge(play) {
   if (ui.challenge.hidden) return;
   ui.challenge.hidden = true; ui.home.inert = false;
   const c = pendingChallenge; pendingChallenge = null;
-  if (play && c) startRush(c);
+  if (play && c) startRush(c); else ui.play.focus({ preventScroll: true });
 }
 function closeShop() { if (ui.shop.hidden) return; ui.shop.hidden = true; ui.home.inert = false; ui.tally.focus({ preventScroll: true }); }
 
@@ -2687,10 +2688,10 @@ function showHome(focus = true) {
   renderDaily(); clearInterval(dailyTimer); dailyTimer = setInterval(renderDaily, 20000);
   homeOpen = true; homeRenderUntil = performance.now() + 1600;
   ui.home.classList.remove('off'); ui.top.inert = ui.bottom.inert = ui.win.inert = true;
-  stage.classList.add('at-home'); clearTimeout(idleTimer); hideHand(); if (focus) ui.play.focus({ preventScroll: true });
+  stage.classList.add('at-home'); clearTimeout(idleTimer); hideHand(); canvas.tabIndex = -1;   // no tab stop behind the home wash if (focus) ui.play.focus({ preventScroll: true });
 }
 function leaveHome() {
-  homeOpen = false; clearInterval(dailyTimer); ui.home.classList.add('off');
+  homeOpen = false; clearInterval(dailyTimer); ui.home.classList.add('off'); canvas.tabIndex = 0;
   stage.classList.remove('at-home'); ui.top.inert = ui.bottom.inert = ui.win.inert = false;
 }
 function play() {
@@ -2933,29 +2934,41 @@ function describeSpot(h) {
   return `Jar: needs ${j.t - jarSum(j)}${n ? `, ${plural(n, 'tile')} in it, top ${j.tiles[n - 1].v}` : ''}`;
 }
 function showKbFocus(h) {
-  for (const sp of kbSpots()) { const v = srcView(sp), on = !!h && sp.kind === h.kind && sp.i === h.i; ringTo(v.focusRing, on ? 0.75 : 0, 140); }
+  const same = (a, b) => a && b && a.kind === b.kind && a.i === b.i;
+  if (kbFocus && !same(kbFocus, h) && (kbFocus.kind === 'jar' ? jars : stacks)[kbFocus.i]) ringTo(srcView(kbFocus).focusRing, 0, 140);
+  if (h && !same(kbFocus, h)) ringTo(srcView(h).focusRing, 0.75, 140);
   kbFocus = h;
   if (h) ui.srStatus.textContent = describeSpot(h) + (sel ? `. Holding ${sel.tile.v === 8 ? 'an' : 'a'} ${sel.tile.v}.` : '');
 }
+/* the board's spots in rows, back to front, each row left to right */
+function boardRows() {
+  const rows = [];
+  for (const sp of kbSpots().sort((a, b) => a.p.z - b.p.z)) {
+    const row = rows[rows.length - 1];
+    if (row && Math.abs(sp.p.z - row[0].p.z) <= 0.5) row.push(sp); else rows.push([sp]);
+  }
+  rows.forEach(r => r.sort((a, b) => a.p.x - b.p.x));
+  return rows;
+}
 function moveKbFocus(key) {
-  const spots = kbSpots(); if (!spots.length) return;
-  const cur = kbFocus && spots.find(s => s.kind === kbFocus.kind && s.i === kbFocus.i);
-  if (!cur) { showKbFocus(sel ? { kind: 'jar', i: 0 } : stacks.length ? { kind: 'stack', i: 0 } : { kind: 'jar', i: 0 }); return; }
-  const kind = key === 'ArrowUp' ? 'jar' : key === 'ArrowDown' ? 'stack' : null;
-  let pick;
-  if (kind) {   // the nearest spot of the other kind, by position on the counter
-    const pool = spots.filter(s => s.kind === kind && s !== cur);
-    pick = pool.sort((a, b) => Math.hypot(a.p.x - cur.p.x, a.p.z - cur.p.z) - Math.hypot(b.p.x - cur.p.x, b.p.z - cur.p.z))[0];
-  } else {      // left and right walk the board in reading order: back row first, left to right
-    const order = spots.slice().sort((a, b) => (Math.abs(a.p.z - b.p.z) > 0.5 ? a.p.z - b.p.z : a.p.x - b.p.x));
-    const k = order.indexOf(cur), d = key === 'ArrowRight' ? 1 : -1;
+  const rows = boardRows(); if (!rows.length) return;
+  const r = rows.findIndex(row => row.some(s => s.kind === kbFocus?.kind && s.i === kbFocus?.i));
+  if (r < 0) { const first = sel ? rows[0][0] : (rows.find(row => row[0].kind === 'stack') || rows[0])[0]; showKbFocus({ kind: first.kind, i: first.i }); return; }
+  const cur = rows[r].find(s => s.kind === kbFocus.kind && s.i === kbFocus.i);
+  let pick = null;
+  if (key === 'ArrowUp' || key === 'ArrowDown') {   // the nearest spot in the row behind or in front; at the edge, stay
+    const row = rows[r + (key === 'ArrowUp' ? -1 : 1)];
+    if (row) pick = row.slice().sort((a, b) => Math.abs(a.p.x - cur.p.x) - Math.abs(b.p.x - cur.p.x))[0];
+  } else {   // reading order, wrapping around
+    const order = rows.flat(), k = order.indexOf(cur), d = key === 'ArrowRight' ? 1 : -1;
     pick = order[(k + d + order.length) % order.length];
   }
-  if (pick) showKbFocus({ kind: pick.kind, i: pick.i });
+  showKbFocus(pick ? { kind: pick.kind, i: pick.i } : kbFocus);
 }
 canvas.addEventListener('keydown', e => {
-  if (homeOpen || !ui.win.hidden) return;
+  if (homeOpen || !ui.win.hidden || e.ctrlKey || e.metaKey || e.altKey) return;   // shortcuts stay the browser's
   const k = e.key;
+  if (k.startsWith('Arrow') || k === 'Enter' || k === ' ') { boardTouched = true; if (handOn) hideHand(); }
   if (k.startsWith('Arrow')) { e.preventDefault(); moveKbFocus(k); return; }
   if ((k === 'Enter' || k === ' ') && kbFocus) { e.preventDefault(); tap({ ...kbFocus }); showKbFocus(kbFocus); return; }
   if (k === 'Escape' && sel) { e.preventDefault(); tap(null); showKbFocus(kbFocus); return; }
@@ -2963,6 +2976,8 @@ canvas.addEventListener('keydown', e => {
   if ((k === 'h' || k === 'H') && !ui.hint.hidden) { e.preventDefault(); ui.hint.click(); }
 });
 canvas.addEventListener('pointerdown', () => { if (kbFocus) showKbFocus(null); }, true);
+// reached with Tab: the ring shows at once, so the focus is visible
+canvas.addEventListener('focus', () => { if (!kbFocus && !homeOpen && canvas.matches(':focus-visible')) moveKbFocus('ArrowRight'); });
 ui.rewardUse.addEventListener('click', () => {
   useTheme(ui.reward.dataset.id); ui.rewardUse.textContent = 'In use'; ui.rewardUse.disabled = true;
   save.boxSeen = Math.max(Number(save.boxSeen) || 0, themeById(ui.reward.dataset.id).at); persist();
@@ -2978,7 +2993,7 @@ ui.homeMusic.addEventListener('click', () => { musicReady = true; setMusic(!musi
 for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { setSound(!soundOn); if (soundOn) sfx.select(5); }); b.setAttribute('aria-pressed', String(soundOn)); }
 
 /* ---------------- loop ---------------- */
-const clock = new THREE.Clock(); let frames = 0, slowMs = 0, frameNo = 0, renders = 0;
+const clock = new THREE.Clock(); let frames = 0, slowMs = 0, frameNo = 0, renders = 0, drawNext = false;
 const liveScene = () => !!(tweens.size || flights || bursts.length || (confetti && confetti.moving) || sel || kick.amount);
 function loop() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime, now = performance.now();
@@ -2996,7 +3011,7 @@ function loop() {
   // A board where nothing moves but the gently bobbing badges is drawn every other frame: the same look for about
   // half the battery. Not in the first 90 frames, which measure how fast this device draws.
   frameNo++;
-  const lively = liveScene() || frameNo <= 90;
+  const lively = liveScene() || frameNo <= 90 || drawNext; drawNext = false;   // a resize cleared the canvas: draw now
   if ((!homeOpen || now < homeRenderUntil) && (lively || frameNo % 2 === 0)) {   // behind the home wash the settled board is a still picture
     renders++;
     if (kick.amount) camera.position.addScaledVector(kick.dir, kick.amount);
@@ -3029,7 +3044,7 @@ async function start(hot) {
     pendingChallenge = challenge; ui.challengeBeat.textContent = String(challenge.beat);
     ui.challenge.hidden = false; ui.home.inert = true; ui.challengePlay.focus({ preventScroll: true });
   }
-  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); if (handOn) placeHand(); }).observe(stage);
+  new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); drawNext = true; if (handOn) placeHand(); }).observe(stage);
   renderer.setAnimationLoop(loop);
   // hooks for automated play-tests and for measuring the build against the Taste File rubric
   const toPage = screenPoint;

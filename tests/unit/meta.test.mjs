@@ -251,3 +251,9 @@ test('streak freeze: earned on milestones from a week, spent by itself on one mi
   t = streakAfter(t, '2026-12-02'); assert.equal(t.count, 30); assert.equal(t.freezes, FREEZE_MAX, 'held freezes are capped'); assert.equal(t.earned, false);
   assert.equal(streakAfter({ count: 5, best: 5, last: '2026-10-01', freezes: 1 }, '2026-10-04').count, 1, 'a freeze covers one missed day, not two');
 });
+
+test('streak: a last daily dated after today (the clock went back) is not a live streak, as streakAfter would reset it', () => {
+  const s = { count: 5, best: 5, last: '2026-10-06', freezes: 1 };
+  assert.equal(streakNow(s, '2026-10-05'), 0);
+  assert.equal(streakAfter(s, '2026-10-05').count, 1);
+});

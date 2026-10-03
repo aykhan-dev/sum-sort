@@ -84,7 +84,8 @@ export const streakMilestone = n => STREAK_MILESTONES.includes(n) ? n : 0;
 export const streakNow = (streak, today) => {
   if (!streak) return 0;
   const gap = dayGap(streak.last, today);
-  return gap <= 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;   // a missed day with a freeze in hand still counts
+  // today or yesterday, or a missed day with a freeze in hand; a last daily dated after today (a clock set back) is not
+  return gap === 0 || gap === 1 || (gap === 2 && streak.freezes > 0) ? streak.count : 0;
 };
 export const msToNextDay = (d = new Date()) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1) - d;
 
