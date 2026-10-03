@@ -433,12 +433,12 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .jnext b{color:var(--ink);font-weight:800}
 .win-card .journey{margin:6px 0 0;width:100%}
 .win-card .jbar{height:9px}
-.play{flex:none;width:min(100%,300px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
+.play{flex:none;width:min(100%,360px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
 .play svg{width:24px;height:24px;fill:currentColor;flex:none}
 @keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
 /* the daily puzzle: a card under Play. Locked until the rules it uses are taught, then one board a day. */
-.modes{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:min(100%,300px)}
-.modes.two{grid-template-columns:minmax(0,1fr) 88px}
+.modes{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;width:min(100%,360px)}
+.modes.two{grid-template-columns:minmax(0,1fr) 82px}
 .daily{
   width:100%;min-height:64px;border-radius:20px;padding:8px 12px 8px 8px;
   display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;
@@ -2742,7 +2742,7 @@ function renderDaily() {
     ui.dailyEyebrow.textContent = `Daily #${dailyNumber(key)}`; ui.dailyName.textContent = `${levelNo >= RUSH_OPENS ? day.slice(0, 3) : day} · ${r.level}`;
     const narrow = levelNo >= RUSH_OPENS;   // the card shares its row with Sugar Rush
     const held = streak && save.streak && dayGap(save.streak.last, key) === 2;   // yesterday was missed; a freeze is holding the streak
-    ui.dailySub.textContent = streak ? (held ? 'A freeze holds it' : 'Keep your streak') : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
+    ui.dailySub.textContent = streak ? (held ? (narrow ? 'Freeze holds it' : 'A freeze holds it') : narrow ? 'Keep it going' : 'Keep your streak') : save.streak && save.streak.best ? (narrow ? 'Start a streak' : 'Start a new streak') : narrow ? 'Same for all' : 'Same board for all';
     ui.dailySide.innerHTML = (streak ? flame(streak) : '') + `<span class="go gummy c-grape">${PLAY_ICON}</span>`;
     const freezes = save.streak && save.streak.freezes ? ` ${plural(save.streak.freezes, 'streak freeze')} in hand.` : '';
     ui.daily.setAttribute('aria-label', `Play daily puzzle ${dailyNumber(key)}, ${WEEKDAYS[weekdayOf(key)]}, ${r.level}.` + (streak ? ` Keep your ${streak}-day streak.` : '') + freezes);

@@ -327,7 +327,7 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-11'; __sumSort.save
   await page.waitForFunction(() => !document.getElementById('home').classList.contains('off'));
   await tapEl('#dailyBtn'); await settled(); const w = await playOut();
   const st = await page.evaluate(() => __sumSort.save.streak);
-  pass('a freeze holds a streak over a missed day, and says so', sub === 'A freeze holds it' && st.count === 8 && st.freezes === 0 && st.saved && /^A freeze covered the day you missed/.test(w.text), JSON.stringify({ sub, st, text: w.text }));
+  pass('a freeze holds a streak over a missed day, and says so', /freeze holds it$/i.test(sub) && st.count === 8 && st.freezes === 0 && st.saved && /^A freeze covered the day you missed/.test(w.text), JSON.stringify({ sub, st, text: w.text }));
   await tapEl('#winHomeBtn'); }
 // 18. a still board is drawn every other frame; anything moving gets every frame
 // (measured between the board's entrance and the idle coaching that pulses after 8 s, which counts as movement)
