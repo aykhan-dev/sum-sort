@@ -329,6 +329,13 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-11'; __sumSort.save
   const st = await page.evaluate(() => __sumSort.save.streak);
   pass('a freeze holds a streak over a missed day, and says so', sub === 'A freeze holds it' && st.count === 8 && st.freezes === 0 && st.saved && /^A freeze covered the day you missed/.test(w.text), JSON.stringify({ sub, st, text: w.text }));
   await tapEl('#winHomeBtn'); }
+// 18. a still board is drawn every other frame; anything moving gets every frame
+// (measured between the board's entrance and the idle coaching that pulses after 8 s, which counts as movement)
+await page.waitForFunction(() => __sumSort.frameNo > 95, null, { timeout: 180000 });
+await page.evaluate(() => __sumSort.play()); await go(25); await settled(); await page.waitForFunction(() => !__sumSort.liveScene, null, { timeout: 60000 });
+{ const share = async () => { const a = await page.evaluate(() => [__sumSort.frameNo, __sumSort.renders]); await page.waitForTimeout(3000); const b = await page.evaluate(() => [__sumSort.frameNo, __sumSort.renders]); return (b[1] - a[1]) / Math.max(1, b[0] - a[0]); };
+  const still = await share(); await page.evaluate(() => __sumSort.tap({ kind: 'stack', i: 0 })); const lifted = await share(); await page.evaluate(() => __sumSort.tap(null));
+  pass('a still board saves battery by drawing every other frame; a lifted tile is drawn every frame', still < 0.85 && lifted === 1, JSON.stringify({ still: +still.toFixed(2), lifted })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

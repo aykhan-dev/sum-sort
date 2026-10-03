@@ -1815,6 +1815,7 @@ function updateConfetti(c, dt) {
     }
   });
   if (moving) writeConfetti(c);
+  c.moving = moving;
 }
 
 /* ---------------- game state ---------------- */
@@ -1849,6 +1850,7 @@ function buildLevel(n, resume = null) {
   buildId++;
   [...playGroup.children].forEach(ch => playGroup.remove(ch));
   if (confetti) { confetti.mesh.dispose(); confetti = null; }
+  bursts.splice(0).forEach(b => { scene.remove(b.pts); b.pts.geometry.dispose(); b.pts.material.dispose(); });   // the last board's sparks go with it
   levelTrash.forEach(x => x.dispose()); levelTrash = [];
   levelNo = n; def = rush ? rush.def : daily ? getDaily(daily) : getLevel(n);
   toastMsg = ''; clearTimeout(toastTimer);
@@ -2976,7 +2978,8 @@ ui.homeMusic.addEventListener('click', () => { musicReady = true; setMusic(!musi
 for (const b of [ui.sound, ui.homeSound]) { b.addEventListener('click', () => { setSound(!soundOn); if (soundOn) sfx.select(5); }); b.setAttribute('aria-pressed', String(soundOn)); }
 
 /* ---------------- loop ---------------- */
-const clock = new THREE.Clock(); let frames = 0, slowMs = 0;
+const clock = new THREE.Clock(); let frames = 0, slowMs = 0, frameNo = 0, renders = 0;
+const liveScene = () => !!(tweens.size || flights || bursts.length || (confetti && confetti.moving) || sel || kick.amount);
 function loop() {
   const raw = clock.getDelta(), dt = Math.min(raw, 0.05), t = clock.elapsedTime, now = performance.now();
   if (rush && !rush.over && !homeOpen) { if (rushLeft() <= 0) endRush(); else renderRushHud(); }
@@ -2990,7 +2993,12 @@ function loop() {
     const b = finaleJar.view.badge, s = b.userData.base * (1 + 0.07 * Math.sin(t * 4.5)); b.scale.set(s, s, 1);
   }
   updateBursts(dt); updateConfetti(confetti, dt);
-  if (!homeOpen || now < homeRenderUntil) {   // behind the home wash the settled board is a still picture
+  // A board where nothing moves but the gently bobbing badges is drawn every other frame: the same look for about
+  // half the battery. Not in the first 90 frames, which measure how fast this device draws.
+  frameNo++;
+  const lively = liveScene() || frameNo <= 90;
+  if ((!homeOpen || now < homeRenderUntil) && (lively || frameNo % 2 === 0)) {   // behind the home wash the settled board is a still picture
+    renders++;
     if (kick.amount) camera.position.addScaledVector(kick.dir, kick.amount);
     renderer.render(scene, camera);
     if (kick.amount) { camera.position.addScaledVector(kick.dir, -kick.amount); camera.updateMatrixWorld(); }
@@ -3032,7 +3040,7 @@ async function start(hot) {
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
-    get hand() { return handOn; }, get challenge() { return !ui.challenge.hidden && pendingChallenge; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
+    get hand() { return handOn; }, get frameNo() { return frameNo; }, get renders() { return renders; }, get liveScene() { return liveScene(); }, get challenge() { return !ui.challenge.hidden && pendingChallenge; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
