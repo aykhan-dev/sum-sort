@@ -267,3 +267,12 @@ test('dailies past the pool stay under the cap', () => {
   let k = '2031-01-05';   // a Monday, then the hardest days of a few weeks
   for (let i = 0; i < 4; i++) { const d = generateDaily(addDays(k, 6 + 7 * i)); assert.ok(d.fail <= DAILY_CAP, `${addDays(k, 6 + 7 * i)}: ${d.fail}`); }
 });
+
+import { weekOf } from '../../src/meta.mjs';
+test('week: Monday to Sunday around any day, across a month and a year', () => {
+  assert.deepEqual(weekOf('2026-10-03'), ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+  assert.deepEqual(weekOf('2026-10-05'), weekOf('2026-10-11'));
+  assert.equal(weekOf('2026-10-05')[0], '2026-10-05');
+  assert.deepEqual([weekOf('2027-01-01')[0], weekOf('2027-01-01')[6]], ['2026-12-28', '2027-01-03']);
+  for (const k of weekOf('2027-03-30')) assert.ok(weekOf(k).includes('2027-03-30'));
+});

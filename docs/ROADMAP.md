@@ -23,7 +23,7 @@ What it lacks is a reason to look up, a reason to come back, and a reason to tel
 
 **Guardrails (from the Taste File, kept):**
 - One new rule per chapter, the ten fail-proof Match levels, model fail rate capped at 65%.
-- Forward-only progression, no level list.
+- Forward-only progression, no level list. (A win card may offer its own level again for three stars; once the player moves on, the level is behind them.)
 - Nothing ever covers the board during play; messages go to the coach strip.
 - Every control 48 px or larger; contrast tokens stay; `prefers-reduced-motion` is honoured by every new animation.
 - No dark patterns: no fake timers, no paywalls, no nag screens. The rewarded-ad stand-in stays a stand-in.
@@ -54,6 +54,8 @@ Impact and effort are 1–5. Order weighs impact on the north star against effor
 | F16 | **Streak freeze**: earned on milestones from a week, forgives one missed day by itself | The day a long streak breaks is the day most daily players stop | 4 | 1 | done |
 | F17 | **Battery**: a still board is drawn every other frame | A game that drains the phone gets closed | 2 | 1 | done |
 | F18 | **Share cards**: where the share sheet takes images, the result goes out as a 1080×1350 picture with the text | Stories and chat feeds favour pictures over text | 4 | 2 | done |
+| F19 | **Replay for three stars**: a level cleared under three stars offers "Replay for 3 stars" on its own win card | One more try is the cheapest way to extend a session, and stars feed the candy boxes | 3 | 1 | done |
+| F20 | **The daily's week**: the daily win card stamps the day on a Monday-to-Sunday row and names tomorrow's board | A week to complete, and a concrete reason to come back tomorrow | 3 | 1 | done |
 | M1 | **Your record**: levels cleared, 3-star levels, best combo, dailies, best streak, rush best, in the candy shop (was: a debug metrics panel) | Pride, and a number to beat in every mode | 2 | 1 | done |
 
 ## Recommended next: needs people, data or a server
@@ -104,4 +106,7 @@ These could not be done well from a headless browser overnight, and are the high
 | 02:34 | Review 3 | Third self-review, of keyboard play through the layout polish, found 10 issues, all fixed: browser shortcuts (Alt+←, Ctrl+U, Ctrl+H) were taken by the board; a tied challenge said "0 short of 340" (now "It's a tie!"); a last daily dated after today showed a live streak the rules would reset; Up/Down could slide sideways and Left/Right used a non-transitive sort (both now walk rows by depth); a key on the board did not retire the first-move hand; closing the challenge card dropped focus; the canvas was a tab stop behind home with no visible focus; every arrow faded every ring; a resize on a skipped frame could flash blank. |
 | 02:44 | F18 | A share now carries a picture where the phone's share sheet accepts files: 1080×1350 in the room's colours, with the wordmark, the result (stars or the rush score), moves against par, the seal squares, the streak, a line to play, and the link. No board, so the daily stays unspoiled. It is drawn when the result appears, so it is ready before the tap (share sheets need the tap's user activation). Elsewhere the text share is unchanged. |
 | 03:12 | Review 4 | Final cross-feature review of the whole night found 10 issues, all fixed: home's "focus Play" call had been swallowed by a comment; U and H still worked in Sugar Rush (and undo let a jar be re-sealed for points); a win was only saved after the lid animation, so leaving during the winning flight lost the stars and the streak (now recorded at the winning move); an older daily finished later reset the streak; on-device dailies past the pool could exceed the 65% cap; the worker's cache version ignored icon and manifest changes (now hashes every kept file, read from the worker's own list); Rush built its first board synchronously on tap (now prepared ahead in idle time); a duplicated swatch style; stray comments. The play-test's taps now wait for cards to stop moving, and its level jumps leave any daily or rush; its viewport is configurable (VIEWPORT=WxH). |
+| 03:33 | QA | Full play-test at 360×640 (the smallest phone we design for): all 61 checks pass, no horizontal overflow. |
+| 04:02 | F19 | A level cleared under three stars shows a "Replay for 3 stars" chip under the note (an icon-only button squeezed "Next chapter" onto two lines and did not say what it was for). The replay is a side trip: it never moves the resume point back (found while testing: building a level wrote it as the resume point), is not kept on a reload, and Home from the middle of it goes on to the next new level. A better replay keeps the new stars and says "Up from 2 stars"; a chapter or run end is not celebrated twice. |
+| 04:02 | F20 | The daily's win card shows the week, Monday to Sunday: a stamp for each daily played (gold for three stars), missed days hollow, today ringed, and "2 of 7 this week. Tomorrow: Thursday, medium." The streak note dropped its "A new board tomorrow" to make room. Fits a 360×640 phone with a milestone tag. |
 

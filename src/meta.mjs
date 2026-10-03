@@ -37,6 +37,7 @@ const DAILY_EPOCH = keyUTC(DAILY_FIRST);
 export const addDays = (key, n) => { const d = new Date(keyUTC(key) + n * 86400000); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`; };
 export const dailyNumber = key => Math.round((keyUTC(key) - DAILY_EPOCH) / 86400000) + 1;
 export const weekdayOf = key => (new Date(keyUTC(key)).getUTCDay() + 6) % 7;   // 0 = Monday
+export const weekOf = key => Array.from({ length: 7 }, (_, i) => addDays(key, i - weekdayOf(key)));   // Monday to Sunday
 export const dailyLabel = key => { const d = new Date(keyUTC(key)); return `${WEEKDAYS[weekdayOf(key)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
 export const dailyRecipe = key => ({ ch: 'daily', ...DAILY_RECIPES[weekdayOf(key)] });
 /* FNV-1a over the date text: a different, stable seed for every day */

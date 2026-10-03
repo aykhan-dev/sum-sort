@@ -221,6 +221,8 @@ await page.evaluate(() => { window.__sumSortToday = '2026-10-05'; __sumSort.show
   const d = await page.evaluate(() => ({ daily: __sumSort.daily, level: __sumSort.level, tag: document.getElementById('levelTag').innerText.replace(/\n/g, ' '), jars: __sumSort.jars.length }));
   pass('the daily card opens today\'s board', /^Play daily puzzle 5, Monday, Easy/.test(card) && d.daily === '2026-10-05' && /Daily #5 Monday/i.test(d.tag), JSON.stringify(d));
   const w = await playOut(); log('win daily', w); await page.screenshot({ path: SHOTS + '/win-daily.png' });
+  const wk = await page.evaluate(() => ({ hidden: winWeek.hidden, days: [...winWeekRow.children].map(e => e.className.trim()), note: winWeekNote.textContent, journey: winJourney.hidden }));
+  pass('the daily win card shows the week: today stamped, and what tomorrow brings', !wk.hidden && wk.journey && wk.days.length === 7 && /^wd on( gold)? this$/.test(wk.days[0]) && wk.days.slice(1).every(c => c === 'wd') && wk.note === '1 of 7 this week. Tomorrow: Tuesday, easy.', JSON.stringify(wk));
   const after = await page.evaluate(() => ({ result: __sumSort.save.daily['2026-10-05'], streak: __sumSort.save.streak, last: __sumSort.save.last }));
   pass('a daily win records the day and starts a streak, and leaves the levels alone', w.shown && /^Daily #5/.test(await page.evaluate(() => document.getElementById('winEyebrow').textContent)) && after.result && after.result.stars >= 1 && after.streak.count === 1 && after.last === 102, JSON.stringify(after));
   await tapEl('#nextBtn');
@@ -357,6 +359,27 @@ await page.evaluate(() => __sumSort.play()); await go(20); await settled();
   await page.waitForTimeout(800);
   const kept = await page.evaluate(() => ({ stars: __sumSort.save.stars[20], last: __sumSort.save.last, level: __sumSort.level, home: __sumSort.home }));
   pass('leaving during the winning flight still records the win', before.won && before.flights === 1 && kept.stars >= 1 && kept.last === 21 && kept.level === 21 && kept.home, JSON.stringify({ before, kept })); }
+// 20. a level cleared under three stars offers a replay from its win card; the replay is a side trip
+{ const winCard = () => page.evaluate(() => ({ retry: !document.getElementById('winRetryBtn').hidden, text: document.getElementById('winText').textContent,
+    stars: __sumSort.save.stars[__sumSort.level], last: __sumSort.save.last, level: __sumSort.level }));
+  await page.evaluate(() => __sumSort.play()); await go(22); await settled();
+  await page.evaluate(() => document.getElementById('refillBtn').click());   // a rescued clear earns two stars at most
+  await playOut(); const w = await winCard();
+  pass('a clear under three stars offers a replay', w.retry && w.stars === 2 && w.last === 23, JSON.stringify(w));
+  await tapEl('#winRetryBtn'); await page.waitForTimeout(900);
+  const r = await page.evaluate(() => ({ level: __sumSort.level, replaying: __sumSort.replaying, moves: __sumSort.moves, win: !document.getElementById('win').hidden, last: __sumSort.save.last }));
+  pass('the replay starts the same level afresh and leaves the progress where it was', r.level === 22 && r.replaying && r.moves === 0 && !r.win && r.last === 23, JSON.stringify(r));
+  await playOut(); const b = await winCard();
+  pass('a better replay keeps the new stars and says so', !b.retry && b.stars === 3 && /^Up from 2 stars/.test(b.text) && b.last === 23, JSON.stringify(b));
+  await page.click('#winHomeBtn', { force: true }); await page.waitForTimeout(800);
+  // Home in the middle of a replay goes back to the next new level, and the replay is not kept
+  await page.evaluate(() => __sumSort.play()); await go(24); await settled();
+  await page.evaluate(() => document.getElementById('refillBtn').click()); await playOut();
+  await tapEl('#winRetryBtn'); await page.waitForTimeout(900);
+  { const m = await page.evaluate(() => __sumSort.plan[0]); await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.click('#homeBtn', { force: true }); await page.waitForTimeout(800);
+  const h = await page.evaluate(() => ({ level: __sumSort.level, home: __sumSort.home, board: __sumSort.save.board, last: __sumSort.save.last, replaying: __sumSort.replaying }));
+  pass('Home in the middle of a replay goes on to the next new level', h.level === 25 && h.home && !h.board && h.last === 25 && !h.replaying, JSON.stringify(h)); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;

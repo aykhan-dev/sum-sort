@@ -248,6 +248,9 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 }
 .cta:active{transform:translateY(4px);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),inset 0 -3px 0 rgba(0,0,0,.10),0 1px 0 var(--chip-lo)}
 .ghost{width:54px;min-height:52px;border-radius:18px;display:grid;place-items:center;color:var(--ink)}
+.chip.retry{display:inline-flex;align-items:center;gap:6px;margin-top:2px}
+.chip.retry svg{width:17px;height:17px}
+.chip.retry[hidden]{display:none}
 /* share: a quiet corner button on a level's win card; on the daily it is the main button */
 .win-share{position:absolute;top:12px;right:12px;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;color:var(--ink)}
 .win-share .done{display:none}
@@ -433,6 +436,18 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
 .jnext b{color:var(--ink);font-weight:800}
 .win-card .journey{margin:6px 0 0;width:100%}
 .win-card .jbar{height:9px}
+/* the daily's week: a stamp for each day played, Monday to Sunday */
+.week{display:flex;justify-content:space-between;width:100%;max-width:252px}
+.wd{display:grid;justify-items:center;gap:3px;font:800 11px var(--body);color:var(--ink-soft)}
+.wd i{font-style:normal}
+.wd b{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--ground);box-shadow:inset 0 0 0 1.5px var(--line)}
+.wd b svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.wd.on b{background:var(--raspberry);box-shadow:inset 0 -3px 0 rgba(0,0,0,.14),inset 0 2px 0 rgba(255,255,255,.35)}
+.wd.gold b{background:#F2B63A}
+.wd.this i{color:var(--ink)}
+.wd.this b{outline:2.5px solid var(--ink);outline-offset:2px}
+.wd.miss b{background:transparent;opacity:.55}
+.wd.off{opacity:.35}
 .play{flex:none;width:min(100%,360px);min-height:66px;font-size:26px;border-radius:22px;animation:breathe 2.4s ease-in-out infinite}
 .play svg{width:24px;height:24px;fill:currentColor;flex:none}
 @keyframes breathe{0%,100%{scale:1}50%{scale:1.035}}
@@ -586,12 +601,16 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
           <span class="stat"><small id="winParLabel">Par</small><b id="winPar">3</b></span>
         </div>
         <p class="note" id="winText">No wasted moves.</p>
+        <button id="winRetryBtn" class="chip retry" type="button" hidden>
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>Replay for 3 stars
+        </button>
         <div class="reward" id="winReward" hidden>
           <span class="sw" id="rewardSw"></span>
           <span class="rtxt"><small>New counter</small><b id="rewardName"></b></span>
           <button class="chip" id="rewardUse" type="button">Use it</button>
         </div>
         <div class="journey" id="winJourney" hidden><div class="jbar" id="winBar" aria-hidden="true"></div><p class="jnext" id="winNext"></p></div>
+        <div class="journey" id="winWeek" hidden><div class="week" id="winWeekRow" role="img"></div><p class="jnext" id="winWeekNote"></p></div>
         <div class="win-actions">
           <button id="winHomeBtn" class="ghost raised" type="button" aria-label="Home">
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3.5v-5h3v5H17a1 1 0 0 0 1-1v-9"/></svg>
@@ -967,6 +986,7 @@ const DAILY_EPOCH = keyUTC(DAILY_FIRST);
 const addDays = (key, n) => { const d = new Date(keyUTC(key) + n * 86400000); return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`; };
 const dailyNumber = key => Math.round((keyUTC(key) - DAILY_EPOCH) / 86400000) + 1;
 const weekdayOf = key => (new Date(keyUTC(key)).getUTCDay() + 6) % 7;   // 0 = Monday
+const weekOf = key => Array.from({ length: 7 }, (_, i) => addDays(key, i - weekdayOf(key)));   // Monday to Sunday
 const dailyLabel = key => { const d = new Date(keyUTC(key)); return `${WEEKDAYS[weekdayOf(key)]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`; };
 const dailyRecipe = key => ({ ch: 'daily', ...DAILY_RECIPES[weekdayOf(key)] });
 /* FNV-1a over the date text: a different, stable seed for every day */
@@ -1322,7 +1342,7 @@ const ui = {
   win: $('win'), winText: $('winText'), winEyebrow: $('winEyebrow'), winTitle: $('winTitle'), winStars: $('winStars'),
   winMoves: $('winMoves'), winPar: $('winPar'), tally: $('starTally'), winCard: $('winCard'), winChapter: $('winChapter'),
   winStats: $('winStats'), nextLabel: $('nextLabel'), tray: $('tray'), hud: $('hud'),
-  next: $('nextBtn'), winHome: $('winHomeBtn'), winShare: $('winShareBtn'), shareTip: $('shareTip'),
+  next: $('nextBtn'), winHome: $('winHomeBtn'), winWeek: $('winWeek'), winWeekRow: $('winWeekRow'), winWeekNote: $('winWeekNote'), winRetry: $('winRetryBtn'), winShare: $('winShareBtn'), shareTip: $('shareTip'),
   undo: $('undoBtn'), spare: $('spareBtn'), split: $('splitBtn'), hint: $('hintBtn'), restart: $('restartBtn'),
   undoCount: $('undoCount'), spareCount: $('spareCount'), splitCount: $('splitCount'), hintCount: $('hintCount'),
   sound: $('soundBtn'), home: $('home'), homeBtn: $('homeBtn'), homeNum: $('homeNum'), homeChapter: $('homeChapter'),
@@ -1912,7 +1932,7 @@ function buildLevel(n, resume = null) {
   for (const b of BOOSTERS) { const on = unlocked(b); ui[b].hidden = !on; ui[b].classList.toggle('fresh', !daily && levelNo === UNLOCK[b]); if (on) shown++; }
   ui.tray.hidden = shown === 0 || !!rush; ui.tray.style.setProperty('--cols', Math.max(1, shown));   // a rush is played without boosters
   ui.restart.hidden = !!rush;   // and without restarts: a dead end costs a skip
-  if (n !== TEST_LEVEL && !daily && !rush) { save.last = n; persist(); }
+  if (n !== TEST_LEVEL && !daily && !rush && !replaying()) { save.last = n; persist(); }   // a replay leaves the resume point on the next new level
   // entrance: jars and dishes pop in, back row first
   if (!REDUCED) {
     const groups = [...jars, ...stacks].map(o => o.view.group);
@@ -2092,7 +2112,7 @@ function boardSnapshot() {
     history: history.map(h => h.type === 'split' ? { type: 'split', loc: h.loc, orig: [h.orig.v, h.orig.hidden ? 1 : 0] } : h) };
 }
 function keepBoard() {
-  if (daily || rush || won || levelNo === TEST_LEVEL || !def) return;
+  if (daily || rush || won || levelNo === TEST_LEVEL || !def || replaying()) return;
   save.board = moveCount || boostersUsed ? boardSnapshot() : null; persist();
 }
 function resumable(n) {
@@ -2383,6 +2403,11 @@ function refill() {
   updateHud();
 }
 function goLevel(n) { buildLevel(n); fitCamera(false); }
+/* A level cleared with fewer than three stars can be played again from its win card. A replay is a side trip:
+   it leaves the progress where it is, does not resume after a reload, and Home goes back to the next new level. */
+let replayOf = 0;
+const replaying = () => replayOf === levelNo && !daily && !rush;
+function replayLevel() { replayOf = levelNo; goLevel(levelNo); }
 function restart() { if (!daily && !rush) { save.board = null; persist(); } goLevel(levelNo); }
 
 /* idle coaching: after 8 s without a tap (sooner while a rule is being learned) the next good move pulses, free of charge */
@@ -2410,12 +2435,12 @@ function armIdle() {
 let winInfo = null;
 function recordWin() {
   if (winInfo) return winInfo;
-  const starsBefore = totalStars(), ch = chapterOf(levelNo);
+  const starsBefore = totalStars(), ch = chapterOf(levelNo), again = replaying(), bestBefore = save.stars[levelNo] || 0;
   const stars = winStars = !rescued && moveCount <= def.par ? 3 : moveCount <= def.par + 3 ? 2 : 1;
   const perfect = stars === 3 && !def.exact && !def.teach;      // tutorial levels cannot be played badly, so they stay on the plain rung
-  const chapterDone = !daily && levelNo === ch.to;
+  const chapterDone = !daily && !again && levelNo === ch.to;
   // past the chapters the journey counts runs of ten: closing one gets the chapter rung too
-  const run = !daily && ch.to === Infinity && levelNo !== TEST_LEVEL ? stretchOf(levelNo, ch) : null, runDone = !!run && levelNo === run.to;
+  const run = !daily && ch.to === Infinity && levelNo !== TEST_LEVEL ? stretchOf(levelNo, ch) : null, runDone = !!run && levelNo === run.to && !again;
   // the level is done the moment it is won: leaving now and coming back later starts the next one.
   // A daily counts for its own day and the streak, and leaves the levels where they were.
   let streakGrew = false;
@@ -2429,12 +2454,12 @@ function recordWin() {
   // a streak landing on 3, 7, 14, 30 days gets the chapter rung: a second wave of candy and the long flourish
   const milestone = daily && streakGrew ? streakMilestone(save.streak.count) : 0, big = chapterDone || !!milestone || runDone;
   persist();
-  return winInfo = { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big };
+  return winInfo = { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big, again, bestBefore };
 }
 async function winLevel() {
   won = true; dead = false; softDead = false; clearTimeout(idleTimer); refreshLocks(false); updateHud();
   updateFinale();
-  const { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big } = recordWin();
+  const { stars, perfect, chapterDone, run, runDone, streakGrew, opened, milestone, big, again, bestBefore } = recordWin();
   const id = buildId, ch = chapterOf(levelNo), tiles = def.par, L = lastLayout;
   if (opened.length) sfx.box();
   // rung 3: level cleared
@@ -2473,12 +2498,13 @@ async function winLevel() {
   const st = save.streak, streakNote = !daily || !st ? ''
     : st.saved && streakGrew && !milestone ? `A freeze covered the day you missed: ${st.count}-day streak!`
     : (st.saved && streakGrew ? 'A freeze covered the day you missed. ' : '')
-    + (milestone ? `${nextMark ? `Next mark: ${nextMark} days. ` : ''}${st.earned && streakGrew ? 'You earned a streak freeze.' : 'A new board tomorrow.'}`
-      : (st.count > 1 ? `${st.count}-day streak${streakGrew ? '!' : '.'} ` : 'Day one of a new streak. ') + 'A new board tomorrow.');
+    + (milestone ? `${nextMark ? `Next mark: ${nextMark} days.` : ''}${st.earned && streakGrew ? ' You earned a streak freeze.' : ''}`.trim() || 'Every mark reached.'
+      : st.count > 1 ? `${st.count}-day streak${streakGrew ? '!' : '.'}` : 'Day one of a new streak.');
   ui.winText.textContent = daily ? streakNote
     : chapterDone && next ? `Next up: ${next.name}. ${next.rule}`
     : runDone ? `Next run: levels ${run.to + 1}–${run.to + 10}.`
     : def.exact || def.teach ? 'All jars sealed.'
+    : again && stars > bestBefore ? `Up from ${plural(bestBefore, 'star')}.${stars === 3 ? ' No wasted moves.' : ''}`
     : stars === 3 ? 'No wasted moves.'
     : rescued ? 'Solved with a booster. Go without one for 3 stars.'
     : `${plural(moveCount - def.par, 'move')} over par. Match par for 3 stars.`;
@@ -2488,15 +2514,31 @@ async function winLevel() {
     ui.rewardUse.textContent = 'Use it'; ui.rewardUse.disabled = false;
   }
   ui.winJourney.hidden = !!daily || levelNo === TEST_LEVEL;
+  ui.winWeek.hidden = !daily; if (daily) renderWeek(daily);
   if (!ui.winJourney.hidden) { drawJourney(ui.winBar, levelNo, { cleared: true }); ui.winNext.innerHTML = chapterDone ? '' : nextText(levelNo); }
   ui.nextLabel.textContent = daily ? 'Share result' : chapterDone && next ? 'Next chapter' : 'Next level';
   ui.next.querySelector('svg').outerHTML = daily ? SHARE_ICON : NEXT_ICON;
   ui.next.className = 'cta gummy ' + (daily ? 'c-grape' : 'c-rasp');
   ui.winShare.hidden = !!daily; ui.winShare.classList.remove('copied'); ui.shareTip.textContent = '';
+  ui.winRetry.hidden = !!daily || levelNo === TEST_LEVEL || (save.stars[levelNo] || 0) >= 3;
   ui.win.hidden = false; ui.next.focus({ preventScroll: true });
   if (levelNo !== TEST_LEVEL) setTimeout(() => prepareShareFile(resultCard(), resultText()), 300);
   // past the stored levels, build the next one now, while nobody is mid-move
   if (!daily && levelNo >= LEVELS.length) setTimeout(() => getLevel(levelNo + 1), 400);
+}
+
+/* The daily's week on its win card: a stamp for each daily played (gold for three stars), today ringed, and what
+   tomorrow brings. Days get harder toward Sunday, so the row is also the week's climb. */
+function renderWeek(key) {
+  const days = weekOf(key), today = todayKey(), done = days.filter(k => save.daily[k]).length, wd = weekdayOf(key);
+  ui.winWeekRow.innerHTML = days.map((k, i) => {
+    const r = save.daily[k], state = r ? (r.stars >= 3 ? 'on gold' : 'on') : k < DAILY_FIRST ? 'off' : k < today ? 'miss' : '';
+    return `<span class="wd ${state}${k === key ? ' this' : ''}"><i>${WEEKDAYS[i][0]}</i><b>${r ? TICK : ''}</b></span>`;
+  }).join('');
+  ui.winWeekRow.setAttribute('aria-label', `This week: ${done} of 7 dailies played`);
+  ui.winWeekNote.textContent = done === 7 ? 'Every daily this week!'
+    : wd === 6 ? `${done} of 7 this week. A new week starts tomorrow.`
+    : `${done} of 7 this week. Tomorrow: ${WEEKDAYS[wd + 1]}, ${dailyRecipe(addDays(key, 1)).level.toLowerCase()}.`;
 }
 
 /* ---------------- Sugar Rush ----------------
@@ -2588,7 +2630,7 @@ function endRush() {
   ui.winTitle.textContent = beaten ? 'You beat it!' : tied ? "It's a tie!" : isBest && rush.score > 0 ? 'New best!' : "Time's up!";
   ui.winTitle.classList.toggle('long', ui.winTitle.textContent.length > 10);
   ui.winStars.innerHTML = BOLT_BIG; ui.winStars.setAttribute('aria-label', 'Sugar Rush');
-  ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true;
+  ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true; ui.winRetry.hidden = true; ui.winWeek.hidden = true;
   ui.winMovesLabel.textContent = 'Score'; ui.winParLabel.textContent = 'Best';
   ui.winMoves.textContent = rush.score; ui.winPar.textContent = save.rush.best;
   ui.winText.textContent = rush.beat != null ? (beaten ? `${rush.score - rush.beat} over the challenge. Share it back.` : tied ? `Level with ${rush.beat}. One more seal wins it.` : `${rush.beat - rush.score} short of ${rush.beat}. Same boards, one more try?`)
@@ -2790,6 +2832,7 @@ function goHome() {
   if (rush) { rush = null; ui.hud.classList.remove('hurry'); buildLevel(levelNo, resumable(levelNo)); fitCamera(false); }
   else if (daily) { daily = null; buildLevel(levelNo, resumable(levelNo)); fitCamera(false); }
   else if (won) { buildLevel(levelNo === TEST_LEVEL ? Math.max(1, Number(save.last) || 1) : levelNo + 1); fitCamera(false); }
+  else if (replaying()) { replayOf = 0; const n = Math.max(1, Number(save.last) || 1); buildLevel(n, resumable(n)); fitCamera(false); }
   showHome();
 }
 /* The rush card sits beside the daily once it opens, with the best score to beat. */
@@ -2978,6 +3021,7 @@ ui.next.addEventListener('click', () => {
 ui.rush.addEventListener('click', () => { if (homeOpen) startRush(); });
 ui.winShare.addEventListener('click', () => shareFromWin(ui.winShare));
 ui.winHome.addEventListener('click', goHome);
+ui.winRetry.addEventListener('click', () => { if (won && !daily && !rush) replayLevel(); });
 ui.homeBtn.addEventListener('click', goHome);
 ui.play.addEventListener('click', play);
 ui.tally.addEventListener('click', openShop);
@@ -3143,7 +3187,7 @@ async function start(hot) {
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
     get hand() { return handOn; }, cardImage: () => drawCard(resultCard()).toDataURL('image/png'), dailyCardImage: key => drawCard(dailyCard(key)).toDataURL('image/png'), get frameNo() { return frameNo; }, get renders() { return renders; }, get liveScene() { return liveScene(); }, get challenge() { return !ui.challenge.hidden && pendingChallenge; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
-    get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel: n => { daily = null; rush = null; goLevel(n); }, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },   // (a test's goLevel jumps to a level, out of any daily or rush)
+    get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel: n => { daily = null; rush = null; replayOf = 0; goLevel(n); }, get replaying() { return replaying(); }, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },   // (a test's goLevel jumps to a level, out of any daily or rush)
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },
     setTileColor(v, hex) { tileMaterial(v).color.set(hex); },
     screenOf(kind, i, y = 0.9) { const g = (kind === 'jar' ? jars : stacks)[i].view.group; return toPage(new THREE.Vector3(g.position.x, y, g.position.z)); },
