@@ -305,6 +305,12 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
   width:min(100%,400px);max-height:100%;overflow:auto;background:var(--card);border-radius:28px;padding:16px 16px 18px;
   box-shadow:0 6px 0 var(--line-deep),0 30px 50px -22px rgba(110,40,90,.6);animation:pop .35s cubic-bezier(.3,1.6,.5,1) both;
 }
+.challenge-card{width:min(100%,330px);display:grid;justify-items:center;text-align:center;gap:6px;padding:22px 20px 20px}
+.challenge-card .bolt{width:56px;height:56px;border-radius:18px;display:grid;place-items:center}
+.challenge-card .bolt svg{width:32px;height:32px;fill:#FFFFFF}
+.challenge-card .eyebrow{margin:6px 0 0;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#C2561A}
+.challenge-card h2{margin:0;font:700 44px/1 var(--display);color:var(--raspberry)}
+.challenge-text{margin:4px 0 6px;font-size:14px;font-weight:700;color:var(--ink-soft);text-wrap:balance}
 .shop-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .shop-head h2{margin:0 0 0 4px;font:700 30px var(--display);color:var(--raspberry)}
 .shop-sub{margin:2px 4px 10px;font-size:13.5px;font-weight:700;color:var(--ink-soft)}
@@ -620,6 +626,23 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.2;stro
     </div>
   </section>
 
+  <section class="shop" id="challenge" role="dialog" aria-modal="true" aria-labelledby="challengeTitle" hidden>
+    <div class="shop-card challenge-card">
+      <span class="bolt gummy c-orange" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 2 4.5 13.5h6L9.5 22l9-12h-6z"/></svg></span>
+      <p class="eyebrow">Sugar Rush challenge</p>
+      <h2 id="challengeTitle">Beat <span id="challengeBeat">0</span></h2>
+      <p class="challenge-text">A friend scored this in Sugar Rush. You get the same boards and one minute. Fill each jar with tiles that add up to its number; clean seals in a row score more.</p>
+      <div class="win-actions">
+        <button id="challengeLater" class="ghost raised" type="button" aria-label="Not now">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+        <button id="challengePlay" class="cta gummy c-orange" type="button">Play it
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>
+  </section>
+
   <section class="shop" id="shop" role="dialog" aria-modal="true" aria-labelledby="shopTitle" hidden>
     <div class="shop-card">
       <div class="shop-head">
@@ -734,7 +757,8 @@ const ui = {
   modes: $('modes'), rush: $('rushBtn'), rushSub: $('rushSub'), winMovesLabel: $('winMovesLabel'), winParLabel: $('winParLabel'),
   homeJourney: $('homeJourney'), homeCount: $('homeCount'), homeBar: $('homeBar'), homeNext: $('homeNext'),
   winJourney: $('winJourney'), winBar: $('winBar'), winNext: $('winNext'),
-  shop: $('shop'), shopClose: $('shopClose'), record: $('record'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
+  shop: $('shop'), shopClose: $('shopClose'), record: $('record'),
+  challenge: $('challenge'), challengeBeat: $('challengeBeat'), challengePlay: $('challengePlay'), challengeLater: $('challengeLater'), shopSub: $('shopSub'), shopFill: $('shopFill'), themes: $('themes'),
   reward: $('winReward'), rewardSw: $('rewardSw'), rewardName: $('rewardName'), rewardUse: $('rewardUse')
 };
 
@@ -1897,7 +1921,7 @@ function renderRushHud(gain = false) {
   const left = Math.ceil(rushLeft()), key = left + '|' + rush.score;
   if (key === rushShown && !gain) return; rushShown = key;
   ui.moves.innerHTML = `Time <b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b>`;
-  ui.par.innerHTML = `Score <b${gain ? ' class="gain"' : ''}>${rush.score}</b>`;
+  ui.par.innerHTML = `Score <b${gain ? ' class="gain"' : ''}>${rush.score}</b>` + (rush.beat != null ? ` · beat ${rush.beat}` : '');
   ui.hud.classList.toggle('hurry', left <= 10 && !rush.over);
   if (left <= 5 && left > 0 && left !== rushTick && !rush.over) { rushTick = left; sfx.tick(); }
 }
@@ -1912,11 +1936,12 @@ function prefetchRush() {
   };
   setTimeout(() => idle(step), 450);
 }
-function startRush() {
-  if (levelNo < RUSH_OPENS) return;
-  const seed = window.__sumSortRushSeed || ((Date.now() ^ Math.floor(Math.random() * 0x7FFFFFFF)) >>> 0);
+/* A run: a new seed, or a challenge's seed with its score to beat. A challenge can be played before Rush opens. */
+function startRush(challenge = null) {
+  if (levelNo < RUSH_OPENS && !challenge) return;
+  const seed = challenge ? challenge.seed : window.__sumSortRushSeed || ((Date.now() ^ Math.floor(Math.random() * 0x7FFFFFFF)) >>> 0);
   daily = null;
-  rush = { seed, round: 0, score: 0, boards: 0, endsAt: 0, pausedLeft: null, over: false, def: rushBoard(seed, 0), next: null };
+  rush = { seed, round: 0, score: 0, boards: 0, endsAt: 0, pausedLeft: null, over: false, def: rushBoard(seed, 0), next: null, beat: challenge ? challenge.beat : null };
   if (homeOpen) leaveHome();
   rush.endsAt = performance.now() + RUSH.start * 1000; rushTick = -1;
   buildLevel(levelNo); fitCamera(false);
@@ -1956,12 +1981,15 @@ function endRush() {
   if (!REDUCED && isBest && L) confetti = makeConfetti(40, { x0: L.minX, x1: L.maxX, z0: L.minZ, z1: L.maxZ });
   ui.winCard.classList.toggle('perfect', isBest && rush.score > 0); ui.winCard.classList.remove('chapter-done');
   ui.winEyebrow.textContent = `Sugar Rush · ${plural(rush.boards, 'board')}`;
-  ui.winTitle.textContent = isBest && rush.score > 0 ? 'New best!' : "Time's up!"; ui.winTitle.classList.remove('long');
+  const beaten = rush.beat != null && rush.score > rush.beat;
+  ui.winTitle.textContent = beaten ? 'You beat it!' : isBest && rush.score > 0 ? 'New best!' : "Time's up!";
+  ui.winTitle.classList.toggle('long', ui.winTitle.textContent.length > 10);
   ui.winStars.innerHTML = BOLT_BIG; ui.winStars.setAttribute('aria-label', 'Sugar Rush');
   ui.winChapter.hidden = true; ui.winStats.hidden = false; ui.reward.hidden = true; ui.winJourney.hidden = true;
   ui.winMovesLabel.textContent = 'Score'; ui.winParLabel.textContent = 'Best';
   ui.winMoves.textContent = rush.score; ui.winPar.textContent = save.rush.best;
-  ui.winText.textContent = isBest && prev.best ? `${rush.score - prev.best} more than your last best.` : rush.boards ? 'Clean seals in a row score double, triple and up.' : 'Clear a board to win time back.';
+  ui.winText.textContent = rush.beat != null ? (beaten ? `${rush.score - rush.beat} over the challenge. Share it back.` : `${rush.beat - rush.score} short of ${rush.beat}. Same boards, one more try?`)
+    : isBest && prev.best ? `${rush.score - prev.best} more than your last best.` : rush.boards ? 'Clean seals in a row score double, triple and up.' : 'Clear a board to win time back.';
   ui.nextLabel.textContent = 'Play again'; ui.next.querySelector('svg').outerHTML = REPLAY_ICON; ui.next.className = 'cta gummy c-orange';
   ui.winShare.hidden = false; ui.winShare.classList.remove('copied'); ui.shareTip.textContent = '';
   ui.win.hidden = false; ui.next.focus({ preventScroll: true });
@@ -1976,7 +2004,7 @@ document.addEventListener('visibilitychange', () => {
 /* ---------------- sharing ----------------
    The phone's share sheet where there is one, the clipboard everywhere else. */
 function resultText() {
-  if (rush) return rushShareText({ score: rush.score, boards: rush.boards, newBest: !!rush.newBest, url: shareUrl(location) });
+  if (rush) return rushShareText({ score: rush.score, boards: rush.boards, newBest: !!rush.newBest, beat: rush.beat, url: challengeUrl(shareUrl(location), rush.seed, rush.score) });
   if (daily) return dailyShareText(daily);
   return shareText({ title: `Sum Sort Level ${levelNo}`, stars: winStars, moves: moveCount, par: def.par, seals: sealLog, boosters: boostersUsed, url: shareUrl(location) });
 }
@@ -2058,6 +2086,13 @@ function openShop() {
   renderShop(); renderRecord(); ui.shop.hidden = false; ui.home.inert = true;
   save.boxSeen = Math.max(Number(save.boxSeen) || 0, themesOwned(totalStars()).at(-1).at); persist(); renderTally();
   sfx.select(4); ui.shopClose.focus({ preventScroll: true });
+}
+let pendingChallenge = null;
+function closeChallenge(play) {
+  if (ui.challenge.hidden) return;
+  ui.challenge.hidden = true; ui.home.inert = false;
+  const c = pendingChallenge; pendingChallenge = null;
+  if (play && c) startRush(c);
 }
 function closeShop() { if (ui.shop.hidden) return; ui.shop.hidden = true; ui.home.inert = false; ui.tally.focus({ preventScroll: true }); }
 
@@ -2272,7 +2307,10 @@ ui.hint.addEventListener('click', () => whenSettled(hint));
 ui.restart.addEventListener('click', restart);
 ui.stripRestart.addEventListener('click', () => { if (rush) rushSkip(); else restart(); });
 ui.refill.addEventListener('click', refill);
-ui.next.addEventListener('click', () => { if (rush) startRush(); else if (daily) shareFromWin(ui.next); else goLevel(levelNo + 1); });
+ui.next.addEventListener('click', () => {
+  if (rush) startRush(rush.beat != null ? { seed: rush.seed, beat: rush.beat } : null);   // a challenge plays its own boards again
+  else if (daily) shareFromWin(ui.next); else goLevel(levelNo + 1);
+});
 ui.rush.addEventListener('click', () => { if (homeOpen) startRush(); });
 ui.winShare.addEventListener('click', () => shareFromWin(ui.winShare));
 ui.winHome.addEventListener('click', goHome);
@@ -2296,7 +2334,9 @@ if ('serviceWorker' in navigator && document.querySelector('link[rel="manifest"]
 ui.shopClose.addEventListener('click', closeShop);
 ui.shop.addEventListener('click', e => { if (e.target === ui.shop) closeShop(); });
 ui.themes.addEventListener('click', e => { const b = e.target.closest('.theme'); if (b && !b.disabled) { useTheme(b.dataset.id); renderShop(); } });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShop(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeShop(); closeChallenge(false); } });
+ui.challengePlay.addEventListener('click', () => closeChallenge(true));
+ui.challengeLater.addEventListener('click', () => closeChallenge(false));
 
 /* ---------------- keyboard play ----------------
    With the board focused: arrows move a ring between jars and stacks (left and right along the board, up and down
@@ -2399,6 +2439,13 @@ async function start(hot) {
   buildLevel(n, resumable(n));   // a level left half-played comes back as it was
   fitCamera(false);
   if (hot && hot.level) ui.home.classList.add('off'); else showHome(false);   // a republish mid-game keeps the player in the game
+  // a challenge link opens its card over home; the address is cleaned so a reload does not ask again
+  const challenge = parseChallenge(location.search);
+  if (challenge && homeOpen) {
+    try { window.history.replaceState(null, '', location.pathname + location.hash); } catch (e) { /* the address stays */ }   // (not `history`: that name is the undo list here)
+    pendingChallenge = challenge; ui.challengeBeat.textContent = String(challenge.beat);
+    ui.challenge.hidden = false; ui.home.inert = true; ui.challengePlay.focus({ preventScroll: true });
+  }
   new ResizeObserver(() => { homeRenderUntil = performance.now() + 600; fitCamera(false); if (handOn) placeHand(); }).observe(stage);
   renderer.setAnimationLoop(loop);
   // hooks for automated play-tests and for measuring the build against the Taste File rubric
@@ -2410,7 +2457,7 @@ async function start(hot) {
     get chain() { return chain; }, get bestChain() { return bestChain; }, get callouts() { return callouts; },
     get rush() { return rush && { round: rush.round, score: rush.score, boards: rush.boards, left: rushLeft(), over: rush.over }; }, startRush,
     endRush, setRushLeft(sec) { if (rush) rush.endsAt = performance.now() + sec * 1000; },
-    get hand() { return handOn; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
+    get hand() { return handOn; }, get challenge() { return !ui.challenge.hidden && pendingChallenge; }, get kbFocus() { return kbFocus; }, get music() { return !!musicTimer; },
     get finale() { return finaleJar ? jars.indexOf(finaleJar) : -1; }, get daily() { return daily; }, playDaily, get save() { return save; }, openShop, useTheme, totalStars, get sealLog() { return sealLog; }, get lastShared() { return lastShared; }, resultText,
     get sel() { return sel && { kind: sel.kind, i: sel.i }; }, tap, goLevel, getLevel, dropQuality, FLAVOURS, play, showHome: () => showHome(false), get home() { return homeOpen; },
     loadDef(d) { levelCache.set(TEST_LEVEL, d); goLevel(TEST_LEVEL); },

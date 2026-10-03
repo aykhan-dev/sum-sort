@@ -177,8 +177,23 @@ export function rushBoard(seed, round) {
 export const rushSealPoints = chain => RUSH.seal * Math.max(1, chain);
 /* seconds on the clock after a board is cleared, never past the cap */
 export const rushTimeAfterClear = left => Math.min(RUSH.cap, left + RUSH.perBoard);
-export function rushShareText({ score, boards, newBest = false, url = '' }) {
+export function rushShareText({ score, boards, newBest = false, beat = null, url = '' }) {
   const lines = [`Sum Sort Sugar Rush ⚡ ${score}`, `${boards} board${boards === 1 ? '' : 's'} in the rush${newBest ? ' · new best' : ''}`];
-  if (url) lines.push(url);
+  if (beat != null) lines.push(score > beat ? `Beat the challenge of ${beat}!` : `Challenge: ${beat} to beat`);
+  if (url) lines.push(`Same boards, your turn: ${url}`);
   return lines.join('\n');
+}
+
+/* ---------------- challenge links ----------------
+   A shared Sugar Rush result carries its run: the seed and the score. Boards come from the seed alone, so whoever
+   opens the link plays the same boards against the same clock, and has a number to beat. */
+export function challengeUrl(base, seed, score) {
+  return base ? `${base}?rush=${seed >>> 0}&beat=${Math.max(0, Math.floor(score))}` : '';
+}
+/* the challenge in a page address, or null; anything malformed is ignored */
+export function parseChallenge(search) {
+  const q = new URLSearchParams(search || ''), seed = q.get('rush'), beat = q.get('beat');
+  if (!/^\d{1,10}$/.test(seed || '') || !/^\d{1,6}$/.test(beat || '')) return null;
+  const s = Number(seed);
+  return s <= 0xFFFFFFFF ? { seed: s, beat: Number(beat) } : null;
 }

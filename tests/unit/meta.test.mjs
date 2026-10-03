@@ -210,7 +210,8 @@ test('sugar rush: score and clock', () => {
   assert.equal(rushSealPoints(0), RUSH.seal); assert.equal(rushSealPoints(1), RUSH.seal); assert.equal(rushSealPoints(4), 4 * RUSH.seal);
   assert.equal(rushTimeAfterClear(10), 10 + RUSH.perBoard);
   assert.equal(rushTimeAfterClear(RUSH.cap - 1), RUSH.cap);
-  assert.equal(rushShareText({ score: 340, boards: 7, newBest: true, url: 'https://x/' }), 'Sum Sort Sugar Rush ⚡ 340\n7 boards in the rush · new best\nhttps://x/');
+  assert.equal(rushShareText({ score: 340, boards: 7, newBest: true, url: 'https://x/?rush=1&beat=340' }), 'Sum Sort Sugar Rush ⚡ 340\n7 boards in the rush · new best\nSame boards, your turn: https://x/?rush=1&beat=340');
+  assert.equal(rushShareText({ score: 410, boards: 8, beat: 340 }), 'Sum Sort Sugar Rush ⚡ 410\n8 boards in the rush\nBeat the challenge of 340!');
   assert.equal(rushShareText({ score: 120, boards: 1 }), 'Sum Sort Sugar Rush ⚡ 120\n1 board in the rush');
 });
 
@@ -219,4 +220,16 @@ import { streakMilestone, STREAK_MILESTONES } from '../../src/meta.mjs';
 test('streak milestones: a celebration on the days that matter, nowhere else', () => {
   assert.deepEqual([1, 2, 3, 4, 7, 8, 14, 30, 31].map(streakMilestone), [0, 0, 3, 0, 7, 0, 14, 30, 0]);
   STREAK_MILESTONES.forEach((n, i) => { if (i) assert.ok(n > STREAK_MILESTONES[i - 1]); });
+});
+
+import { challengeUrl, parseChallenge } from '../../src/meta.mjs';
+
+test('challenge links: a rush run travels as its seed and score, and nothing else gets in', () => {
+  const url = challengeUrl('https://a.github.io/sum-sort/', 4242, 340.7);
+  assert.equal(url, 'https://a.github.io/sum-sort/?rush=4242&beat=340');
+  assert.deepEqual(parseChallenge(new URL(url).search), { seed: 4242, beat: 340 });
+  assert.equal(challengeUrl('', 1, 2), '', 'no link for a page with no web address');
+  for (const bad of ['', '?rush=12', '?beat=3', '?rush=-1&beat=3', '?rush=abc&beat=3', '?rush=1&beat=9999999', '?rush=99999999999&beat=1', '?rush=1e3&beat=1'])
+    assert.equal(parseChallenge(bad), null, bad);
+  assert.deepEqual(rushBoard(4242, 0), rushBoard(parseChallenge('?rush=4242&beat=1').seed, 0), 'the same seed, the same first board');
 });

@@ -304,6 +304,22 @@ await page.evaluate(() => __sumSort.play()); await go(14); await settled(); awai
   await page.keyboard.press('Enter'); await settled();
   const after = await page.evaluate(() => ({ moves: __sumSort.moves, sr: document.getElementById('srStatus').textContent }));
   pass('arrows and Enter play a move, and each spot is read out', !!first.f && /^Stack \d: top tile \d/.test(first.sr) && lifted && lifted.kind === m.src.kind && after.moves === 1 && /^Jar/.test(after.sr), JSON.stringify({ first, after })); }
+// 16. a challenge link: the same boards, a score to beat, and a link back
+await page.goto(URL_ + '?rush=4242&beat=50'); await page.waitForFunction(() => window.__sumSort && window.__sumSort.jars.length > 0); await page.evaluate(() => __sumSort.dropQuality());
+{ const card = await page.evaluate(() => ({ c: __sumSort.challenge, search: location.search }));
+  // the card pops in: tap its button where it ends up, not where it is mid-pop
+  await page.waitForFunction(() => document.querySelector('.challenge-card').getAnimations().every(a => a.playState === 'finished'));
+  await tapEl('#challengePlay'); await settled();
+  const r0 = await page.evaluate(() => ({ r: __sumSort.rush, hud: document.getElementById('hud').innerText.replace(/\n/g, ' ') }));
+  for (let k = 0; k < 30; k++) { const m = await page.evaluate(() => __sumSort.rush.round === 0 && __sumSort.plan && __sumSort.plan[0]); if (!m) break;
+    await page.evaluate(m => { __sumSort.tap(m.src); __sumSort.tap({ kind: 'jar', i: m.dst }); }, m); await settled(); }
+  await page.waitForFunction(() => __sumSort.rush.round === 1, null, { timeout: 30000 });
+  await page.evaluate(() => __sumSort.setRushLeft(0.2));
+  await page.waitForFunction(() => !document.getElementById('win').hidden, null, { timeout: 30000 }); await page.waitForTimeout(600);
+  const end = await page.evaluate(() => ({ title: document.getElementById('winTitle').textContent, score: __sumSort.rush.score }));
+  await page.click('#winShareBtn', { force: true }); await page.waitForTimeout(300);
+  const shared = await page.evaluate(() => window.__copied.at(-1) || '');
+  pass('a challenge link plays its seed against its score, cleans the address, and shares a link back', card.c && card.c.seed === 4242 && card.c.beat === 50 && card.search === '' && /beat 50$/.test(r0.hud) && end.title === 'You beat it!' && new RegExp(`\\?rush=4242&beat=${end.score}$`).test(shared), JSON.stringify({ card, r0, end, shared })); }
 console.log('errors:', errors.join('\n') || 'none');
 await browser.close(); server.close();
 console.log(fails ? fails + ' check(s) failed' : 'all checks passed'); process.exitCode = fails || errors.length ? 1 : 0;
