@@ -31,7 +31,7 @@ On GitHub Pages: repository Settings → Pages → Deploy from a branch → `mai
 | `tests/playtest.mjs` | Plays the built page in headless Chromium with real touches. |
 | `docs/ROADMAP.md` | What gets built next, and why. |
 | `src/sw.src.js` | Service worker source. The build stamps its version and writes `sw.js`. |
-| `manifest.webmanifest`, `icons/`, `og.png` | Install manifest, app icons and the link-preview image. `scripts/make-art.mjs` draws them from the game. |
+| `manifest.webmanifest`, `icons/`, `og.png` | Install manifest, app icons and the link-preview image. `scripts/make-art.mjs` draws them from the game: the icon is a three.js render of a sealed jar of 4, 3, 1 and 2 gummies under a gold 10 coin, with a 1024 px master for the app stores. |
 | `vendor/three/` | three.js r170 (MIT), so the page needs no CDN for code. |
 
 ## Build and test
